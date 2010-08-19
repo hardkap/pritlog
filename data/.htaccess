@@ -1,0 +1,3 @@
+<FilesMatch "\.(sqlite|php)$">
+deny from all
+</FilesMatch>

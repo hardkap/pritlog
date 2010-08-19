@@ -1,0 +1,16 @@
+<ifmodule mod_expires.c>
+  <filesmatch "\.(jpg|gif|png|css|js)$">
+       ExpiresActive on
+       ExpiresDefault "access plus 1 year"
+   </filesmatch>
+</ifmodule>
+
+directoryindex index.php
+
+RewriteEngine On
+RewriteCond %{REQUEST_URI} !^/index.php
+RewriteCond %{REQUEST_URI} (/|data|themes|include|plugins|javascripts|images|lang|/[^.]*)$ [NC]
+RewriteRule (.*) index.php
+
+
+
