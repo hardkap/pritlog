@@ -45,10 +45,10 @@ Pritlog already has code to try to dynamically load Sqlite module if not already
 
 You can try this solution if you have access to php.ini on your server. All you have to do is to add the below lines to your php.ini (somewhere near other 'extension=' lines): 
 
-@Loading PDO 
-extension=pdo.so 
-extension=pdo_sqlite.so 
-extension=sqlite.so 
-extension=pdo_mysql.so@
+@Loading PDO@ 
+@extension=pdo.so@
+@extension=pdo_sqlite.so@
+@extension=sqlite.so@
+@extension=pdo_mysql.so@
 
 If the above solution does not work, try talking to your web hosting company to find out how to enable Sqlite.
