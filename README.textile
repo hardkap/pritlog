@@ -35,10 +35,10 @@ If you are using Pritlog version earlier than 0.81, you will need to go through 
 
 h2. TROUBLESHOOTING
 
-# *Reset Admin Password*
+1. *Reset Admin Password*
 If you lose or forget your main admin password, the only way to reset it is to manually edit the config_admin.php file and change the characters between the first and the second '|' character to a0c551398833948214f921e984868883. After you change this on your server, you can use 'password' to login to the admin menu. Now you can change the password as you wish.
 
-# *Sqlite not working*
+2. *Sqlite not working*
 Pritlog will run out of the box on most servers with PHP5. In some cases however, even though Sqlite is compiled into PHP5, the host may not have Sqlite enabled.
 
 Pritlog already has code to try to dynamically load Sqlite module if not already loaded. But even this may not work on some servers
