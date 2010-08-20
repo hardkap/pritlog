@@ -1,3 +1,5 @@
+h2. PRITLOG
+
 PRITLOG is an extremely simple, small and powerful blog system. It does not use or need a MYSQL database and fully works based on Sqlite. Sqlite is very similar to flat files and does not need any server setup and comes as default with most PHP5 installations. Just drop Pritlog into your server and it starts running. No separate installation is required. 
 
 *PRITLOG now uses the MIT License.*
@@ -54,3 +56,5 @@ extension=pdo_mysql.so
 </pre>
 
 If the above solution does not work, try talking to your web hosting company to find out how to enable Sqlite.
+
+h3. Enjoy!
