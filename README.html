@@ -1,6 +1,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-US">
 <head>
+<title>Readme for Pritlog</title>
 <style type="text/css">
 	body {background:#ccc; font:normal normal 12px Verdana, Arial, Helvetica, sans-serif;}
 	#container {width:580px; padding:10px; border:#333 3px solid; background:#fff; color:#333; margin:0 auto; position:relative; padding-bottom:5px;}
@@ -23,7 +24,7 @@
 <body>
 <div id="container">
 
-<h1>PRITLOG - Blogging made simple</h1>
+<h1>PRITLOG - Think Simple</h1>
 <hr>
 
 <p>Pritlog is a simple, fatfree blog, made in PHP.</p>
@@ -34,7 +35,7 @@
 
 <h2>Thanks to</h2>
 <ul>
-<li>Ken, Bert and John (and few others) for all the testing, feedback and valuable suggestions for developing this version.</li>
+<li>Ken, Bert, John, Andreas and few others for all the testing, feedback and valuable suggestions for developing this version.</li>
 <li>Federico Ramírez, for the inspiration.</li>
 <li>Barry K, the creator of Puppy Linux, for introducing me to PPLOG.</li>
 <li>My wife, for the support and encouragement.</li>
@@ -48,18 +49,23 @@ pritlog @ hardkap.com or <a href="http://hardkap.net/forums">Hardkap Forums</a> 
 <p>PRITLOG now uses the MIT License.
 <br><a href="http://www.opensource.org/licenses/mit-license.php">http://www.opensource.org/licenses/mit-license.php</a></p>
 
-<p>Powered by YAGNI (You Ain't Gonna Need It).
-<br><strong>YAGNI:</strong> Only add things, when you actually
-need them, not because you think you will.</p>
-
-<h2>Changes for Version 0.8</h2>
+<h2>Changes for Version 0.81</h2>
 <p>Significant changes are highlighted in bold</p>
 <ul>
-<li><strong>Sqlite Database. </strong>Pritlog now uses Sqlite database instead of flat files.</li>
-<li><strong>Login Management. </strong>Using sessions, users can login, logout, self register.</li>
-<li><strong>Sticky Posts. </strong>Posts can be made stickies to show up on front page.</li>
-<li>Commenters name can be a link (optional URL and email fields on add comment form).</li>
-<li>Users are auto logged out after few minutes of being inactive.</li>
+<li><strong>Easier Navigation. </strong>Admin panel and other panels are easier to navigate.</li>
+<li><strong>Cleaner Urls. </strong>Enable cleaner urls if mod_rewrite works on the server.</li>
+<li><strong>Multi Blog. </strong>A switch in the program for enabling multi blogging.</li>
+<li><strong>Theme Management. </strong>Presentation and logic are separate, easy theme creation.</li>
+<li><strong>Plugin Management. </strong>Additional features can be added through plugins.</li>
+<li><strong>Better search results. </strong> Multiple words in search work better.</li>
+<li><strong>Comment moderation. </strong>Option to enable comment moderation.</li>
+<li>Hits are counted only once per session.</li>
+<li>nicEdit is a plugin now.</li>
+<li>Use *readmore* (Continue Reading) to RSS feeds as well.</li>
+<li>Special accented characters are handled well.</li>
+<li>Option for multiple tags or categories (thanks to Andreas).</li>
+<li>Ban IP's.</li>
+<li>Limit the number of invalid login attempts.</li>
 </ul>
 
 
@@ -81,12 +87,24 @@ need them, not because you think you will.</p>
 
 <h2>Updating from an earlier version</h2>
 
-<p>Run the update.php script. You can only use this to update from 0.7.</p>
+<p>Run the update.php script. You can only use this to update from 0.8.</p>
 
+<br/>
 
-<h2>Reset Admin Password</h2>
-<p>If you lose or forget your main admin password, the only way to reset it is to manually edit the config_admin.php file and change the characters between the first and the second '|' character to a0c551398833948214f921e984868883. After you change this on your server, you can use 'password' to login to the admin menu. Now you can change the password as you wish.</p>
-<p style="font-weight:bold;color:red;">It is recommended to delete this README.html file after Pritlog installation</p>
+<h2>Troubleshooting</h2>
+<h3>1. Reset Admin Password</h3>
+<p>If you lose or forget your main admin password, the only way to reset it is to manually edit the config_admin.php file and change the characters between the first and the second '|' character to <strong>a0c551398833948214f921e984868883</strong>. After you change this on your server, you can use 'password' to login to the admin menu. Now you can change the password as you wish.</p>
+<h3>2. Sqlite not working</h3>
+<p>Pritlog will run out of the box on most servers with PHP5. In some cases however, even though Sqlite is compiled into PHP5, the host may not have Sqlite enabled. </p>
+<p>Pritlog already has code to try to dynamically load Sqlite module if not already loaded. But even this may not work on some servers</p>
+<p>You can try this solution if you have access to php.ini on your server. All you have to do is to add the below lines to your php.ini (somewhere near other 'extension=' lines):
+<br/><br/>; Loading PDO
+<br/>extension=pdo.so
+<br/>extension=pdo_sqlite.so
+<br/>extension=sqlite.so
+<br/>extension=pdo_mysql.so 
+<br/>
+<p>If the above solution does not work, try talking to your web hosting company to find out how to enable Sqlite.</p> 
 </div>
 </body>
 </html>

@@ -1,43 +1,48 @@
 <?php
-
 /*#######################################################################
-# 	PRITLOG		                                                #
-#	                                                                #
-#       The idea of this blog, is directly taken from a	                #
-#	very simple yet powerful blog software called PPLOG             #
-#       (Perl Powered Blog). PPLOG is a creation of			#
-#	Federico Ramírez (fedekun) - fedekiller@gmail.com               #
-#   	                                                                #
-#       I just wanted to experiment with creating		        #
-#	a similar blog in PHP. Hence PRITLOG.		                #
-#	pritlog@hardkap.com				                #
-#							                #
-#	PRITLOG now uses the MIT License                                #
-#	http://www.opensource.org/licenses/mit-license.php              #
-#							                #
-#	Powered by YAGNI (You Ain't Gonna Need It)	                #
-#	YAGNI: Only add things, when you actually 	                #
-#	need them, not because you think you will.	                #
-#							                #
-#	Version: 0.8                                                    #
+	PRITLOG
+	Pritlog is a lightweight blog app powered by PHP and Sqlite
+	pritlog@hardkap.com
+	PRITLOG now uses the MIT License
+	http://www.opensource.org/licenses/mit-license.php
+	Version: 0.81
 #######################################################################*/
+/* Enable all kinds of errors - to eliminate as many warnings and errors as possible */
+//error_reporting(E_ALL);
+//ini_set('display_errors', '1');
 
-
+// Example loading an extension based on OS
+if (!extension_loaded('sqlite')) {
+	if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+		@dl('php_sqlite.dll');
+	} else {
+		@dl('sqlite.so');
+	}
+}
+$multi_user = false;  // 'true' - multi blog pritlog installation; 'false' - single blog pritlog installation
+$domain = $_SERVER['HTTP_HOST'];
+$domain_parts = explode('.',$domain);
+if ($multi_user) {
+	if (count($domain_parts) == 3 && $domain_parts[0]!= "www") { // make sure a subdomain is called
+		$user  = $domain_parts[0];
+		$user1 = $domain_parts[1];
+		//$loc = "http://pritlog.com/pritloggers/$user/";
+		//@header("Location: $loc");
+		//die();
+	}
+}
+else $user="user";
 
   require("includes/secure_session.php");
-  
   if (substr_count($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip')) ob_start("ob_gzhandler"); else ob_start();
-
   session_start();
   $ss = new SecureSession();
   $ss->check_browser = true;
   $ss->check_ip_blocks = 2;
   $ss->secure_word = 'SALT_aJyeiuLioRhjlP';
   $ss->regenerate_id = true;
-
   $debugMode    = "off";    // Turn this on for debugging displays. But is not fully functional yet.
   $separator    = "#~#";    // Separator used between fields when the entry files are created.
-
   $config       = array();
   $authors      = array();
   $authorsPass  = array();
@@ -45,13 +50,22 @@
   $authorsActCode = array();
   $authorsActStatus = array();
   $tags         = array();
-
   readConfig();                                            /* Read the config file and load it into the array */
+  if ($config['cleanUrl'] == 0) $config['cleanIndex'] = "/index.php";
+  else $config['cleanIndex'] = "";
   require("lang/".$config['blogLanguage'].".php");         /* Load the language file */
-
-  $postdb               = getcwd()."/data/postdb.sqlite";
+  $postdb               = getcwd()."/data/".$user."/postdb.sqlite";
   $config['postdb']     = $postdb;
-  $config['authorFile'] = getcwd(). "/data/authors.php";
+  $config['authorFile'] = getcwd(). "/data/".$user."/authors.php";
+  $_SESSION['user'] = $user;
+  //$config['theme']      = "skyblue";
+  if (!file_exists(getcwd().'/themes/'.$config['theme'])) {
+      $config['theme'] = 'default';
+      if (!file_exists(getcwd().'/themes/'.$config['theme'])) {
+          die('Error in the themes directory');
+      }
+  }
+  //echo getcwd().'/themes/'.$config['theme'].'<br>';
   readAuthors();
   $firstTime = false;
   if (!file_exists($postdb)) { $firstTime = true; }
@@ -63,19 +77,31 @@
               @sqlite_query($config['db'], 'DROP TABLE stats');
               @sqlite_query($config['db'], 'DROP TABLE active_guests');
               @sqlite_query($config['db'], 'DROP TABLE active_users');
+              @sqlite_query($config['db'], 'DROP TABLE plugins');
+              @sqlite_query($config['db'], 'DROP TABLE ipban');
+              @sqlite_query($config['db'], 'DROP TABLE logs');
               sqlite_query($config['db'], 'CREATE TABLE posts (title CHAR(100), content CHAR(4500), date DATETIME, postid PRIMARY KEY, category CHAR(20), type CHAR(5), stick CHAR(5), allowcomments CHAR(4), visits INTEGER, author CHAR(25));');
-              sqlite_query($config['db'], 'CREATE TABLE comments (commentid INTEGER PRIMARY KEY, postid CHAR(6), sequence INTEGER, author CHAR(25), title CHAR(100), content CHAR(4500), date DATETIME, ip CHAR(16), url CHAR(50), email CHAR(50));');
+              sqlite_query($config['db'], 'CREATE TABLE comments (commentid INTEGER PRIMARY KEY, postid CHAR(6), sequence INTEGER, author CHAR(25), title CHAR(100), content CHAR(4500), date DATETIME, ip CHAR(16), url CHAR(50), email CHAR(50), status CHAR(10));');
               sqlite_query($config['db'], 'CREATE TABLE stats (statid INTEGER PRIMARY KEY, stattype CHAR(10), statcount INTEGER);');
               sqlite_query($config['db'], 'CREATE TABLE active_guests (id INTEGER PRIMARY KEY, ip CHAR(16), logtime DATETIME);');
               sqlite_query($config['db'], 'CREATE TABLE active_users (id INTEGER PRIMARY KEY, ip CHAR(16), logtime DATETIME);');
+              sqlite_query($config['db'], 'CREATE TABLE plugins (id PRIMARY KEY, name CHAR(50), author CHAR(50), url CHAR(80), description CHAR(300), status INTEGER);');
+              sqlite_query($config['db'], 'CREATE TABLE ipban (id INTEGER PRIMARY KEY, ip CHAR(16));');
+              sqlite_query($config['db'], 'CREATE TABLE logs (id INTEGER PRIMARY KEY, ip CHAR(16), action CHAR(30), date DATE);');
               $stattype  = "total";
               $statcount = 0;
+              sqlite_query($config['db'], "INSERT INTO plugins (id, name, author, url, description, status) VALUES('nicedit', 'nicEdit Plugin', 'Prit', 'http://hardkap.net/forums', 'Plugin to add nicEdit WYSIWYG editor to Pritlog', 1);");
               sqlite_query($config['db'], "INSERT INTO stats (stattype, statcount) VALUES('$stattype', '$statcount');");
           }
        }
   }
-  else { die(); }
-
+  else { die("Your server does not seem to have Sqlite enabled. This version of Pritlog will not work without Sqlite."); }
+  $ip = getRealIpAddr();
+  //echo $ip.'<br>';
+  //phpinfo();
+  $result = sqlite_query($config['db'], "select * from ipban WHERE ip = '$ip'");
+  if (sqlite_num_rows($result) > 0) die($lang['errorNotAuthorized']);
+  require("includes/init_plugins.php");
   loadCategories();
   $result = sqlite_query($config['db'], 'select MAX(postid) as mymax from posts');
   while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
@@ -84,7 +110,6 @@
   $newPostNumber    =$lastEntry;                      /* Assign a new post number if a new post will be created */
   $newFullPostNumber=str_pad($newPostNumber, 5, "0", STR_PAD_LEFT);
   $newPostFile      =$newFullPostNumber.$config['dbFilesExtension'];
-
   $op = 0;
   $path = (isset($_SERVER['PATH_INFO'])) ? $_SERVER['PATH_INFO'] : @getenv('PATH_INFO');
   if (trim($path, '/') != '' && $path != "/".$_SERVER['PHP_SELF']) { $op = 1; $path1 = $path; }
@@ -96,7 +121,8 @@
   if ($op == 0) { $op = 4; $path1 = $path . basename($_SERVER['SCRIPT_NAME']); }
   //echo basename($_SERVER['SCRIPT_NAME']).' Option selected = '.$op.' Path = '.$path1.'<br>';
   //var_dump($_SERVER);
-  $data = explode("/",$path1);
+  //$path1 = str_replace("index.php","",$path1);
+  //echo $path1.'<br>';
 
   $serverName='http://'.$_SERVER['SERVER_NAME'];
   $serverPort=($_SERVER['SERVER_PORT']=='80')?'':':'.$_SERVER['SERVER_PORT'];
@@ -106,66 +132,63 @@
       $config['blogPath'] = $blogPath;
       writeConfig(false);
   }
-
+  $fullpath  = "http://" . $_SERVER['HTTP_HOST']  . $_SERVER['REQUEST_URI'];
+  $remaining = str_replace($blogPath,"",$fullpath);
+  //$data = explode("/",$path1);
+  //echo $blogPath.'  '.$fullpath.'  '.$remaining.'<br>';
+  $data = explode("/",$remaining);
+  if ($config['cleanUrl'] == 0) $optionIndex = 2;
+  else $optionIndex = 1;	
   $baseScript=basename($scriptName);
+  //echo $blogPath.'1<br>';
+  //echo "http://" . $_SERVER['HTTP_HOST']  . $_SERVER['REQUEST_URI'].'<br>';
+  
+  //echo $remaining.'<br>';
   $i=0;
-  $optionIndex=1;
-  if (is_array($data)) {
-      foreach ($data as $value) {
-          if (strcmp($value,$baseScript) == 0) {
-            $optionIndex=$i+1;
-          }
-          $i++;
-      }
-  }
+  //$optionIndex=1;
+  //if (is_array($data)) {
+  //    foreach ($data as $value) {
+  //        if (strcmp($value,$baseScript) == 0) {
+  //          $optionIndex=$i+1;
+  //        }
+  //        $i++;
+  //    }
+  //}
+
   $option = isset($data[$optionIndex])?$data[$optionIndex]:"mainPage";
+  @$option = (trim($data[$optionIndex]) == "")?"mainPage":$data[$optionIndex];
+  $option = str_replace("index.php","",$option); // PritlogMU
   $nicEditType = "default";
   $nicEditUrl  = '<script src="'.$blogPath.'/javascripts/nicEdit.js" type="text/javascript"></script>';
-  if (file_exists(getcwd().'/nicFile/nicEditorIcons.gif')) {
-       $nicEditType = "nicFile";
-       $nicEditUrl  = '<script src="'.$blogPath.'/nicFile/nicEdit.js" type="text/javascript"></script>';
-  }
-  elseif (file_exists(getcwd().'/nicUpload.php')) {
-       $nicEditType = "nicUpload";
-       $nicEditUrl  = '<script src="http://js.nicedit.com/nicEdit-latest.js" type="text/javascript"></script>';
-  }
-  else {
-       $nicEditType = "default";
-       //$nicEditUrl  = '<script src="http://js.nicedit.com/nicEdit-latest.js" type="text/javascript"></script>';
-       $nicEditUrl  = '<script src="'.$blogPath.'/javascripts/nicEdit.js" type="text/javascript"></script>';
-  }
   /* To get the query string from the pretty urls */
-  $optionValue = isset($data[$optionIndex+1])?$data[$optionIndex+1]:"";
-  $optionValue2= isset($data[$optionIndex+2])?$data[$optionIndex+2]:"";
-  $optionValue3= isset($data[$optionIndex+3])?$data[$optionIndex+3]:"";
+  $optionValue = str_replace("index.php","",isset($data[$optionIndex+1])?$data[$optionIndex+1]:"");
+  $optionValue2= str_replace("index.php","",isset($data[$optionIndex+2])?$data[$optionIndex+2]:"");
+  $optionValue3= str_replace("index.php","",isset($data[$optionIndex+3])?$data[$optionIndex+3]:"");
   //echo $optionIndex."<br>";
   //echo $option."<br>";
   //echo $optionValue."<br>";
   //echo $optionValue2."<br>";
   //echo $optionValue3."<br>";
-
   // In seconds. User will be logged out after this
   $inactive = $config['timeoutDuration'];
   // check to see if $_SESSION['timeout'] is set
-  $ip = $_SERVER['REMOTE_ADDR'];
   $_SESSION['notice'] = "";
   if( isset($_SESSION['timeout'])) {
        $session_life  = time() - $_SESSION['timeout'];
-
        if ($session_life > $inactive && isset($_SESSION['logged_in']) && $_SESSION['logged_in']) {
           /* session_unset();
-           session_destroy(); 
+           session_destroy();
            header("Location: ".$blogPath); */
            $_SESSION['notice']=$lang['loggedOut'];
            $option="logoutPage";
        }
   }
   $_SESSION['timeout'] = time();
-
+  if (isset($_SESSION['start'])) $_SESSION['start']   = false;
+  else $_SESSION['start']   = true;
    $mypath  =isset($_SERVER['PATH_INFO'])?str_replace("/index.php","",$_SERVER['PATH_INFO']):"";
    //$referrer=$blogPath.'/index.php'.$mypath;
    $referrer=$serverName.$_SERVER['REQUEST_URI'];
-
    if ($option == "mainPage") { $_SESSION['url']=$referrer; }
    $accessArray=array('newEntry', 'newEntryForm', 'newEntrySubmit', 'deleteEntry', 'editEntry', 'editEntryForm', 'editEntrySubmit', 'deleteComment', 'myProfile', 'myProfileSubmit');
    if (in_array($option,$accessArray)) {
@@ -173,292 +196,188 @@
            $_SESSION['notice']="";
            $_SESSION['url']=$referrer;
            $_SESSION['access_type']="regular";
-           header('Location: '.$_SERVER["SCRIPT_NAME"].'/loginPage');
+           header('Location: '.$config['blogPath'].$config['cleanIndex'].'/loginPage');
            die;
       }
    }
-   $adminAccessArray=array('adminPage', 'adminPageBasic', 'adminPageBasicSubmit', 'adminPageAdvanced', 'adminPageAdvancedSubmit', 'adminPageAuthors', 'adminAuthorsAdd', 'adminAuthorsEdit');
+   $adminAccessArray=array('adminPage', 'adminPageBasic', 'adminPageBasicSubmit', 'adminPageAdvanced', 'adminPageAdvancedSubmit', 'adminPageAuthors', 'adminAuthorsAdd', 'adminAuthorsEdit', 'adminPagePlugins', 'adminPluginsSubmit');
    if (in_array($option, $adminAccessArray)) {
       if (!$ss->Check() || !isset($_SESSION['logged_in']) || !$_SESSION['logged_in'] || !$_SESSION['isAdmin']) {
            $_SESSION['notice']="";
            $_SESSION['url']=$referrer;
            $_SESSION['access_type']="admin";
-           header('Location: '.$_SERVER["SCRIPT_NAME"].'/loginPage');
+           header('Location: '.$config['blogPath'].$config['cleanIndex'].'/loginPage');
            die;
       }
    }
-
    if ($option == 'loginPageSubmit') {
        loginPageSubmit();
        die;
    }
-
    if ($option == 'logoutPage') {
        logout();
        //die;
    }
-
-
+  //execute hooks only if there are hooks to execute
+  if ($SHP->hooks_exist('hook-head-before')) {
+  	$SHP->execute_hooks('hook-head-before');
+  }
 if($option == 'RSS')
 {
       createRSS();
+      exit();
 }
-else
-{
-
-?>
-<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-US">
-<head>
-<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
-<meta name="Keywords" content="<?php echo $config['metaKeywords']; ?>"/>
-<meta name="Description" content="<?php echo $config['metaDescription']; ?>"/>
-<title>
-<?php
 if (trim($optionValue2) == "") { $postTitle=""; $postTitleSave="";}
 else {
   $postTitle    =str_replace("  "," ",str_replace("-"," ",$optionValue2))." &laquo; ";
   $postTitleSave=str_replace("  "," ",str_replace("-"," ",$optionValue2))." | ";
 }
-
-echo $postTitle.$config['blogTitle'];
-
-?>
-</title>
-<link rel="alternate" type="application/rss+xml" title="Recent Posts" href="<?php echo $_SERVER["SCRIPT_NAME"].'/RSS/'.$optionValue ?>" />
-
-<!-- Blueprint CSS Framework -->
-	<link rel="stylesheet" href="<?php echo $blogPath.'/css/screen.css' ?>" type="text/css" media="screen, projection">
-	<link rel="stylesheet" href="<?php echo $blogPath.'/css/print.css' ?>" type="text/css" media="print">
-<!--[if IE]><link rel="stylesheet" href="<?php echo $blogPath.'/css/ie.css' ?>" type="text/css" media="screen, projection"><![endif]-->
-
-<link href="<?php echo $blogPath.'/css/style.css' ?>" rel=stylesheet type=text/css>
-<?php
-  echo '<script type="text/javascript">var blogPath="'.$blogPath.'";</script>';
-?>
-<script src="<?php echo $blogPath.'/javascripts/livevalidation.js' ?>" type="text/javascript"></script>
-
-</head>
-
-<body id="noticebd">
-
-<div class="container">
-
-<!-- Below is the header portion of the blog -->
-
-<div id="myhead" class="span-24">
-<h1><a href=<?php echo $_SERVER["SCRIPT_NAME"].'/mainPage>' ?><?php echo $config['blogTitle']; ?></a></h1>
-</div>
-
-<div class="span-24">
-     <?php 
-           if (is_array($tags) && count($tags) > 0 && $config['showCategoryCloud'] == 1) {
-                printTagCloudAgain($tags);
-           }
-     ?>
-</div>
-
-
-<div id="all" class="span-24">
-
-
-<!-- Left Sidebar -->
-
-<?php
-
-if (trim($_SESSION['notice']) !== "") {
-?>
-
-<script src="<?php echo $blogPath.'/javascripts/addremove.js' ?>" type="text/javascript"></script>
-<script type="text/javascript">
-Event.add(window, 'load', function() {
-  var i = 0;
-  var el = document.createElement('p');
-  el.innerHTML = "<strong><?php echo $_SESSION['notice'] ?></strong>";
-  el.setAttribute("id","notice");
-  el.setAttribute("class","error");
-  Dom.add(el, 'noticehd');
-  var t=setTimeout("Dom.remove('notice');",3300);
-  /*
-  Event.add('add-element', 'click', function() {
-    var el = document.createElement('p');
-    el.innerHTML = 'Remove This Element (' + ++i + ')';
-    Dom.add(el, 'h3');
-    Event.add(el, 'click', function(e) {
-      Dom.remove(this);
-    });
-  }); */
-});
-</script>
-<?php 
-unset($_SESSION['notice']);
-} 
-?>
-
-
-
-<!-- Main content - that has the posts begins here -->
-
-<div id="content" class="span-16">
-
-<div id="noticehd"></div>
-<?php
-
+$theme_header['title']       = $postTitle.$config['blogTitle'];
+$theme_header['script']      = $blogPath; //$_SERVER["SCRIPT_NAME"];
+$theme_header['optionValue'] = $optionValue;
+$theme_header['blogPath']    = $blogPath;
+$theme_header['blogTitle']   = $config['blogTitle'];
+$theme_header['metaKeywords']= $config['metaKeywords'];
+$theme_header['metaDesc']    = $config['metaDescription'];
+$theme_header['loc_head']   = "";
+$theme_header['loc_top']    = "";
+$theme_header['loc_title_after'] = "";
+//execute hooks only if there are hooks to execute
+if ($SHP->hooks_exist('hook-head')) {
+    $SHP->execute_hooks('hook-head');
 }
-
+$theme_main['loc_sidebar_top']    = "";
+$theme_main['loc_sidebar_bottom'] = "";
+$theme_main['loc_menu_top']       = "";
+$theme_main['loc_menu_bottom']    = "";
+$theme_main['loc_main_after']     = "";
+$theme_main['loc_main_top']       = "";
+$theme_main['loc_main_bottom']    = "";
+if ($SHP->hooks_exist('hook-main')) {
+    $SHP->execute_hooks('hook-main');
+}
+$theme_post['test'] = "";
+$theme_new['test']  = "";
+$public_data['test'] = "";
+$theme_edit['test'] = "";
+$theme_adminbasic['test'] = "";
+//print @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_header["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/header.tpl"));
+$theme_main['blogPath']    = $blogPath;
+$theme_main['tagCloud'] = "";
+if (is_array($tags) && count($tags) > 0 && $config['showCategoryCloud'] == 1) {
+    $theme_main['tagCloud'] = printTagCloudAgain($tags);
+}
 /* This function does the main logic to direct to other functions as required */
 mainLogic();
 
 if($option !== 'RSS') {
-?>
-</div>
-
-<!-- Right sidebar -->
-
-<div class="span-6">
-
-<div id="menu" class="span-6">
-
-<div class="span-6  last">
-<br>
-<style>
+$theme_main['shareme'] = '<style>
 #shareButton {font:12px Verdana, Helvetica, Arial; height: 30px;width:100px;}
 #shareDrop {position:absolute; padding:10px; display: none; z-index: 100; top:-900px; left:0px; width: 200px;float:left;background: #E9E9E9;border:1px solid black;}
 #shareButton img, #shareDrop img {border:0} #shareDrop a {color:#008DC2; padding:0px 5px;display:block;text-decoration:none;} #shareDrop a:hover {background-color: #999999; color: #fff; text-decoration:none;}
 #shareshadow{position: absolute;left: 0; top: 0; z-index: 99; background: black; visibility: hidden;}
 div.sharefoot {position: absolute; top: 172px; height:15px; width: 200px; text-align: center; background-color: #999999; color: #fff;}
 div.sharefoot a{display:inline; color:#fff; background-color:#999999; } div.sharefoot a:hover{text-decoration:none; background: #00adef; color: #fff}
-</style>
-<script type="text/javascript">
-<?php
-echo 'var bPath="'.$blogPath.'/images/bookmarks";';
+</style>';
+$theme_main['shareme'] .= '<script type="text/javascript">';
+$theme_main['shareme'] .=  'var bPath="'.$blogPath.'/images/bookmarks";';
 //echo 'var u1   ="'.urlencode($blogPath).'";';
-echo 'var u1   =encodeURIComponent(document.location.href);';
-echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
+$theme_main['shareme'] .=  'var u1   =encodeURIComponent(document.location.href);';
+$theme_main['shareme'] .=  'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
+$theme_main['shareme'] .= '</script>';
+$theme_main['shareme'] .= '<style>';
+$theme_main['shareme'] .= 'div #shareButton a { background: url("'.$blogPath.'/images/shareme.gif") no-repeat; }';
+$theme_main['shareme'] .= 'div .share a span { cursor:pointer; display:block; margin-left:15px; color:#008DC2; padding:0px 5px; height:16px; width: 60px; text-decoration:none;}';
+$theme_main['shareme'] .= 'div .share a span:hover {background-color: #999999; color: #fff; text-decoration:none;}';
+$theme_main['shareme'] .= 'div .shareit { background: url("'.$blogPath.'/images/shareme.gif") no-repeat;}';
+$theme_main['shareme'] .= '</style>';
+$theme_main['shareme'] .=  '<script type="text/javascript" src="'.$blogPath.'/javascripts/shareme.js"></script>';
+$theme_main['script']  = $config['blogPath'].$config['cleanIndex'];
+/* Latest Entries */
+$theme_main['latestEntriesHeader'] = $lang['sidebarHeadLatestEntries'];
+sidebarListEntries();
+/* Menu */
+$theme_main['menuHeader'] = $lang['sidebarHeadMainMenu'];
+$theme_main['blogTitle']  = $config['blogTitle'];
+$theme_main['home']       = $lang['sidebarLinkHome'];
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath; //$_SERVER["SCRIPT_NAME"].'/mainPage';
+$theme_menu['linktext'] = $lang['sidebarLinkHome'];
+$theme_main['menu']	    = "";
+$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/archives';
+$theme_menu['linktext'] = $lang['sidebarLinkArchive'];
+$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/RSS';
+$theme_menu['linktext'] = $lang['sidebarLinkRSSFeeds'];
+$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false)) {
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/adminPage';
+$theme_menu['linktext'] = $lang['sidebarLinkAdmin'];
+$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/newEntry';
+$theme_menu['linktext'] = $lang['sidebarLinkNewEntry'];
+$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/logoutPage';
+$theme_menu['linktext'] = $lang['sidebarLinkLogout'];
+$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+} else {
+if (isset($_SESSION['logged_in']) && $_SESSION['logged_in']) {
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/newEntry';
+$theme_menu['linktext'] = $lang['sidebarLinkNewEntry'];
+$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/myProfile';
+$theme_menu['linktext'] = $lang['pageMyProfile'];
+$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/logoutPage';
+$theme_menu['linktext'] = $lang['sidebarLinkLogout'];
+$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+} else {
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/loginPage';
+$theme_menu['linktext'] = $lang['sidebarLinkLogin'];
+$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+}
+}
+$theme_main['categoriesHeader'] = $lang['postFtTags'];
+$theme_main['categories']       = sidebarCategories();
+$theme_main['pagesHeader'] = $lang['sidebarHeadPages'];
+$theme_main['pages']       = sidebarPageEntries();
+$theme_main['linksHeader'] = $lang['sidebarHeadLinks'];
+$theme_main['links']       = sidebarLinks();
+
+$theme_main['statsHeader'] = $lang['sidebarHeadStats'];
+$theme_main['stats']       = sidebarStats();
+$theme_main['popularHeader'] = $lang['sidebarHeadPopularEntries'];
+$theme_main['popular']       = sidebarPopular();
+$theme_main['commentsHeader'] = $lang['sidebarHeadLatestComments'];
+$theme_main['comments']       = sidebarListComments();
+$theme_listcomments['link']     = $config['blogPath'].$config['cleanIndex'].'/listAllComments';
+$theme_listcomments['linktext'] = $lang['sidebarLinkListComments'];
+$theme_main['comments']      .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_listcomments["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/listcomments.tpl"));
+$theme_main['aboutHeader']    = $lang['pageBasicConfigAbout'];
+$theme_main['about']          = $config['about'];
+$theme_main['footer']    = $lang['footerCopyright'].' '.$config['blogTitle'].' '.date('Y').' - '.$lang['footerRightsReserved'].' - Powered by <a href="http://hardkap.net/pritlog/">Pritlog</a></div>';
+print @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_header["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/header.tpl"));
+print @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_main["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/main.tpl"));
+sqlite_close($config['db']);
+
+}
 ?>
-</script>
-
-<style>
-
-div #shareButton a { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>") no-repeat; }
-div .share a span { cursor:pointer; display:block; margin-left:15px; color:#008DC2; padding:0px 5px; height:16px; width: 60px; text-decoration:none;}
-div .share a span:hover {background-color: #999999; color: #fff; text-decoration:none;}
-
-div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>") no-repeat;}
-
-</style>
-
-<?php echo '<script type="text/javascript" src="'.$blogPath.'/javascripts/shareme.js"></script>'; ?>
-
-
-</div>
-
-<div class="span-6  last">
-    <br/>
-    <form name="form1" method="post" id="searchform" action=<?php echo $_SERVER['SCRIPT_NAME']; ?>/searchPosts>
-    <input type="text" class="s" name="searchkey">
-    <input type="hidden" name="do" value="search">
-    <input type="submit" class="submit" name="Submit" value="Search"><br />
-    </form>
-</div>
-
-<div  class="span-6 last">
-<h3><?php echo $lang['sidebarHeadLatestEntries']; ?></h3>
-    <?php sidebarListEntries(); ?>
-</div>
-
-<div  class="span-6  last">
-<h3><?php echo $lang['sidebarHeadMainMenu']; ?></h3>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/mainPage>'.$lang['sidebarLinkHome']; ?></a>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/viewArchive>'.$lang['sidebarLinkArchive']; ?></a>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/RSS>'.$lang['sidebarLinkRSSFeeds']; ?></a>
-<?php if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false)) { ?>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/adminPage>'.$lang['sidebarLinkAdmin']; ?></a>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/newEntry>'.$lang['sidebarLinkNewEntry']; ?></a>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/logoutPage>'.$lang['sidebarLinkLogout']; ?></a>
-<?php } else { ?>
-<?php if (isset($_SESSION['logged_in']) && $_SESSION['logged_in']) { ?>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/newEntry>'.$lang['sidebarLinkNewEntry']; ?></a>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/myProfile>'.$lang['pageMyProfile']; ?></a>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/logoutPage>'.$lang['sidebarLinkLogout']; ?></a>
-<?php } else { ?>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/loginPage>'.$lang['sidebarLinkLogin']; ?></a>
-<?php } ?>
-<?php } ?>
-</div>
-
-<div  class="span-6  last">
-<h3><?php echo $lang['sidebarHeadCategories']; ?></h3>
-<?php sidebarCategories(); ?>
-</div>
-
-<div class="span-6  last">
-<h3><?php echo $lang['sidebarHeadPages']; ?></h3>
-<?php sidebarPageEntries() ?>
-</div>
-
-<div  class="span-6  last">
-<h3><?php echo $lang['sidebarHeadLinks']; ?></h3>
-<?php sidebarLinks(); ?>
-</div>
-
-<div  class="span-6  last">
-<h3><?php echo $lang['sidebarHeadStats']; ?></h3>
-<?php sidebarStats() ?>
-</div>
-
-
-</div>
-
-</div>
-
-<div id="foot" class="span-24">
-
-<div  class="span-7  prepend-1 append-1">
-<h3><?php echo $lang['sidebarHeadPopularEntries']; ?></h3>
-    <?php sidebarPopular();  ?>
-</div>
-
-<div  class="span-7 append-1">
-<h3><?php echo $lang['sidebarHeadLatestComments']; ?></h3>
-<?php
-      sidebarListComments();
-      echo '<a href="'.$_SERVER['SCRIPT_NAME'].'/listAllComments">'.$lang['sidebarLinkListComments'].'</a>';
-?>
-</div>
-
-<?php if (strlen($config['about']) > 10) { ?>
-<div  class="span-6">
-<h3><?php echo $lang['pageBasicConfigAbout']; ?></h3>
-<?php echo $config['about']; ?>
-</div>
-<?php } ?>
-
-</div>
-
-</div>
-
-
-
-<?php /* PLEASE DONT REMOVE THIS COPYRIGHT WITHOUT PERMISSION FROM THE AUTHOR */ ?>
-<?php sqlite_close($config['db']); echo '<div id="footer">'.$lang['footerCopyright'].' '.$config['blogTitle'].' '.date('Y').' - '.$lang['footerRightsReserved'].' - Powered by <a href="http://hardkap.net/pritlog/">Pritlog</a></div>'; ?>
-
-</div>
-
-</body>
-</html>
-<?php } ?>
-
-
 
 <?php
 
   function mainLogic() {
-
-      global $debugMode,$option,$requestCategory,$optionValue;
-
+      global $debugMode,$option,$requestCategory,$optionValue,$serverName;
       //$category = $data[4];
-
       switch ($option) {
       case "newEntry":
           if ($debugMode=="on") {echo "Calling newEntryPass()";}
@@ -474,6 +393,8 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
       case "mainPage":
           $requestCategory = '';
           listPosts();
+		  $referrer=$serverName.$_SERVER['REQUEST_URI'];
+	      $_SESSION['referrer'] = $referrer;
           break;
       case "adminPage":
           adminPage();
@@ -506,7 +427,14 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
           if ($debugMode=="on") {echo "adminAuthorsEdit  ".$_POST['process']."<br>";}
           adminAuthorsEdit();
           break;
-
+      case "adminPluginsSubmit":
+      case "adminPagePlugins":
+          adminPagePlugins();
+          break;
+      case "adminPageModerate":
+      case "adminModerateSubmit":
+          adminPageModerate();
+          break; 
       case "deleteEntry":
           if ($debugMode=="on") {echo "deleteEntry  ".$_POST['process']."<br>";}
           //deleteEntrySubmit();
@@ -520,6 +448,8 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
       case "editEntry":
           if ($debugMode=="on") {echo "editEntry  ".$_POST['process']."<br>";}
           editEntryForm();
+		  $referrer=$serverName.$_SERVER['REQUEST_URI'];
+	      $_SESSION['referrer'] = $referrer; 
           break;
       case "editEntryForm";
           editEntryForm();
@@ -527,18 +457,20 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
       case "editEntrySubmit";
           editEntrySubmit();
           break;
-      case "viewEntry":
+      case "posts":
           viewEntry();
           break;
-      case "viewArchive":
+      case "archives":
           viewArchive();
           break;
-      case "viewArchiveMonth":
+      case "month":
           viewArchiveMonth();
           break;
-      case "viewCategory":
+      case "category":
           $requestCategory=$optionValue;
           listPosts();
+		  $referrer=$serverName.$_SERVER['REQUEST_URI'];
+	      $_SESSION['referrer'] = $referrer;
           break;
       case "searchPosts":
           searchPosts();
@@ -586,59 +518,139 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
       case "myProfileSubmit":
            myProfileSubmit();
            break;
+      case "pluginFunction1":
+           pluginFunction1();
+           break;
+      case "pluginFunction2":
+           pluginFunction2();
+           break;
+      case "pluginFunction3":
+           pluginFunction3();
+           break;
+      case "pluginFunction4":
+           pluginFunction4();
+           break;
+      case "pluginFunction5":
+           pluginFunction5();
+           break;
+      }
+  }
+
+  function getRealIpAddr()
+  {
+      if (!empty($_SERVER['HTTP_CLIENT_IP']))   //check ip from share internet
+      {
+        $ip=$_SERVER['HTTP_CLIENT_IP'];
+      }
+      elseif (!empty($_SERVER['HTTP_X_FORWARDED_FOR']))   //to check ip is pass from proxy
+      {
+        $ip=$_SERVER['HTTP_X_FORWARDED_FOR'];
+      }
+      else
+      {
+        $ip=$_SERVER['REMOTE_ADDR'];
+      }
+      return $ip;
+  }
+
+  function pluginFunction1() {
+      global $optionValue, $theme_main, $SHP;
+      if ($SHP->hooks_exist('hook-pluginFunction1')) {
+          $SHP->execute_hooks('hook-pluginFunction1');
+      }
+  }
+
+  function pluginFunction2() {
+      global $optionValue, $theme_main, $SHP;
+      if ($SHP->hooks_exist('hook-pluginFunction2')) {
+          $SHP->execute_hooks('hook-pluginFunction2');
+      }
+  }
+
+  function pluginFunction3() {
+      global $optionValue, $theme_main, $SHP;
+      if ($SHP->hooks_exist('hook-pluginFunction3')) {
+          $SHP->execute_hooks('hook-pluginFunction3');
+      }
+  }
+
+  function pluginFunction4() {
+      global $optionValue, $theme_main, $SHP;
+      if ($SHP->hooks_exist('hook-pluginFunction4')) {
+          $SHP->execute_hooks('hook-pluginFunction4');
+      }
+  }
+
+  function pluginFunction5() {
+      global $optionValue, $theme_main, $SHP;
+      if ($SHP->hooks_exist('hook-pluginFunction5')) {
+          $SHP->execute_hooks('hook-pluginFunction5');
       }
   }
 
   function logout() {
-      global $blogPath, $lang;
+      global $blogPath, $lang, $SHP;
       unset($_SESSION['logged_in']);
       unset($_SESSION['username']);
       unset($_SESSION['isAdmin']);
       unset($_SESSION['access_type']);
       unset($_SESSION['loginError']);
       unset($_SESSION['ss_fprint']);
-      header('Location: '.$_SESSION['url']);
+      if ($SHP->hooks_exist('hook-logout')) {
+          $SHP->execute_hooks('hook-logout');
+      }
+      //header('Location: '.$_SESSION['url']);
+      header('Location: '.$blogPath);
       die();
       //unset($_SESSION['url']);
   }
 
   function logoutPage() {
-      global $blogPath, $lang;
-      echo "<h3>".$lang['titleLogoutPage']."</h3>";
-      echo $lang['loggedOut'].'<br>';
+      global $blogPath, $lang, $theme_main;
+      $theme_main['content'] = "<h3>".$lang['titleLogoutPage']."</h3>";
+      $theme_main['content'].= $lang['loggedOut'].'<br>';
   }
 
   function loginPage() {
-      global $debugMode, $optionValue, $config, $lang;
-      echo "<h3>".$lang['titleLoginPage']."</h3>";
-      echo "<form name=\"form1\" method=\"post\" action=\"".$_SERVER['SCRIPT_NAME']."/loginPageSubmit\">";
-      echo "<table>";
-      echo "<tr><td>".$lang['pageAuthorsNew']."</td>";
-      echo "<td><input class=\"s\" name=\"author\" type=\"text\" id=\"author\">&nbsp;&nbsp;('admin' for master user)</td></tr>";
-      echo '<script>';
-      echo 'var author = new LiveValidation( "author", {onlyOnSubmit: true } );';
-      echo 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-      echo '</script>';
-      echo "<tr><td>".$lang['pageDeletePass']."</td>";
-      echo "<td><input class=\"s\" name=\"pass\" type=\"password\" id=\"pass\"></td></tr>";
-      echo '<script>';
-      echo 'var pass = new LiveValidation( "pass", {onlyOnSubmit: true } );';
-      echo 'pass.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-      echo '</script>';
-      echo '</tr><tr><td>&nbsp;</td><td><input type="submit" class="submit" name="Submit" value="'.$lang['pageBasicConfigSubmit'].'"></td>';
-      echo "</tr></table></form>";
-      echo '[<a href="'.$_SERVER['SCRIPT_NAME'].'/forgotPass">'.$lang['titleForgotPass'].'?</a>]';
-      if ($config['allowRegistration'] == 1) {
-          echo '<br>Not registered?&nbsp;<a href="'.$_SERVER['SCRIPT_NAME'].'/registerPage">'.$lang['titleRegisterPageSubmit'].'!</a><br>';
+      global $debugMode, $optionValue, $config, $lang, $theme_main, $SHP;
+      if ($SHP->hooks_exist('hook-login-replace')) {
+          $SHP->execute_hooks('hook-login-replace');
+      }
+      else {
+          $theme_login['header'] = $lang['titleLoginPage'];
+          $theme_login['action'] = $config['blogPath'].$config['cleanIndex']."/loginPageSubmit";
+          $theme_login['user']   = $lang['pageAuthorsNew'];
+          $theme_login['userValidate'] = '<script>';
+          $theme_login['userValidate'].= 'var author = new LiveValidation( "author", {onlyOnSubmit: true } );';
+          $theme_login['userValidate'].= 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          $theme_login['userValidate'].= '</script>';
+          $theme_login['password']     = $lang['pageDeletePass'];
+          $theme_login['passValidate'] = '<script>';
+          $theme_login['passValidate'].= 'var pass = new LiveValidation( "pass", {onlyOnSubmit: true } );';
+          $theme_login['passValidate'].= 'pass.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          $theme_login['passValidate'].= '</script>';
+          $theme_login['submit']       = $lang['pageBasicConfigSubmit'];
+          $theme_login['forgotPassLink'] = '<a href="'.$config['blogPath'].$config['cleanIndex'].'/forgotPass">'.$lang['titleForgotPass'].'?</a>';
+          $theme_login['register']     = "";
+          $theme_login['loc_form']    = '';
+          $theme_login['loc_bottom']  = '';
+          if ($SHP->hooks_exist('hook-login')) {
+              $SHP->execute_hooks('hook-login');
+          }
+          if ($config['allowRegistration'] == 1) {
+              $theme_login['register'].= '<br>Not registered?&nbsp;<a href="'.$config['blogPath'].$config['cleanIndex'].'/registerPage">'.$lang['titleRegisterPageSubmit'].'!</a><br>';
+          }
+          $theme_main['content'].= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_login["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/login.tpl"));
       }
       if (isset($_SESSION["loginError"])) {
-           echo '<br>'.$_SESSION["loginError"].'<br>';
+           $theme_main['content'].= '<br>'.$_SESSION["loginError"].'<br>';
            unset($_SESSION["loginError"]);
       }
   }
 
   function loginPageSubmit() {
-      global $debugMode, $optionValue, $config, $lang, $baseScript, $authorsPass, $ss, $authorsActStatus;
+      global $debugMode, $optionValue, $config, $lang, $baseScript, $authorsPass, $ss, $authorsActStatus, $ip;
+      global $SHP;
       $loginError=false;
       $authorsActStatus['admin'] = 1;
       //echo 'yes - '.$_SESSION['url'].' - '.$_POST['author'].' - '.$_POST['pass'].' - '.$authorsPass[$_POST['author']].' - '.$authorsActStatus[$_POST['author']]; die();
@@ -646,98 +658,129 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
          $ss->Open();
          $_SESSION['logged_in'] = true;
          $_SESSION['username']  = $_POST['author'];
+         @sqlite_query($config['db'], "DELETE FROM logs WHERE ip = '$ip'");
+         @sqlite_query($config['db'], "DELETE FROM ipban WHERE ip = '$ip'");
+         if ($SHP->hooks_exist('hook-login-valid')) {
+             $SHP->execute_hooks('hook-login-valid');
+         }
          if ($_POST['author'] == "admin") {
-            $_SESSION['isAdmin'] = true;
-            $_SESSION['access_type'] = "admin";
+             $_SESSION['isAdmin'] = true;
+             $_SESSION['access_type'] = "admin";
          }
          else {
-           if ($_SESSION['access_type'] == "admin" || $authorsActStatus[$_POST['author']] == 0) {
-               $_SESSION["loginError"] = $lang['errorUserPassIncorrect'];
-               $loginError=true;
-           }
-           $_SESSION['access_type'] = "regular";
-           $_SESSION["loginError"]  = $lang['errorNotAuthorized'];
+             if ($_SESSION['access_type'] == "admin" || $authorsActStatus[$_POST['author']] == 0) {
+                 $_SESSION["loginError"] = $lang['errorUserPassIncorrect'];
+                 $loginError=true;
+             }
+             $_SESSION['access_type'] = "regular";
+             $_SESSION["loginError"]  = $lang['errorNotAuthorized'];
+             if ($SHP->hooks_exist('hook-login-invalid')) {
+                 $SHP->execute_hooks('hook-login-invalid');
+             }
          }
          header('Location: '.$_SESSION['url']);
       }
       else {
+         $action = "loginerror";
+         $date   = date("Y-m-d H:i");
+         sqlite_query($config['db'], "INSERT INTO logs (ip, action, date) VALUES ('$ip', '$action', '$date')");
+         $result = sqlite_query($config['db'], "select * from logs WHERE ip = '$ip' AND action = 'loginerror'");
+         if (sqlite_num_rows($result) > $config['limitLogins']) {
+            $result = sqlite_query($config['db'], "select * from ipban WHERE ip = '$ip'");
+            if (sqlite_num_rows($result) == 0) sqlite_query($config['db'], "INSERT INTO ipban (ip) VALUES ('$ip')");
+         }
          $_SESSION["loginError"] = $lang['errorUserPassIncorrect'];
-         header('Location: '.$baseScript.'/loginPage');
+         header('Location: '.$config['blogPath'].$config['cleanIndex'].'/loginPage');
       }
   }
 
   function myProfile() {
-      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail;
-      echo "<h3>".$lang['pageMyProfile']."</h3>";
+      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $theme_main, $SHP;
+      $theme_main['content'] = "";
+      $theme_profile['header'] = $lang['pageMyProfile'];
       if ((isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) && !(isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false)) {
-          echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/myProfileSubmit>";
-          echo "<fieldset>";
-          echo '<legend>'.$lang['pageMyProfile'].'</legend>';
-          echo '<p><label for="origpass">'.$lang['pageMyProfileCurrentPass'].'</label><br>';
-          echo '<input type="password" class="ptext" name="origpass" id="origpass" value=""></p>';
-          echo '<script>';
-          echo 'var origpass = new LiveValidation( "origpass", {onlyOnSubmit: true } );';
-          echo 'origpass.add( Validate.Presence, { failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          echo '</script>';
-          echo '<p><label for="newpass1">'.$lang['pageBasicConfigNewpass1'].'</label><br>';
-          echo '<input type="password" class="ptext" name="newpass1" id="newpass1" value=""></p>';
-          echo '<script>';
-          echo 'var pass1 = new LiveValidation( "newpass1", {onlyOnSubmit: true } );';
-          echo 'pass1.add( Validate.Length, { minimum: 5 , failureMessage: "'.$lang['errorPassLength'].'" } );';
-          echo '</script>';
-          echo '<p><label for="newpass2">'.$lang['pageBasicConfigNewpass2'].'</label><br>';
-          echo '<input type="password" class="ptext" name="newpass2" id="newpass2" value=""></p>';
-          echo '<script>';
-          echo 'var pass2 = new LiveValidation( "newpass2", {onlyOnSubmit: true } );';
-          echo 'pass2.add( Validate.Confirmation,{ match: "newpass1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
-          echo '</script>';
-          echo '<p><label for="authorEmail">'.$lang['pageAuthorsNewEmail'].'</label><br>';
-          echo '<input type="text" class="ptext" name="authorEmail" id="authorEmail" value="'.$authorsEmail[$_SESSION['username']].'"></p>';
-          echo '<script>';
-          echo 'var email = new LiveValidation( "authorEmail", {onlyOnSubmit: true } );';
-          echo 'email.add( Validate.Presence, { failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          echo 'email.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
-          echo '</script>';
-          echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
-          echo '<p><input type="submit" value="'.$lang['pageAdvancedConfigSubmit'].'"></p>';
-          echo '</fieldset>';
-          echo '</form>';
+          if ($SHP->hooks_exist('hook-myprofile-replace')) {
+              $SHP->execute_hooks('hook-myprofile-replace');
+          }
+          else {
+              $theme_profile['action'] = $config['blogPath'].$config['cleanIndex']."/myProfileSubmit";
+              $theme_profile['legend'] = $lang['pageMyProfile'];
+              $theme_profile['currentPass'] = $lang['pageMyProfileCurrentPass'];
+              $theme_profile['currentPassValidate'] = '<script>';
+              $theme_profile['currentPassValidate'].= 'var origpass = new LiveValidation( "origpass", {onlyOnSubmit: true } );';
+              $theme_profile['currentPassValidate'].= 'origpass.add( Validate.Presence, { failureMessage: "'.$lang['errorRequiredField'].'" } );';
+              $theme_profile['currentPassValidate'].= '</script>';
+              $theme_profile['newPass1'] = $lang['pageBasicConfigNewpass1'];
+              $theme_profile['newPass1Validate'] = '<script>';
+              $theme_profile['newPass1Validate'].= 'var pass1 = new LiveValidation( "newpass1", {onlyOnSubmit: true } );';
+              $theme_profile['newPass1Validate'].= 'pass1.add( Validate.Length, { minimum: 5 , failureMessage: "'.$lang['errorPassLength'].'" } );';
+              $theme_profile['newPass1Validate'].= '</script>';
+              $theme_profile['newPass2'] = $lang['pageBasicConfigNewpass2'];
+              $theme_profile['newPass2Validate'].= '<script>';
+              $theme_profile['newPass2Validate'].= 'var pass2 = new LiveValidation( "newpass2", {onlyOnSubmit: true } );';
+              $theme_profile['newPass2Validate'].= 'pass2.add( Validate.Confirmation,{ match: "newpass1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
+              $theme_profile['newPass2Validate'].= '</script>';
+              $theme_profile['authorEmailLabel']    = $lang['pageAuthorsNewEmail'];
+              $theme_profile['authorEmail']         = $authorsEmail[$_SESSION['username']];
+              $theme_profile['authorEmailValidate'].= '<script>';
+              $theme_profile['authorEmailValidate'].= 'var email = new LiveValidation( "authorEmail", {onlyOnSubmit: true } );';
+              $theme_profile['authorEmailValidate'].= 'email.add( Validate.Presence, { failureMessage: "'.$lang['errorRequiredField'].'" } );';
+              $theme_profile['authorEmailValidate'].= 'email.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
+              $theme_profile['authorEmailValidate'].= '</script>';
+              $theme_profile['hidden']              = '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
+              $theme_profile['loc_form']           = '';
+              if ($SHP->hooks_exist('hook-myprofile')) {
+                  $SHP->execute_hooks('hook-myprofile');
+              }
+              $theme_profile['submit']              = $lang['pageAdvancedConfigSubmit'];
+              $theme_main['content'].= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_profile["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/myprofile.tpl"));
+          }
       }
-      else { echo $lang['errorInvalidRequest'].'<br>'; }
+      else { $theme_main['content'].= $lang['errorInvalidRequest'].'<br>'; }
   }
 
   function myProfileSubmit() {
-      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $separator, $authorsPass, $authorsActCode, $authorsActStatus;
+      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $separator, $authorsPass, $authorsActCode, $authorsActStatus, $theme_main;
+      global $SHP, $public_data;
       $authorFileName=$config['authorFile'];
-      echo "<h3>".$lang['pageMyProfile']."</h3>";
+      $theme_main['content'] = "";
+      $theme_main['content'].= "<h3>".$lang['pageMyProfile']."</h3>";
       $do = 1;
       if ((isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) && !(isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false)) {
           $authorEmail=$_POST['authorEmail'];
           $addAuthor  =$_SESSION['username'];
-          if (trim($authorEmail) == "") {
-               echo $lang['errorAllFields'].'<br>';
-               $do = 0;
+          if (!$SHP->hooks_exist('hook-myprofile-replace')) {
+              if (trim($authorEmail) == "") {
+                   $theme_main['content'].= $lang['errorAllFields'].'<br>';
+                   $do = 0;
+              }
+              if (!eregi("^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", trim($authorEmail))) {
+                   $theme_main['content'].= $lang['errorInvalidAdminEmail'].'<br>';
+                   $do = 0;
+              }
+              if ($_POST['newpass1'] != $_POST['newpass2']) {
+                   $theme_main['content'].= $lang['errorNewPasswordsMatch']."<br>";
+                   $do = 0;
+              }
+              if (strtolower(trim($addAuthor)) == "admin") {
+                   $theme_main['content'].= $lang['errorForbiddenAuthor'].'<br>';
+                   $do = 0;
+              }
+              if (isset($_POST['newpass1']) && trim($_POST['newpass1']) != "" && strlen($_POST['newpass1']) < 5) {
+                  $theme_main['content'].= $lang['errorPassLength'].'<br>';
+                  $do = 0;
+              }
+              if (md5($config['randomString'].$_POST['origpass']) !== $authorsPass[$addAuthor]) {
+                  $theme_main['content'].= $lang['errorPasswordIncorrect'].'<br>';
+                  $do = 0;
+              }
           }
-          if (!eregi("^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", trim($authorEmail))) {
-               echo $lang['errorInvalidAdminEmail'].'<br>';
-               $do = 0;
+          unset($GLOBALS['$public_data']);
+          $public_data['do'] = $do;
+          if ($SHP->hooks_exist('hook-myprofile-validate')) {
+              $SHP->execute_hooks('hook-myprofile-validate', $public_data);
           }
-          if ($_POST['newpass1'] != $_POST['newpass2']) {
-               echo $lang['errorNewPasswordsMatch']."<br>";
-               $do = 0;
-          }
-          if (strtolower(trim($addAuthor)) == "admin") {
-               echo $lang['errorForbiddenAuthor'].'<br>';
-               $do = 0;
-          }
-          if (isset($_POST['newpass1']) && trim($_POST['newpass1']) != "" && strlen($_POST['newpass1']) < 5) {
-              echo $lang['errorPassLength'].'<br>';
-              $do = 0;
-          }
-          if (md5($config['randomString'].$_POST['origpass']) !== $authorsPass[$addAuthor]) {
-              echo $lang['errorPasswordIncorrect'].'<br>';
-              $do = 0;
-          }
+          $do = $public_data['do'];
           if ($do == 1) {
               $fp = fopen($authorFileName, "w");
               fwrite($fp,'<?php /*');
@@ -753,117 +796,142 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
               }
               fwrite($fp,'*/ ?>');
               fclose($fp);
-              echo '<br>'.$lang['msgConfigSaved'].'.';
-              echo '<br>'.$lang['msgConfigLoginAgain'].'.';
+              $theme_main['content'].= '<br>'.$lang['msgConfigSaved'].'.';
+              $theme_main['content'].= '<br>'.$lang['msgConfigLoginAgain'].'.';
+              if ($SHP->hooks_exist('hook-myprofile-success')) {
+                  $SHP->execute_hooks('hook-myprofile-success');
+              }
           }
       }
-      else { echo $lang['errorInvalidRequest'].'<br>'; }
+      else { 
+          if ($SHP->hooks_exist('hook-myprofile-fail')) {
+              $SHP->execute_hooks('hook-myprofile-fail');
+          }
+          $theme_main['content'].= $lang['errorInvalidRequest'].'<br>';
+      }
   }
 
   function registerPage() {
       global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail;
-      echo "<h3>".$lang['titleRegisterPage']."</h3>";
+      global $theme_main, $SHP;
+      $theme_main['content'] = "";
+      $theme_register['header'] = "<h3>".$lang['titleRegisterPage']."</h3>";
       if (!isset($_SESSION['logged_in']) && !(isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) && ($config['allowRegistration'] == 1)) {
-          echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/registerPageSubmit>";
-          echo "<fieldset>";
-          echo '<legend>'.$lang['titleRegisterPage'].'</legend>';
-          echo '<p><label for="addAuthor">'.$lang['pageAuthorsNew'].'</label><br>';
-          echo '<input type="text" class="ptext" name="addAuthor" id="addAuthor" value=""></p>';
-          $authorsList="";
-          foreach ($authors as $value) {
-              $authorsList.='"'.$value.'" , ';
+          if ($SHP->hooks_exist('hook-register-replace')) {
+              $SHP->execute_hooks('hook-register-replace');
           }
-          echo '<script>';
-          echo 'var author = new LiveValidation( "addAuthor", {onlyOnSubmit: true } );';
-          echo 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          echo 'author.add( Validate.Exclusion, { within: [ '.$authorsList.' ] , failureMessage: "'.$lang['errorDuplicateAuthor'].'"  } );';
-          echo '</script>';
-          echo '<p><label for="newpass1">'.$lang['pageBasicConfigNewpass1'].'</label><br>';
-          echo '<input type="password" class="ptext" name="newpass1" id="newpass1" value=""></p>';
-          echo '<script>';
-          echo 'var pass1 = new LiveValidation( "newpass1", {onlyOnSubmit: true } );';
-          echo 'pass1.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          echo 'pass1.add( Validate.Length, { minimum: 5 , failureMessage: "'.$lang['errorPassLength'].'" } );';
-          echo '</script>';
-          echo '<p><label for="newpass2">'.$lang['pageBasicConfigNewpass2'].'</label><br>';
-          echo '<input type="password" class="ptext" name="newpass2" id="newpass2" value=""></p>';
-          echo '<script>';
-          echo 'var pass2 = new LiveValidation( "newpass2", {onlyOnSubmit: true } );';
-          echo 'pass2.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          echo 'pass2.add( Validate.Confirmation,{ match: "newpass1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
-          echo '</script>';
-          echo '<p><label for="authorEmail">'.$lang['pageAuthorsNewEmail'].'</label><br>';
-          echo '<input type="text" class="ptext" name="authorEmail" id="authorEmail" value=""></p>';
-          echo '<script>';
-          echo 'var email = new LiveValidation( "authorEmail", {onlyOnSubmit: true } );';
-          echo 'email.add( Validate.Presence, { failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          echo 'email.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
-          echo '</script>';
-          if($config['commentsSecurityCode'] == 1)
-  	  {
-	       $code = '';
-	       if($config['onlyNumbersOnCAPTCHA'] == 1)
-	       {
-		   $code = substr(rand(0,999999),1,$config['CAPTCHALength']);
-               }
-	       else
-	       {
-	  	   //$code = strtoupper(substr(crypt(rand(0,999999), $config['randomString']),1,$config['CAPTCHALength']));
-	  	   $code = genRandomString($config['CAPTCHALength']);
-	       }
-	       echo '<p><label for="code">'.$lang['pageCommentsCode'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$code.')</font><br>';
-	       echo '<input name="code" class="s" type="text" id="code"></p>';
-               echo '<input name="originalCode" value="'.$code.'" type="hidden" id="originalCode">';
+          else {
+              $theme_register['action'] = $config['blogPath'].$config['cleanIndex']."/registerPageSubmit";
+              $theme_register['legend'] = $lang['titleRegisterPage'];
+              $theme_register['authorLabel'] = $lang['pageAuthorsNew'];
+              $authorsList="";
+              foreach ($authors as $value) {
+                  $authorsList.='"'.$value.'" , ';
+              }
+              $theme_register['authorValidate'] = '<script>';
+              $theme_register['authorValidate'].= 'var author = new LiveValidation( "addAuthor", {onlyOnSubmit: true } );';
+              $theme_register['authorValidate'].= 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+              $theme_register['authorValidate'].= 'author.add( Validate.Exclusion, { within: [ '.$authorsList.' ] , failureMessage: "'.$lang['errorDuplicateAuthor'].'"  } );';
+              $theme_register['authorValidate'].= '</script>';
+              $theme_register['newPass1']       = $lang['pageBasicConfigNewpass1'];
+              $theme_register['newPass1Validate'] = '<script>';
+              $theme_register['newPass1Validate'].= 'var pass1 = new LiveValidation( "newpass1", {onlyOnSubmit: true } );';
+              $theme_register['newPass1Validate'].= 'pass1.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+              $theme_register['newPass1Validate'].= 'pass1.add( Validate.Length, { minimum: 5 , failureMessage: "'.$lang['errorPassLength'].'" } );';
+              $theme_register['newPass1Validate'].= '</script>';
+              $theme_register['newPass2']       = $lang['pageBasicConfigNewpass2'];
+              $theme_register['newPass2Validate'] = '<script>';
+              $theme_register['newPass2Validate'].= 'var pass2 = new LiveValidation( "newpass2", {onlyOnSubmit: true } );';
+              $theme_register['newPass2Validate'].= 'pass2.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+              $theme_register['newPass2Validate'].= 'pass2.add( Validate.Confirmation,{ match: "newpass1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
+              $theme_register['newPass2Validate'].= '</script>';
+              $theme_register['authorEmail'] = $lang['pageAuthorsNewEmail'];
+              $theme_register['authorEmailValidate'] = '<script>';
+              $theme_register['authorEmailValidate'].= 'var email = new LiveValidation( "authorEmail", {onlyOnSubmit: true } );';
+              $theme_register['authorEmailValidate'].= 'email.add( Validate.Presence, { failureMessage: "'.$lang['errorRequiredField'].'" } );';
+              $theme_register['authorEmailValidate'].= 'email.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
+              $theme_register['authorEmailValidate'].= '</script>';
+              $theme_register['securityCode'] = "";
+              if($config['commentsSecurityCode'] == 1)
+      	  {
+    	       $code = '';
+    	       if($config['onlyNumbersOnCAPTCHA'] == 1)
+    	       {
+    		   $code = substr(rand(0,999999),1,$config['CAPTCHALength']);
+                   }
+    	       else
+    	       {
+    	  	   //$code = strtoupper(substr(crypt(rand(0,999999), $config['randomString']),1,$config['CAPTCHALength']));
+    	  	   $code = genRandomString($config['CAPTCHALength']);
+    	       }
+    	       $theme_register['securityCode'].= '<p><label for="code">'.$lang['pageCommentsCode'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$code.')</font><br>';
+    	       $theme_register['securityCode'].= '<input name="code" class="s" type="text" id="code"></p>';
+                   $theme_register['securityCode'].= '<input name="originalCode" value="'.$code.'" type="hidden" id="originalCode">';
+              }
+              $theme_register['loc_form'] = '';
+              if ($SHP->hooks_exist('hook-register')) {
+                  $SHP->execute_hooks('hook-register');
+              }
+              $theme_register['submit'] = $lang['titleRegisterPageSubmit'];
+              $theme_main['content'].= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_register["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/register.tpl"));
           }
-          echo '<p><input type="submit" class="submit" value="'.$lang['titleRegisterPageSubmit'].'"></p>';
-          echo '</fieldset>';
-          echo '</form>';
       }
-      else { echo $lang['errorInvalidRequest'].'<br>'; }
+      else { $theme_main['content'].= $lang['errorInvalidRequest'].'<br>'; }
   }
 
   function registerPageSubmit() {
       global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $separator, $authorsPass, $blogPath, $authorsActCode, $authorsActStatus;
+      global $theme_main, $public_data, $SHP;
+      $theme_main['content'] = "";
       $authorFileName=$config['authorFile'];
-      echo "<h3>".$lang['titleRegisterPage']."</h3>";
+      $theme_main['content'].= "<h3>".$lang['titleRegisterPage']."</h3>";
       $do = 1;
       if (!isset($_SESSION['logged_in']) && !$_SESSION['logged_in'] && ($config['allowRegistration'] == 1)) {
           $authorEmail=$_POST['authorEmail'];
-          $addAuthor=$_POST['addAuthor'];
-          if (isset($authorsPass[$addAuthor])) {
-               echo $lang['errorDuplicateAuthor'].'<br>';
-               $do = 0;
-          }
-          if (trim($addAuthor) == "" || trim($authorEmail) == "") {
-               echo $lang['errorAllFields'].'<br>';
-               $do = 0;
-          }
-          if (!eregi("^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", trim($authorEmail))) {
-               echo $lang['errorInvalidAdminEmail'].'<br>';
-               $do = 0;
-          }
-          if ($_POST['newpass1'] != $_POST['newpass2']) {
-               echo $lang['errorNewPasswordsMatch']."<br>";
-               $do = 0;
-          }
-          if (strtolower(trim($addAuthor)) == "admin") {
-               echo $lang['errorForbiddenAuthor'].'<br>';
-               $do = 0;
-          }
-          if (strlen($_POST['newpass1']) < 5) {
-              echo $lang['errorPassLength'].'<br>';
-              $do = 0;
-          }
-          if($config['commentsSecurityCode'] == 1)
-	  {
-	      $code         = isset($_POST['code'])?$_POST['code']:"";
- 	      $originalCode = isset($_POST['originalCode'])?$_POST['originalCode']:"";
-	      if ($code !== $originalCode)
-	      {
-	   	  echo $lang['errorSecurityCode'].'<br>';
-		  $do = 0;
+          $addAuthor=strtolower($_POST['addAuthor']);
+          if (!$SHP->hooks_exist('hook-register-replace')) {
+              if (isset($authorsPass[$addAuthor])) {
+                   $theme_main['content'].= $lang['errorDuplicateAuthor'].'<br>';
+                   $do = 0;
               }
-	  }
+              if (trim($addAuthor) == "" || trim($authorEmail) == "") {
+                   $theme_main['content'].= $lang['errorAllFields'].'<br>';
+                   $do = 0;
+              }
+              if (!eregi("^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", trim($authorEmail))) {
+                   $theme_main['content'].= $lang['errorInvalidAdminEmail'].'<br>';
+                   $do = 0;
+              }
+              if ($_POST['newpass1'] != $_POST['newpass2']) {
+                   $theme_main['content'].= $lang['errorNewPasswordsMatch']."<br>";
+                   $do = 0;
+              }
+              if (strtolower(trim($addAuthor)) == "admin") {
+                   $theme_main['content'].= $lang['errorForbiddenAuthor'].'<br>';
+                   $do = 0;
+              }
+              if (strlen($_POST['newpass1']) < 5) {
+                  $theme_main['content'].= $lang['errorPassLength'].'<br>';
+                  $do = 0;
+              }
+              if($config['commentsSecurityCode'] == 1)
+    	      {
+      	          $code         = isset($_POST['code'])?$_POST['code']:"";
+       	          $originalCode = isset($_POST['originalCode'])?$_POST['originalCode']:"";
+      	          if ($code !== $originalCode)
+      	          {
+      	   	     $theme_main['content'].= $lang['errorSecurityCode'].'<br>';
+      		     $do = 0;
+                  }
+    	      }
+          }
+          unset($GLOBALS['$public_data']);
+          $public_data['do'] = $do;
+          if ($SHP->hooks_exist('hook-register-validate')) {
+              $SHP->execute_hooks('hook-register-validate', $public_data);
+          }
+          $do = $public_data['do'];
+
           if ($do == 1) {
               $fp = fopen($authorFileName, "w");
               fwrite($fp,'<?php /*');
@@ -901,10 +969,13 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
                  $message,
                  $headers)) {
                    fwrite($fp,$authorLine);
-                   echo '<br>'.$lang['titleRegisterThank'].'.';
+                   $theme_main['content'].= '<br>'.$lang['titleRegisterThank'].'.';
+                   if ($SHP->hooks_exist('hook-register-success')) {
+                       $SHP->execute_hooks('hook-register-success');
+                   }
              }
              else {
-                 echo '<br>'.$lang['msgMail9'].'.<br>';
+                 $theme_main['content'].= '<br>'.$lang['msgMail9'].'.<br>';
              }
              fwrite($fp,'*/ ?>');
              fclose($fp);
@@ -928,36 +999,46 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
              }
           }
           else {
-              echo $lang['errorPleaseGoBack'];
+              if ($SHP->hooks_exist('hook-register-fail')) {
+                  $SHP->execute_hooks('hook-register-fail');
+              }
+              $theme_main['content'].= $lang['errorPleaseGoBack'];
           }
 
        }
-       else { echo $lang['errorInvalidRequest'].'<br>'; }
+       else { $theme_main['content'].= $lang['errorInvalidRequest'].'<br>'; }
   }
 
   function forgotPass() {
       global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail;
-      echo "<h3>".$lang['titleForgotPass']."</h3>";
+      global $theme_main, $SHP;
+      $theme_main['content'] = "";
+      $theme_forgotpass['header'] = $lang['titleForgotPass'];
       if (!isset($_SESSION['logged_in']) && !(isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false)) {
-          echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/forgotPassSubmit>";
-          echo "<fieldset>";
-          echo '<legend>'.$lang['titleForgotPass'].'</legend>';
-          echo '<p><label for="addAuthor">'.$lang['pageAuthorsNew'].'</label><br>';
-          echo '<input type="text" class="ptext" name="addAuthor" id="addAuthor" value=""></p>';
-          $authorsList="";
-          foreach ($authors as $value) {
-              $authorsList.='"'.$value.'" , ';
+          if ($SHP->hooks_exist('hook-forgotpass-replace')) {
+              $SHP->execute_hooks('hook-forgotpass-replace');
           }
-          echo '<script>';
-          echo 'var author = new LiveValidation( "addAuthor", {onlyOnSubmit: true } );';
-          echo 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          echo 'author.add( Validate.Inclusion, { within: [ '.$authorsList.' ] , failureMessage: "'.$lang['errorUserNotFound'].'"  } );';
-          echo '</script>';
-          echo '<p><input type="submit" class="submit" value="'.$lang['pageBasicConfigSubmit'].'"></p>';
-          echo '</fieldset>';
-          echo '</form>';
+          else {
+              $theme_forgotpass['action'] = $config['blogPath'].$config['cleanIndex']."/forgotPassSubmit";
+              $theme_forgotpass['legend'] = $lang['titleForgotPass'];
+              $theme_forgotpass['author'] = $lang['pageAuthorsNew'];
+              $authorsList="";
+              foreach ($authors as $value) {
+                  $authorsList.='"'.$value.'" , ';
+              }
+              $theme_forgotpass['authorValidate'] = '<script>';
+              $theme_forgotpass['authorValidate'].= 'var author = new LiveValidation( "addAuthor", {onlyOnSubmit: true } );';
+              $theme_forgotpass['authorValidate'].= 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+              $theme_forgotpass['authorValidate'].= 'author.add( Validate.Inclusion, { within: [ '.$authorsList.' ] , failureMessage: "'.$lang['errorUserNotFound'].'"  } );';
+              $theme_forgotpass['authorValidate'].= '</script>';
+              if ($SHP->hooks_exist('hook-forgotpass')) {
+                  $SHP->execute_hooks('hook-forgotpass');
+              }
+              $theme_forgotpass['submit'] = $lang['pageBasicConfigSubmit'];
+              $theme_main['content'].= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_forgotpass["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/forgotpass.tpl"));
+          }
       }
-      else { echo $lang['errorInvalidRequest'].'<br>'; }
+      else { $theme_main['content'].= $lang['errorInvalidRequest'].'<br>'; }
   }
 
   function createRandomPassword() {
@@ -976,20 +1057,31 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
 
   function forgotPassSubmit() {
       global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $separator, $authorsPass, $blogPath, $authorsActCode, $authorsActStatus;
+      global $theme_main, $public_data, $SHP;
+      $theme_main['content'] = "";
       $authorFileName=$config['authorFile'];
-      echo "<h3>".$lang['titleForgotPass']."</h3>";
+      $theme_main['content'].= "<h3>".$lang['titleForgotPass']."</h3>";
       $do = 1;
       if (!isset($_SESSION['logged_in']) && !in_array('"'.$_POST['addAuthor'].'"', $authors)) {
-          $addAuthor=$_POST['addAuthor'];
-          $addEmail =$authorsEmail[$addAuthor];
-          if (trim($addAuthor) == "") {
-               echo $lang['errorAllFields'].'<br>';
-               $do = 0;
+          if (!$SHP->hooks_exist('hook-forgotpass-replace')) {
+              $addAuthor=$_POST['addAuthor'];
+              $addEmail =$authorsEmail[$addAuthor];
+              if (trim($addAuthor) == "") {
+                   $theme_main['content'].= $lang['errorAllFields'].'<br>';
+                   $do = 0;
+              }
+              if (strtolower(trim($addAuthor)) == "admin") {
+                   $theme_main['content'].= $lang['errorForbiddenAuthor'].'<br>';
+                   $do = 0;
+              }
           }
-          if (strtolower(trim($addAuthor)) == "admin") {
-               echo $lang['errorForbiddenAuthor'].'<br>';
-               $do = 0;
+          unset($GLOBALS['$public_data']);
+          $public_data['do'] = $do;
+          if ($SHP->hooks_exist('hook-forgotpass-validate')) {
+              $SHP->execute_hooks('hook-forgotpass-validate', $public_data);
           }
+          $do = $public_data['do'];
+
           if ($do == 1) {
               $fp = fopen($authorFileName, "w");
               fwrite($fp,'<?php /*');
@@ -1022,14 +1114,20 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
                  $subject,
                  $message,
                  $headers)) {
-                   echo '<br>'.$lang['titleForgotPassMsg'];
+                   $theme_main['content'].= '<br>'.$lang['titleForgotPassMsg'];
              }
              else {
-                 echo '<br>'.$lang['msgMail9'].'.<br>';
+                 $theme_main['content'].= '<br>'.$lang['msgMail9'].'.<br>';
+             }
+             if ($SHP->hooks_exist('hook-forgotpass-success')) {
+                 $SHP->execute_hooks('hook-forgotpass-success');
              }
           }
           else {
-              echo $lang['errorPleaseGoBack'];
+              $theme_main['content'].= $lang['errorPleaseGoBack'];
+              if ($SHP->hooks_exist('hook-forgotpass-fail')) {
+                  $SHP->execute_hooks('hook-forgotpass-fail');
+              }
           }
        }
        else {
@@ -1040,11 +1138,12 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
 
   function activation() {
       global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $separator, $authorsPass, $serverName, $authorsActCode, $authorsActStatus;
-      global $optionValue, $optionValue2;
+      global $optionValue, $optionValue2, $theme_main, $SHP;
       $authorFileName=$config['authorFile'];
       $author  = trim($optionValue);
       $actCode = trim($optionValue2);
-      echo "<h3>".$lang['titleRegisterPage']."</h3>";
+      $theme_main['content'] = "";
+      $theme_main['content'].= "<h3>".$lang['titleRegisterPage']."</h3>";
       $do = 1;
       if (!isset($_SESSION['logged_in']) && !$_SESSION['logged_in'] && ($config['allowRegistration'] == 1)) {
           if ($authorsActCode[$author] == $actCode) {
@@ -1059,110 +1158,113 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
                   }
                   fwrite($fp,'*/ ?>');
                   fclose($fp);
-                  echo $lang['titleRegisterActive'].'<br>';
+                  $theme_main['content'].= $lang['titleRegisterActive'].'<br>';
+                  if ($SHP->hooks_exist('hook-activation-success')) {
+                      $SHP->execute_hooks('hook-activation-success');
+                  }
               }
-              else { echo $lang['titleRegisterAlready'].'<br>'; }
+              else { $theme_main['content'].= $lang['titleRegisterAlready'].'<br>'; }
           }
-          else { echo $lang['errorInvalidRequest'].'<br>'; }
+          else {
+             $theme_main['content'].= $lang['errorInvalidRequest'].'<br>';
+             if ($SHP->hooks_exist('hook-activation-fail')) {
+                 $SHP->execute_hooks('hook-activation-fail');
+             }
+          }
 
       }
-      else { echo $lang['errorInvalidRequest'].'<br>'; }
+      else { $theme_main['content'].= $lang['errorInvalidRequest'].'<br>'; }
   }
 
   function adminPage() {
-      global $debugMode, $optionValue, $config, $lang;
-      echo "<h3>".$lang['titleAdminPage']."</h3>";
+      global $debugMode, $optionValue, $config, $lang, $theme_main, $SHP;
+      $theme_main['content'] = "";
+      $theme_admin['header'] = $lang['titleAdminPage'];
 
       if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
-          echo '<p><form method="post" class="adminPage" action="'.$_SERVER['SCRIPT_NAME'].'/adminPageBasic">';
-          echo '<input type="submit" class="submit" value="'.$lang['pageBasicConfig'].'">';
-          echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
-          echo '</form><br>';
-          echo '<form method="post" class="adminPage" action="'.$_SERVER['SCRIPT_NAME'].'/adminPageAdvanced">';
-          echo '<input type="submit" class="submit" value="'.$lang['pageAdvancedConfig'].'">';
-          echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
-          echo '</form><br>';
-          echo '<form method="post" class="adminPage" action="'.$_SERVER['SCRIPT_NAME'].'/adminPageAuthors">';
-          echo '<input type="submit" class="submit" value="'.$lang['pageAuthorsManage'].'">';
-          echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
-          echo '</form></p>';
-          echo '<br><br><h3>Pritlog Version</h3>';
-          //echo 'You are using Pritlog 0.8 Beta 1<br>Thank you for testing!<br>';
-          echo '<script type="text/javascript">';
-          echo 'var clientVersion=0.8;';
-          echo '</script>';
-          echo '<script src="http://hardkap.net/pritlog/checkversion.8.js" type="text/javascript"></script>';
+          $theme_admin['tabs'].= adminPageTabs();  
+		  $theme_main['content'].= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_admin["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/admin.tpl"));
        }
        else {
-          echo $lang['errorPasswordIncorrect'].' .. <br>';
+          $theme_main['content'].= $lang['errorPasswordIncorrect'].' .. <br>';
        }
   }
 
   function adminPageBasic() {
-      global $debugMode, $optionValue, $config, $lang;
-      echo "<h3>".$lang['titleAdminPage']."</h3>";
+      global $debugMode, $optionValue, $config, $lang, $theme_main, $theme_adminbasic;
+      $theme_main['content'] = "";
+      $theme_adminbasic['header'] = $lang['pageBasicConfig'];
       if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
-          echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/adminPageBasicSubmit>";
-          echo "<fieldset>";
-          echo '<legend>'.$lang['pageBasicConfig'].'</legend>';
-          echo '<p><label for="title">'.$lang['pageBasicConfigTitle'].'</label><br>';
-          echo '<input type="text" class="ptitle" name="title" id="title" value="'.$config['blogTitle'].'"></p>';
-          echo '<script>';
-          echo 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
-          echo 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          echo '</script>';
-          echo '<p><label for="newpass1">'.$lang['pageBasicConfigNewpass1'].'</label><br>';
-          echo '<input type="password" class="ptext" name="newpass1" id="newpass1" value=""></p>';
-          echo '<script>';
-          echo 'var pass1 = new LiveValidation( "newpass1", {onlyOnSubmit: true } );';
-          echo '</script>';
-          echo '<p><label for="newpass2">'.$lang['pageBasicConfigNewpass2'].'</label><br>';
-          echo '<input type="password" class="ptext" name="newpass2" id="newpass2" value=""></p>';
-          echo '<script>';
-          echo 'var pass2 = new LiveValidation( "newpass2", {onlyOnSubmit: true } );';
-          echo 'pass2.add( Validate.Confirmation,{ match: "newpass1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
-          echo '</script>';
-          echo '<p><label for="adminEmail">'.$lang['pageBasicConfigAdminEmail'].'</label><br>';
-          echo '<input type="text" class="ptext" name="adminEmail" id="adminEmail" value="'.$config['sendMailWithNewCommentMail'].'"></p>';
-          echo '<script>';
-          echo 'var email = new LiveValidation( "adminEmail", {onlyOnSubmit: true } );';
-          echo 'email.add( Validate.Presence, { failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          echo 'email.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
-          echo '</script>';
-          echo '<br><label for="posts">'.$lang['pageBasicConfigAbout'].'</label><br>';
-          nicEditStuff();
-          echo '<textarea name="posts" id="posts">'.$config['about'].'</textarea><br><br>';  /* this is actually about. not posts. Dont be mislead */
-          echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
-          echo '<p><input type="submit" class="submit" value="'.$lang['pageBasicConfigSubmit'].'"></p>';
-          echo '</fieldset>';
-          echo '</form>';
+          $theme_adminbasic['tabs'] = adminPageTabs();
+		  $msgtext    = "";
+		  $msgclass   = "hide";
+		  if (isset($_POST['submitted'])) {
+			  $submit_result = adminPageBasicSubmit();
+			  if ($submit_result === true) {
+				  $msgtext = $lang['msgConfigSaved'];
+				  $msgclass= "success";
+			  }
+			  else {
+				  $msgtext = $submit_result;
+				  $msgclass= "error"; 
+			  }
+		  }		
+		  $theme_adminbasic['msgtext']  = $msgtext;
+		  $theme_adminbasic['msgclass'] = $msgclass;
+		  $theme_adminbasic['action'] = $config['blogPath'].$config['cleanIndex']."/adminPageBasic";
+          $theme_adminbasic['legend'] = $lang['pageBasicConfig'];
+          $theme_adminbasic['titleLabel'] = $lang['pageBasicConfigTitle'];
+          $theme_adminbasic['title'] = $config['blogTitle'];
+          $theme_adminbasic['titleValidate'] = '<script>';
+          $theme_adminbasic['titleValidate'].= 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
+          $theme_adminbasic['titleValidate'].= 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          $theme_adminbasic['titleValidate'].= '</script>';
+          $theme_adminbasic['pass1']         = $lang['pageBasicConfigNewpass1'];
+          $theme_adminbasic['pass1Validate'].= '<script>';
+          $theme_adminbasic['pass1Validate'].= 'var pass1 = new LiveValidation( "newpass1", {onlyOnSubmit: true } );';
+          $theme_adminbasic['pass1Validate'].= '</script>';
+          $theme_adminbasic['pass2'] = $lang['pageBasicConfigNewpass2'];
+          $theme_adminbasic['pass2Validate'] = '<script>';
+          $theme_adminbasic['pass2Validate'].= 'var pass2 = new LiveValidation( "newpass2", {onlyOnSubmit: true } );';
+          $theme_adminbasic['pass2Validate'].= 'pass2.add( Validate.Confirmation,{ match: "newpass1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
+          $theme_adminbasic['pass2Validate'].= '</script>';
+          $theme_adminbasic['emailLabel'] = $lang['pageBasicConfigAdminEmail'];
+          $theme_adminbasic['email'] = $config['sendMailWithNewCommentMail'];
+          $theme_adminbasic['emailValidate'] = '<script>';
+          $theme_adminbasic['emailValidate'].= 'var email = new LiveValidation( "adminEmail", {onlyOnSubmit: true } );';
+          $theme_adminbasic['emailValidate'].= 'email.add( Validate.Presence, { failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          $theme_adminbasic['emailValidate'].= 'email.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
+          $theme_adminbasic['emailValidate'].= '</script>';
+          $theme_adminbasic['aboutLabel'] = $lang['pageBasicConfigAbout'];
+          $theme_adminbasic['about'] = $config['about'];
+          $theme_adminbasic['submit'] = $lang['pageBasicConfigSubmit'];
+          $theme_main['content'].= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_adminbasic["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/adminbasic.tpl"));
        }
        else {
-          echo $lang['errorPasswordIncorrect'].' .. <br/>';
+          $theme_main['content'].= $lang['errorPasswordIncorrect'].' .. <br/>';
        }
   }
 
 
   function adminPageBasicSubmit() {
-       global $config, $lang;
-       echo "<h3>".$lang['titleAdminPage']."</h3>";
-
+       global $config, $lang, $theme_main;
+	   $msgtext = "";
       $do=1;
       if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
           if (trim($_POST['title']) == "" || trim($_POST['adminEmail']) == "" || trim($_POST['posts']) == "") {
-              echo $lang['errorCannotBeSpaces'].'<br>';
-              echo '<li>'.$lang['pageBasicConfigTitle'].'</li>';
-              echo '<li>'.$lang['pageBasicConfigAdminEmail'].'</li>';
-              echo '<li>'.$lang['pageBasicConfigAbout'].'</li>';
+              $msgtext .= $lang['errorCannotBeSpaces'].'<br>';
+              $msgtext.= '<li>'.$lang['pageBasicConfigTitle'].'</li>';
+              $msgtext.= '<li>'.$lang['pageBasicConfigAdminEmail'].'</li>';
+              $msgtext.= '<li>'.$lang['pageBasicConfigAbout'].'</li>';
               $do=0;
           }
           if (!eregi("^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", trim($_POST['adminEmail']))) {
-              echo '<br>'.$lang['errorInvalidAdminEmail'].'<br>';
+              $msgtext.= '<br>'.$lang['errorInvalidAdminEmail'].'<br>';
               $do=0;
           }
           if (trim($_POST['newpass1'])!="" || trim($_POST['newpass2'])!="") {
               if (strcmp($_POST['newpass1'],$_POST['newpass2']) != 0) {
-                  echo '<br>'.$lang['errorNewPasswordsMatch'].'<br>';
+                  $msgtext.= '<br>'.$lang['errorNewPasswordsMatch'].'<br>';
                   $do=0;
               }
               else {
@@ -1170,52 +1272,72 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
               }
           }
           if ($do == 0) {
-              echo '<br>'.$lang['errorPleaseGoBack'].'<br>';
+			  return $msgtext;
           }
           else {
-              $config['blogTitle']=trim($_POST['title']);
+              $config['blogTitle']=trim(str_replace("\\","",$_POST['title']));
               $config['sendMailWithNewCommentMail']=trim($_POST['adminEmail']);
               $config['about']=str_replace("\\","",trim($_POST['posts']));
-              writeConfig();
+              writeConfig(false);
+			  return true;
           }
        }
        else {
-          echo $lang['errorPasswordIncorrect'].' .. <br/>';
+          $msgtext.= $lang['errorPasswordIncorrect'].' .. <br/>';
+		  return $msgtext;
        }
   }
 
   function adminPageAdvanced() {
-      global $debugMode, $optionValue, $config, $lang;
-      echo "<h3>".$lang['titleAdminPage']."</h3>";
-
+      global $debugMode, $optionValue, $config, $lang, $theme_main;
+      $theme_adminadvanced['header'] = $lang['pageAdvancedConfig'];
+      $theme_main['content'] = "";
 
       if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
-          echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/adminPageAdvancedSubmit>";
-          echo "<fieldset>";
-          echo '<legend>'.$lang['pageAdvancedConfig'].'</legend>';
-          echo '<p><label for="metaDesc">'.$lang['pageAdvancedConfigMetaDesc'].'</label><br>';
-          echo '<input type="text" class="ptext" name="metaDesc" id="metaDesc" value="'.$config['metaDescription'].'"></p>';
-          echo '<p><label for="metaKeywords">'.$lang['pageAdvancedConfigMetaKey'].'</label><br>';
-          echo '<input type="text" class="ptext" name="metaKeywords" id="metaKeywords" value="'.$config['metaKeywords'].'"></p>';
+          $theme_adminadvanced['tabs'] = adminPageTabs();
+          
+		  $msgtext    = "";
+		  $msgclass   = "hide";
+		  if (isset($_POST['submitted'])) {
+			  $submit_result = adminPageAdvancedSubmit();
+			  if ($submit_result === true) {
+				  $msgtext = $lang['msgConfigSaved'];
+				  $msgclass= "success";
+			  }
+			  else {
+				  $msgtext = $submit_result;
+				  $msgclass= "error"; 
+			  }
+		  }		
+		  $theme_adminadvanced['msgtext']  = $msgtext;
+		  $theme_adminadvanced['msgclass'] = $msgclass;
+		  
+		  $theme_adminadvanced['action'] = $config['blogPath'].$config['cleanIndex']."/adminPageAdvanced";
+          $theme_adminadvanced['legend'] = $lang['pageAdvancedConfig'];
+          $theme_adminadvanced['metaDescLabel'] = $lang['pageAdvancedConfigMetaDesc'];
+          $theme_adminadvanced['metaDesc'] = $config['metaDescription'];
+          $theme_adminadvanced['metaKeywordsLabel'] = $lang['pageAdvancedConfigMetaKey'];
+          $theme_adminadvanced['metaKeywords'] = $config['metaKeywords'];
 
-          echo '<p><label for="commentsMaxLength">'.$lang['pageAdvancedConfigCommentsLen'].'</label><br>';
-          echo '<input type="text" class="ptext" name="commentsMaxLength" id="commentsMaxLength" value="'.$config['commentsMaxLength'].'"></p>';
-          echo '<p><label for="commentsForbiddenAuthors">'.$lang['pageAdvancedConfigCommentsFor'].'</label><br>';
-          echo '<input type="text" class="ptext" name="commentsForbiddenAuthors" id="commentsForbiddenAuthors" value="'.$config['commentsForbiddenAuthors'].'"></p>';
-          echo '<p><label for="statsDontLog">'.$lang['pageAdvancedConfigDontLog'].'</label><br>';
-          echo '<input type="text" class="ptext" name="statsDontLog" id="statsDontLog" value="'.$config['statsDontLog'].'"></p>';
-          echo '<p><label for="entriesOnRSS">'.$lang['pageAdvancedConfigEntriesRSS'].'</label><br>';
-          echo '<input type="text" class="ptext" name="entriesOnRSS" id="entriesOnRSS" value="'.$config['entriesOnRSS'].'"></p>';
-          echo '<p><label for="entriesPerPage">'.$lang['pageAdvancedConfigPostsperPage'].'</label><br>';
-          echo '<input type="text" class="ptext" name="entriesPerPage" id="entriesPerPage" value="'.$config['entriesPerPage'].'"></p>';
-          echo '<p><label for="menuEntriesLimit">'.$lang['pageAdvancedConfigMenuEntries'].'</label><br>';
-          echo '<input type="text" class="ptext" name="menuEntriesLimit" id="menuEntriesLimit" value="'.$config['menuEntriesLimit'].'"></p>';
-          echo '<p><label for="timeoutDuration">'.$lang['timeoutDuration'].'</label><br>';
-          echo '<input type="text" class="ptext" name="timeoutDuration" id="timeoutDuration" value="'.$config['timeoutDuration'].'"></p>';
+          $theme_adminadvanced['commentsMaxLengthLabel'] = $lang['pageAdvancedConfigCommentsLen'];
+          $theme_adminadvanced['commentsMaxLength'] = $config['commentsMaxLength'];
+          $theme_adminadvanced['commentsForbiddenAuthorsLabel'] = $lang['pageAdvancedConfigCommentsFor'];
+          $theme_adminadvanced['commentsForbiddenAuthors'] = $config['commentsForbiddenAuthors'];
+          $theme_adminadvanced['statsDontLogLabel'] = $lang['pageAdvancedConfigDontLog'];
+          $theme_adminadvanced['statsDontLog'] = $config['statsDontLog'];
+          $theme_adminadvanced['entriesOnRSSLabel'] = $lang['pageAdvancedConfigEntriesRSS'];
+          $theme_adminadvanced['entriesOnRSS'] = $config['entriesOnRSS'];
+          $theme_adminadvanced['entriesPerPageLabel'] = $lang['pageAdvancedConfigPostsperPage'];
+          $theme_adminadvanced['entriesPerPage'] = $config['entriesPerPage'];
+          $theme_adminadvanced['menuEntriesLimitLabel'] = $lang['pageAdvancedConfigMenuEntries'];
+          $theme_adminadvanced['menuEntriesLimit'] = $config['menuEntriesLimit'];
+          $theme_adminadvanced['timeoutDurationLabel'] = $lang['timeoutDuration'];
+          $theme_adminadvanced['timeoutDuration'] = $config['timeoutDuration'];
+          $theme_adminadvanced['limitLoginsLabel'] = $lang['limitLogins'];
+          $theme_adminadvanced['limitLogins'] = $config['limitLogins'];
 
-
-          echo '<p><label for="blogLanguage">'.$lang['pageAdvancedConfigLanguage'].'</label><br>';
-          echo '<select name="blogLanguage" id="blogLanguage">';
+          $theme_adminadvanced['language'] = '<p><label for="blogLanguage">'.$lang['pageAdvancedConfigLanguage'].'</label><br>';
+          $theme_adminadvanced['language'].= '<select name="blogLanguage" id="blogLanguage">';
           $languageDir=getcwd()."/lang";
           if (file_exists($languageDir)) {
               if ($handle = opendir($languageDir)) {
@@ -1225,14 +1347,34 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
                           $language=substr($file,0,strlen($file)-4);
                           //echo substr($file,0,strlen($file)-4).'<br>';
                           ($config['blogLanguage'] == $language)?$selected="selected":$selected="";
-                          echo '<option value="'.$language.'" '.$selected.' >'.$language;
+                          $theme_adminadvanced['language'] .= '<option value="'.$language.'" '.$selected.' >'.$language;
                       }
                   }
                   closedir($handle);
               }
           }
 
-          echo '</select>';
+          $theme_adminadvanced['language'] .= '</select>';
+
+          $theme_adminadvanced['theme'] = '<p><label for="theme">'.$lang['pageAdvancedConfigTheme'].'</label><br>';
+          $theme_adminadvanced['theme'].= '<select name="theme" id="theme">';
+          $themeDir=getcwd()."/themes";
+          if (file_exists($themeDir)) {
+              if ($handle = opendir($themeDir)) {
+                  $file_array_unsorted = array();
+                  while (false !== ($file = readdir($handle))) {
+                      $fullname = $themeDir."/".$file;
+                      if (is_dir($fullname) && $file != ".." && $file != ".") {
+                          $theme=$file;
+                          ($config['theme'] == $theme)?$selected="selected":$selected="";
+                          $theme_adminadvanced['theme'] .= '<option value="'.$theme.'" '.$selected.' >'.$theme;
+                      }
+                  }
+                  closedir($handle);
+              }
+          }
+
+          $theme_adminadvanced['theme'] .= '</select>';
 
           $menuLinks="";
           if (is_array($config['menuLinksArray'])) {
@@ -1240,75 +1382,99 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
                   $menuLinks=$menuLinks."\n".$value;
               }
           }
-          echo '<p><label for="menuLinks">'.$lang['pageAdvancedConfigMenuLinks'].'</label><br>';
-          echo '<textarea name="menuLinks" id="menuLinks" rows="5" cols="25" value="">'.$menuLinks.'</textarea></p>';
+          $theme_adminadvanced['menuLinksLabel'] = $lang['pageAdvancedConfigMenuLinks'];
+          $theme_adminadvanced['menuLinks'] = $menuLinks;
+          
+          $ipBan="";
+          $ipsep="";
+          $result = sqlite_query($config['db'], "select * from ipban");
+          while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+             $ipBan .= $ipsep.$row['ip'];
+             $ipsep="\n";
+          }
+          $theme_adminadvanced['ipBanLabel'] = $lang['pageAdvancedConfigIpBan'];
+          $theme_adminadvanced['ipBan'] = $ipBan;
+
           if ($config['sendMailWithNewComment'] == 1) {
               $checking='checked="checked"';
           }
           else {
               $checking='';
           }
-          echo '<input type="checkbox" name="sendMailComments" value="1" '.$checking.'>'.$lang['pageAdvancedConfigSendMail'].'</a><br>';
+          $theme_adminadvanced['sendMailComments'] = '<input type="checkbox" name="sendMailComments" value="1" '.$checking.'>'.$lang['pageAdvancedConfigSendMail'].'</a><br>';
           if ($config['commentsSecurityCode'] == 1) {
               $checking='checked="checked"';
           }
           else {
               $checking='';
           }
-          echo '<input type="checkbox" name="commentsSecurityCode" value="1" '.$checking.'>'.$lang['pageAdvancedConfigSecCode'].'</a><br>';
+          $theme_adminadvanced['commentsSecurityCode'] = '<input type="checkbox" name="commentsSecurityCode" value="1" '.$checking.'>'.$lang['pageAdvancedConfigSecCode'].'</a><br>';
           if ($config['authorEditPost'] == 1) {
               $checking='checked="checked"';
           }
           else {
               $checking='';
           }
-          echo '<input type="checkbox" name="authorEditPost" value="1" '.$checking.'>'.$lang['pageAdvancedConfigAuthorEdit'].'</a><br>';
+          $theme_adminadvanced['authorEditPost'] = '<input type="checkbox" name="authorEditPost" value="1" '.$checking.'>'.$lang['pageAdvancedConfigAuthorEdit'].'</a><br>';
           if ($config['authorDeleteComment'] == 1) {
               $checking='checked="checked"';
           }
           else {
               $checking='';
           }
-          echo '<input type="checkbox" name="authorDeleteComment" value="1" '.$checking.'>'.$lang['pageAdvancedConfigAuthorComment'].'</a><br>';
+          $theme_adminadvanced['authorDeleteComment'] = '<input type="checkbox" name="authorDeleteComment" value="1" '.$checking.'>'.$lang['pageAdvancedConfigAuthorComment'].'</a><br>';
           if ($config['showCategoryCloud'] == 1) {
               $checking='checked="checked"';
           }
           else {
               $checking='';
           }
-          echo '<input type="checkbox" name="showCategoryCloud" value="1" '.$checking.'>'.$lang['pageAdvancedConfigCatCloud'].'</a><br>';
+          $theme_adminadvanced['showCategoryCloud'] = '<input type="checkbox" name="showCategoryCloud" value="1" '.$checking.'>'.$lang['pageAdvancedConfigCatCloud'].'</a><br>';
           if ($config['allowRegistration'] == 1) {
               $checking='checked="checked"';
           }
           else {
               $checking='';
           }
-          echo '<input type="checkbox" name="allowRegistration" value="1" '.$checking.'>'.$lang['pageAdvancedConfigRegister'].'</a><br>';
+          $theme_adminadvanced['allowRegistration'] = '<input type="checkbox" name="allowRegistration" value="1" '.$checking.'>'.$lang['pageAdvancedConfigRegister'].'</a><br>';
           if ($config['sendRegistMail'] == 1) {
               $checking='checked="checked"';
           }
           else {
               $checking='';
           }
-          echo '<input type="checkbox" name="sendRegistMail" value="1" '.$checking.'>'.$lang['pageAdvancedConfigRegistMail'].'</a></p>';
-          echo '<input name="process" type="hidden" id="process" value="adminPageAdvancedSubmit">';
-          echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
-          echo '<br><br><p><input type="submit" class="submit" value="'.$lang['pageAdvancedConfigSubmit'].'"></p>';
-          echo '</fieldset>';
-          echo '</form>';
+          $theme_adminadvanced['sendRegistMail'] = '<input type="checkbox" name="sendRegistMail" value="1" '.$checking.'>'.$lang['pageAdvancedConfigRegistMail'].'</a><br>';
+
+          if ($config['cleanUrl'] == 1) {
+              $checking='checked="checked"';
+          }
+          else {
+              $checking='';
+          }
+          $theme_adminadvanced['cleanUrl'] = '<input type="checkbox" name="cleanUrl" value="1" '.$checking.'>'.$lang['pageAdvancedConfigCleanUrl'].'</a><br>';
+
+          if ($config['commentModerate'] == 1) {
+              $checking='checked="checked"';
+          }
+          else {
+              $checking='';
+          }
+          $theme_adminadvanced['commentModerate'] = '<input type="checkbox" name="commentModerate" value="1" '.$checking.'>'.$lang['pageAdvancedCommentModerate'].'</a></p>';
+          $theme_adminadvanced['hidden'] = '<input name="process" type="hidden" id="process" value="adminPageAdvancedSubmit">';
+          $theme_adminadvanced['submit'] = $lang['pageAdvancedConfigSubmit'];
+          
+		  $theme_main['content'].= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_adminadvanced["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/adminadvanced.tpl"));
        }
        else {
-          echo $lang['errorPasswordIncorrect'].' .. <br>';
+          $theme_main['content'].= $lang['errorPasswordIncorrect'].' .. <br>';
        }
   }
 
 
 
   function adminPageAdvancedSubmit() {
-       global $config, $lang;
-       echo "<h3>".$lang['titleAdminPage']."</h3>";
-
-       $do=1;
+       global $config, $lang, $theme_main;
+      $do=1;
       if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
           if (isset($_POST['metaDesc']) && trim($_POST['metaDesc']) != "") {
                $config['metaDescription'] = $_POST['metaDesc'];
@@ -1337,6 +1503,9 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
           if (isset($_POST['timeoutDuration']) && trim($_POST['timeoutDuration']) != "") {
                $config['timeoutDuration'] = $_POST['timeoutDuration'];
           }
+          if (isset($_POST['limitLogins']) && trim($_POST['limitLogins']) != "") {
+               $config['limitLogins'] = $_POST['limitLogins'];
+          }
 
           if ($_POST['sendMailComments'] == 1) { $config['sendMailWithNewComment'] = 1; }
           else { $config['sendMailWithNewComment'] = 0; }
@@ -1359,132 +1528,175 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
           if ($_POST['sendRegistMail'] == 1) { $config['sendRegistMail'] = 1; }
           else { $config['sendRegistMail'] = 0; }
 
+          if ($_POST['commentModerate'] == 1) { $config['commentModerate'] = 1; }
+          else { $config['commentModerate'] = 0; }
+          
+		  if ($_POST['cleanUrl'] == 1) { $config['cleanUrl'] = 1; }
+          else { $config['cleanUrl'] = 0; }
+
           if (isset($_POST['menuLinks'])) {
                $config['menuLinks']=$config['menuLinksOrig']=str_replace("\r\n",";",$_POST['menuLinks']);
+          }
+          
+          if (isset($_POST['ipBan'])) {
+               $ipBanArray=explode("\r\n", $_POST['ipBan']);
+               @sqlite_query($config['db'], "DELETE FROM ipban");
+               foreach ($ipBanArray as $ipBan) {
+                  $ipBan = trim($ipBan);
+                  sqlite_query($config['db'], "INSERT INTO ipban (ip) VALUES ('$ipBan')");
+               }
           }
 
           if (isset($_POST['blogLanguage'])) {
                $config['blogLanguage']=$_POST['blogLanguage'];
           }
+
+          if (isset($_POST['theme'])) {
+               $config['theme']=$_POST['theme'];
+          }
+
           setConfigDefaults();
-          writeConfig();
+          writeConfig(false);
+		  return true;
        }
        else {
-          echo $lang['errorPasswordIncorrect'].' .. <br/>';
+		  return $lang['errorPasswordIncorrect'];
        }
   }
 
   function adminPageAuthors() {
       global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail;
-      echo "<h3>".$lang['titleAdminPage']."</h3>";
+      global $theme_main;
+      $theme_main['content'] = "";
+      $theme_authoradd['header'] = $lang['pageAuthorsManage'];
       if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
-          echo "<form method=\"post\" class=\"adminPage\" action=".$_SERVER['SCRIPT_NAME']."/adminAuthorsAdd>";
-          echo "<fieldset>";
-          echo '<legend>'.$lang['pageAuthorsAdd'].'</legend>';
-          echo '<p><label for="addAuthor">'.$lang['pageAuthorsNew'].'</label><br>';
-          echo '<input type="text" class="ptext" name="addAuthor" id="addAuthor" value=""></p>';
+		  
+		  $theme_authoradd['tabs']	 = adminPageTabs();
+		  
+		  $msgtext    = "";
+		  $msgclass   = "hide";
+		  if (isset($_POST['authoradd'])) {
+			  $submit_result = adminAuthorsAdd();
+			  if ($submit_result === true) {
+				  $msgtext = $lang['msgConfigSaved'];
+				  $msgclass= "success";
+			  }
+			  else {
+				  $msgtext = $submit_result;
+				  $msgclass= "error"; 
+			  }
+		  }	
+		  else if (isset($_POST['authoredit'])) {	
+		      $submit_result = adminAuthorsEdit();
+			  if ($submit_result === true) {
+				  $msgtext = $lang['msgConfigSaved'];
+				  $msgclass= "success";
+			  }
+			  else {
+				  $msgtext = $submit_result;
+				  $msgclass= "error"; 
+			  }
+		  }
+		  $theme_authoradd['msgtext']  = $msgtext;
+		  $theme_authoradd['msgclass'] = $msgclass;
+		  
+		  $theme_authoradd['action'] = $config['blogPath'].$config['cleanIndex']."/adminPageAuthors";
+          $theme_authoradd['legend'] = $lang['pageAuthorsAdd'];
+          $theme_authoradd['author'] = $lang['pageAuthorsNew'];
           $authorsList="";
           foreach ($authors as $value) {
               $authorsList.='"'.$value.'" , ';
           }
           $authorsList.='"admin"';
-          echo '<script>';
-          echo 'var author = new LiveValidation( "addAuthor", {onlyOnSubmit: true } );';
-          echo 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          echo 'author.add( Validate.Exclusion, { within: [ '.$authorsList.' ] , failureMessage: "'.$lang['errorDuplicateAuthor'].'"  } );';
-          echo '</script>';
-          echo '<p><label for="newpass1">'.$lang['pageBasicConfigNewpass1'].'</label><br>';
-          echo '<input type="password" class="ptext" name="newpass1" id="newpass1" value=""></p>';
-          echo '<script>';
-          echo 'var pass1 = new LiveValidation( "newpass1", {onlyOnSubmit: true } );';
-          echo 'pass1.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          echo 'pass1.add( Validate.Length, { minimum: 5 , failureMessage: "'.$lang['errorPassLength'].'" } );';
-          echo '</script>';
-          echo '<p><label for="newpass2">'.$lang['pageBasicConfigNewpass2'].'</label><br>';
-          echo '<input type="password" class="ptext" name="newpass2" id="newpass2" value=""></p>';
-          echo '<script>';
-          echo 'var pass2 = new LiveValidation( "newpass2", {onlyOnSubmit: true } );';
-          echo 'pass2.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          echo 'pass2.add( Validate.Confirmation,{ match: "newpass1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
-          echo '</script>';
-          echo '<p><label for="authorEmail">'.$lang['pageAuthorsNewEmail'].'</label><br>';
-          echo '<input type="text" class="ptext" name="authorEmail" id="authorEmail" value=""></p>';
-          echo '<script>';
-          echo 'var email = new LiveValidation( "authorEmail", {onlyOnSubmit: true } );';
-          echo 'email.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          echo 'email.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
-          echo '</script>';
-          echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
-          echo '<p><input type="submit" class="submit" value="'.$lang['pageAuthorsAdd'].'"></p>';
-          echo '</fieldset>';
-          echo '</form>';
-
+          $theme_authoradd['authorValidate'] = '<script>';
+          $theme_authoradd['authorValidate'].= 'var author = new LiveValidation( "addAuthor", {onlyOnSubmit: true } );';
+          $theme_authoradd['authorValidate'].= 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          $theme_authoradd['authorValidate'].= 'author.add( Validate.Exclusion, { within: [ '.$authorsList.' ] , failureMessage: "'.$lang['errorDuplicateAuthor'].'"  } );';
+          $theme_authoradd['authorValidate'].= '</script>';
+          $theme_authoradd['pass1'] = $lang['pageBasicConfigNewpass1'];
+          $theme_authoradd['pass1Validate'] = '<script>';
+          $theme_authoradd['pass1Validate'].= 'var pass1 = new LiveValidation( "newpass1", {onlyOnSubmit: true } );';
+          $theme_authoradd['pass1Validate'].= 'pass1.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          $theme_authoradd['pass1Validate'].= 'pass1.add( Validate.Length, { minimum: 5 , failureMessage: "'.$lang['errorPassLength'].'" } );';
+          $theme_authoradd['pass1Validate'].= '</script>';
+          $theme_authoradd['pass2'] = $lang['pageBasicConfigNewpass2'];
+          $theme_authoradd['pass2Validate'] = '<script>';
+          $theme_authoradd['pass2Validate'].= 'var pass2 = new LiveValidation( "newpass2", {onlyOnSubmit: true } );';
+          $theme_authoradd['pass2Validate'].= 'pass2.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          $theme_authoradd['pass2Validate'].= 'pass2.add( Validate.Confirmation,{ match: "newpass1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
+          $theme_authoradd['pass2Validate'].= '</script>';
+          $theme_authoradd['email'] = $lang['pageAuthorsNewEmail'];
+          $theme_authoradd['emailValidate'] = '<script>';
+          $theme_authoradd['emailValidate'].= 'var email = new LiveValidation( "authorEmail", {onlyOnSubmit: true } );';
+          $theme_authoradd['emailValidate'].= 'email.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          $theme_authoradd['emailValidate'].= 'email.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
+          $theme_authoradd['emailValidate'].= '</script>';
+          $theme_authoradd['submit'] = $lang['pageAuthorsAdd'];
+		  
+		  $theme_main['content'].= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_authoradd["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/authoradd.tpl"));
+	       
+		  readAuthors(); 	
+		  
           if (is_array($authors)) {
               $i = 0;
               foreach ($authors as $value) {
-                  echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/adminAuthorsEdit>";
-                  echo "<fieldset>";
-                  echo '<legend>'.$lang['pageAuthorsManage'].'</legend>';
-                  echo '<table>';
-                  echo '<tr><td><strong>Author: </strong>'.$value.'<br><br></td>';
-                  echo '<td><label for="authorEmail">'.$lang['pageAuthorsNewEmail'].'</label><br>';
-                  echo '<input type="text" name="authorEmail" id="authorEmail" value="'.$authorsEmail[$value].'"></td></tr>';
-                  echo '<tr><td><label for="newpass'.$i.'1">'.$lang['pageBasicConfigNewpass1'].'</label><br>';
-                  echo '<input type="password" name="newpass'.$i.'1" id="newpass'.$i.'1" value=""></td>';
-                  echo '<script>';
-                  echo 'var pass'.$i.'1 = new LiveValidation( "newpass'.$i.'1", {onlyOnSubmit: true } );';
-                  //echo 'pass'.$i.'1.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-                  echo 'pass'.$i.'1.add( Validate.Length, { minimum: 5 , failureMessage: "'.$lang['errorPassLength'].'" } );';
-                  echo '</script>';
-                  echo '<td><label for="newpass'.$i.'2">'.$lang['pageBasicConfigNewpass2'].'</label><br>';
-                  echo '<input type="password" name="newpass'.$i.'2" id="newpass'.$i.'2" value=""></td></tr>';
-                  echo '<script>';
-                  echo 'var pass'.$i.'2 = new LiveValidation( "newpass'.$i.'2", {onlyOnSubmit: true } );';
-                  echo 'pass'.$i.'2.add( Validate.Confirmation,{ match: "newpass'.$i.'1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
-                  echo '</script>';
-                  echo '</table>';
-                  echo '<input type="submit" value="'.$lang['postFtEdit'].'">&nbsp;&nbsp;';
-                  echo '<input type="checkbox" name="deleteAuthor" value="1">'.$lang['pageAuthorsDelete'];
-                  echo '<input name="author" type="hidden" id="author" value="'.$value.'">';
-                  echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
-                  echo '</fieldset>';
-                  echo '</form>';
+                  $theme_authoredit['action'] = $config['blogPath'].$config['cleanIndex']."/adminPageAuthors";
+                  $theme_authoredit['legend'] = $lang['pageAuthorsManage'];
+                  $theme_authoredit['author'] = $value;
+                  $theme_authoredit['emailLabel'] = $lang['pageAuthorsNewEmail'];
+                  $theme_authoredit['email'] = $authorsEmail[$value];
+                  $theme_authoredit['pass1Label'] = $lang['pageBasicConfigNewpass1'];
+                  $theme_authoredit['pass1']      = 'newpass'.$i.'1';
+                  $theme_authoredit['pass1Validate'] = '<script>';
+                  $theme_authoredit['pass1Validate'].= 'var pass'.$i.'1 = new LiveValidation( "newpass'.$i.'1", {onlyOnSubmit: true } );';
+                  $theme_authoredit['pass1Validate'].= 'pass'.$i.'1.add( Validate.Length, { minimum: 5 , failureMessage: "'.$lang['errorPassLength'].'" } );';
+                  $theme_authoredit['pass1Validate'].= '</script>';
+                  $theme_authoredit['pass2Label'] = $lang['pageBasicConfigNewpass2'];
+                  $theme_authoredit['pass2']      = 'newpass'.$i.'2';
+                  $theme_authoredit['pass2Validate'] = '<script>';
+                  $theme_authoredit['pass2Validate'].= 'var pass'.$i.'2 = new LiveValidation( "newpass'.$i.'2", {onlyOnSubmit: true } );';
+                  $theme_authoredit['pass2Validate'].= 'pass'.$i.'2.add( Validate.Confirmation,{ match: "newpass'.$i.'1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
+                  $theme_authoredit['pass2Validate'].= '</script>';
+                  $theme_authoredit['submit'] = $lang['postFtEdit'];
+                  $theme_authoredit['delete'] = $lang['pageAuthorsDelete'];
+                  $theme_authoredit['authornum'] = $i;
+                  $theme_main['content'].= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_authoredit["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/authoredit.tpl"));
                   $i++;
               }
           }
        }
        else {
-          echo $lang['errorPasswordIncorrect'].' .. <br/>';
+          $theme_main['content'].= $lang['errorPasswordIncorrect'].' .. <br/>';
        }
   }
 
-
   function adminAuthorsAdd() {
       global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $separator, $authorsPass, $authorsActCode, $authorsActStatus;
+      global $theme_main;
       $authorFileName=$config['authorFile'];
-      echo "<h3>".$lang['titleAdminPage']."</h3>";
-      $do = 1;
+	  $do = 1;
+	  $msgtext = "";
       if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
-          $addAuthor=$_POST['addAuthor'];
+          $addAuthor=strtolower($_POST['addAuthor']);
           $authorEmail=$_POST['authorEmail'];
           if (isset($authorsPass[$addAuthor])) {
-               echo $lang['errorDuplicateAuthor'].'<br>';
+               $msgtext.= $lang['errorDuplicateAuthor'].'<br>';
                $do = 0;
           }
           if (trim($addAuthor) == "" || trim($authorEmail) == "") {
-               echo $lang['errorAllFields'].'<br>';
+               $msgtext.= $lang['errorAllFields'].'<br>';
                $do = 0;
           }
           if ($_POST['newpass1'] != $_POST['newpass2']) {
-               echo $lang['errorNewPasswordsMatch']."<br>";
+               $msgtext.= $lang['errorNewPasswordsMatch']."<br>";
                $do = 0;
           }
           if (strtolower(trim($addAuthor)) == "admin") {
-               echo $lang['errorForbiddenAuthor'].'<br>';
+               $msgtext.= $lang['errorForbiddenAuthor'].'<br>';
                $do = 0;
           }
           if (strlen($_POST['newpass1']) < 5) {
-              echo $lang['errorPassLength'].'<br>';
+              $msgtext.= $lang['errorPassLength'].'<br>';
               $do = 0;
           }
           if ($do == 1) {
@@ -1495,7 +1707,7 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
                    $authorLine=$value.$separator.$authorsPass[$value].$separator.$authorsEmail[$value].$separator.$authorsActCode[$value].$separator.$authorsActStatus[$value]."\n";
                    fwrite($fp,$authorLine);
               }
-              $addAuthor=$_POST['addAuthor'];
+              $addAuthor=strtolower($_POST['addAuthor']);
               $addPass  =md5($config['randomString'].$_POST['newpass1']);
               $addEmail =$_POST['authorEmail'];
               $authorLine=$addAuthor.$separator.$addPass.$separator.$addEmail.$separator."11111".$separator."1"."\n";
@@ -1503,34 +1715,37 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
               fwrite($fp,'*/ ?>');
 
               fclose($fp);
-              echo $lang['msgConfigSaved'].'<br>';
+			  return true;
           }
           else {
-              echo $lang['errorPleaseGoBack'];
+			  return $msgtext;
           }
 
        }
        else {
-          echo $lang['errorPasswordIncorrect'].' .. <br/>';
+		  return $lang['errorPasswordIncorrect'];
        }
   }
 
 
   function adminAuthorsEdit() {
       global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $authorsPass, $separator, $authorsActCode, $authorsActStatus;
+      global $theme_main;
       $authorFileName=$config['authorFile'];
-      echo "<h3>".$lang['titleAdminPage']."</h3>";
-      $do = 1;
+	  $do = 1;
+	  $msgtext = "";
       $deleteAuthor = (isset($_POST['deleteAuthor']))?$_POST['deleteAuthor']:0;
       if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
           $editAuthor=$_POST['author'];
           if ($deleteAuthor != 1) {
-              if ($_POST['newpass1'] != $_POST['newpass2']) {
-                   echo $lang['errorNewPasswordsMatch']."<br>";
+              $newpass1 = 'newpass'.$_POST['authornum'].'1';
+              $newpass2 = 'newpass'.$_POST['authornum'].'2';
+              if ($_POST[$newpass1] != $_POST[$newpass2]) {
+                   $msgtext.= $lang['errorNewPasswordsMatch']."<br>";
                    $do = 0;
               }
-              if (strlen($_POST['newpass1']) < 5) {
-                  echo $lang['errorPassLength'].'<br>';
+              if (strlen($_POST[$newpass1]) < 5) {
+                  $msgtext.= $lang['errorPassLength'].'<br>';
                   $do = 0;
               }
           }
@@ -1541,31 +1756,216 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
               foreach ($authors as $value) {
                    $authorsDelete = false;
                    if (strcmp($value,$editAuthor) == 0) {
-                        $authorsPass[$value]  = md5($config['randomString'].$_POST['newpass1']);
+                        $authorsPass[$value]  = md5($config['randomString'].$_POST[$newpass1]);
                         $authorsEmail[$value] = $_POST['authorEmail'];
                         if ($deleteAuthor == 1) {
                             $authorsDelete = true;
                         }
                    }
                    $authorLine=$value.$separator.$authorsPass[$value].$separator.$authorsEmail[$value].$separator.$authorsActCode[$value].$separator.$authorsActStatus[$value]."\n";
-                   //echo $authorLine.'<br>';
                    if (!$authorsDelete) {
                       fwrite($fp,$authorLine);
                    }
               }
               fwrite($fp,'*/ ?>');
               fclose($fp);
-              echo $lang['msgConfigSaved'].'<br>';
+			  return true;
           }
           else {
-              echo $lang['errorPleaseGoBack'];
+			  return $msgtext;
           }
 
        }
        else {
-          echo $lang['errorPasswordIncorrect'].' .. <br/>';
+		  return $lang['errorPasswordIncorrect'];
        }
   }
+
+  
+  function plugin_cleanup() {
+      global $SHP, $config;
+      $result = sqlite_query($config['db'], "select id from plugins;");
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $pluginid  = $row['id'];
+          $plugin_id = $pluginid.'.plugin.php';
+          if (!isset($SHP->plugins[$plugin_id]['file']) && ($SHP->plugins[$plugin_id]['file'] !== $plugin_id)) {
+              @sqlite_query($config['db'], "DELETE FROM plugins WHERE id = '$pluginid'");
+          }
+      }
+  }
+
+  function list_plugins($plugin_folder = './plugins/') {
+        global $SHP, $theme_main, $config;
+        if ($handle = @opendir($plugin_folder)) {
+		while (false !== ($file = readdir($handle))) {
+			if (is_file($plugin_folder . $file)) {
+				if ((strpos($plugin_folder . $file,'.plugin.php') != false) && 
+				    (strpos($from_folder . $file,'.svn-base') == false)) {
+					$plugin_array = $SHP->get_plugin_data($file);
+					$pluginid1 = explode(".",$plugin_array['file']);
+					$pluginid  = $pluginid1[0];
+					//echo '-> '.$pluginid.'  '.$_POST[$pluginid].'<br>';
+					$plugin_checked = false;
+					if ($_POST[$pluginid] == 1) {$status = 1; }
+					else { $status = 0; }
+					$active = false;
+                                        if (!isset($_POST['notfirst']) && $plugin_array['active']) {
+                                            $active = true;
+                                        }
+                                        if (isset($_POST['notfirst'])) {
+                                            sqlite_query($config['db'], "UPDATE plugins SET status = '$status' WHERE id = '$pluginid';");
+                                        }
+                                        if (($_POST[$pluginid] == 1) || $active) {
+                                            $checking='checked="checked"';
+                                        }
+                                        else {
+                                            $checking='';
+                                        }
+					$theme_main['content'] .= '<tr><td><input type="checkbox" name="'.$pluginid.'" value="1" '.$checking.'></td><td><a href="'.$plugin_array['url'].'">'.$plugin_array['name'].'</a></td><td>'.$plugin_array['author'].'</td><td>'.$plugin_array['desc'].'</td></tr>';
+				}
+			}
+			else if ((is_dir($plugin_folder . $file)) && ($file != '.') && ($file != '..')) {
+				list_plugins($plugin_folder . $file . '/');
+			}
+		}
+		closedir($handle);
+        }
+        plugin_cleanup();
+  }
+
+  function list_comments_moderate() {
+      global $SHP, $theme_main, $config, $optionValue, $lang;
+      $message = "";
+      $result = sqlite_query($config['db'], "select count(commentid) AS view from comments WHERE status = 'pending'");
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $commentCount  = $row['view'];
+          if ($commentCount > 0) {
+              $theme_main['content'].= '<table><tr><th>Select</th><th>Comment Title</th><th>'.$lang['pageAllCommentsBy'].'</th></tr>';
+              $result = sqlite_query($config['db'], "select * from comments WHERE status = 'pending' ORDER BY date DESC");
+              while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+                  $commentid     = $row['commentid'];
+                  $postid        = $row['postid'];
+                  $sequence      = $row['sequence'];
+                  $author        = $row['author'];
+                  $title         = $row['title'];
+                  $content       = $row['content'];
+                  $date          = $row['date'];
+                  $ip            = $row['ip'];
+                  $url           = $row['url'];
+                  $email         = $row['email'];
+                  $titleModified=getTitleFromFilename($postid);
+                  if ($_POST[$commentid] == 1) {$status = 'approved'; }
+    	          else { $status = 'pending'; }
+                  if (isset($_POST['notfirst']) || ($optionValue == 'delete')) {
+                      //echo $optionValue.'<br>';
+                      $message = $lang['pageModerateMessage'];
+                      if ($optionValue !== 'delete') {
+                          sqlite_query($config['db'], "UPDATE comments SET status = '$status' WHERE commentid = '$commentid';");
+                      }
+                      else {
+                          sqlite_query($config['db'], "DELETE FROM comments WHERE commentid = '$commentid';");
+                      }
+                  }
+              }
+              $result = sqlite_query($config['db'], "select * from comments WHERE status = 'pending' ORDER BY date DESC");
+              while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+                  $commentid     = $row['commentid'];
+                  $postid        = $row['postid'];
+                  $sequence      = $row['sequence'];
+                  $author        = $row['author'];
+                  $title         = $row['title'];
+                  $content       = $row['content'];
+                  $date          = $row['date'];
+                  $ip            = $row['ip'];
+                  $url           = $row['url'];
+                  $email         = $row['email'];
+                  $titleModified=getTitleFromFilename($postid);
+                  $theme_main['content'].= '<tr><td><input type="checkbox" name="'.$commentid.'" value="1"></td><td><a style="font-style:normal" href="'.$config['blogPath'].$config['cleanIndex'].'/posts/'.$postid.'/'.$titleModified.'#'.$sequence.'">'.$title.'</a></td><td>'.$author.'</td></tr>';
+              }
+             $theme_main['content'].= "</table>";
+             //$theme_main['content'].= "<br>".$message."<br>";
+          }
+          else {
+              $theme_main['content'].= $lang['pageModerateEmpty'].'!<br>';
+          }
+      }
+
+  }
+
+  function adminPageTabs() {
+	  global $config, $lang;
+	  $theme_admintabs['actionBasic']    = $config['blogPath'].$config['cleanIndex'].'/adminPageBasic';
+	  $theme_admintabs['basic'] 		 = $lang['tabsBasic'];
+	  $theme_admintabs['actionAdvanced'] = $config['blogPath'].$config['cleanIndex'].'/adminPageAdvanced';
+	  $theme_admintabs['advanced'] 		 = $lang['tabsAdvanced'];
+	  $theme_admintabs['actionAuthor'] 	 = $config['blogPath'].$config['cleanIndex'].'/adminPageAuthors';
+	  $theme_admintabs['manageAuthors']  = $lang['tabsAuthors'];
+	  $theme_admintabs['actionPlugins']  = $config['blogPath'].$config['cleanIndex'].'/adminPagePlugins';
+	  $theme_admintabs['managePlugins']  = $lang['tabsPlugins'];
+	  $theme_admintabs['actionModerate'] = $config['blogPath'].$config['cleanIndex'].'/adminPageModerate';
+	  $theme_admintabs['manageModerate'] = $lang['tabsModerate'];	
+	  return @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_admintabs["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/admintabs.tpl"));
+  }
+  
+  function adminPagePlugins() {
+      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail;
+      global $theme_main, $SHP;
+      $theme_main['content'] = "";
+      $theme_main['content'].= '<h3>'.$lang['pagePlugins'].'</h3>';
+      $theme_main['content'].= adminPageTabs();
+	  if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
+		  $msgclass = "hide";
+		  $msgtext	= "";
+          if (isset($_POST['notfirst'])) {
+			  $msgtext = $lang['msgConfigSaved'];
+			  $msgclass= "success";
+		  }	
+		  $theme_main['content'] .= "<div class='$msgclass'>$msgtext</div>";
+		  $theme_main['content'] .= '<br><form method="post" action="'.$config['blogPath'].$config['cleanIndex'].'/adminPluginsSubmit">';
+          $theme_main['content'] .= '<table>';
+          $theme_main['content'] .= '<tr><th>Active</th><th>Plugin</th><th>Author</th><th>Description</th></tr>';
+          $plugin_folder = './plugins/';
+          list_plugins($plugin_folder);
+          $theme_main['content'] .= '</table>';
+          $theme_main['content'] .= '<input type="hidden" id="notfirst" name="notfirst" value="notfirst">';
+          $theme_main['content'] .= '<br><input type="submit" id="submit" name="submit" value="'.$lang['pageAdvancedConfigSubmit'].'">';
+          $theme_main['content'] .= '</form>';
+       }
+       else {
+          $theme_main['content'].= $lang['errorPasswordIncorrect'].' .. <br/>';
+       }
+  }
+
+
+  function adminPageModerate() {
+      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail;
+      global $theme_main, $SHP;
+      $theme_main['content'] = "";
+      $theme_main['content'].= '<h3>'.$lang['pageModerate'].'</h3>';
+	  $theme_main['content'].= adminPageTabs();
+      if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
+	  	  $msgclass = "hide";
+		  $msgtext	= "";
+          if (isset($_POST['notfirst'])) {
+			  $msgtext = $lang['pageModerateMessage'];
+			  $msgclass= "success";
+		  }	
+		  $theme_main['content'] .= "<div class='$msgclass'>$msgtext</div>"; 
+	      $theme_main['content'] .= '<br><form method="post" action="'.$config['blogPath'].$config['cleanIndex'].'/adminModerateSubmit">';
+          $theme_main['content'] .= '<table>';
+          //$theme_main['content'] .= '<tr><th>Active</th><th>Plugin</th><th>Author</th><th>Description</th></tr>';
+          //$plugin_folder = './plugins/';
+		  list_comments_moderate();
+          $theme_main['content'] .= '</table>';
+          $theme_main['content'] .= '<input type="hidden" id="notfirst" name="notfirst" value="notfirst">';
+          $theme_main['content'] .= '<br><input type="submit" id="submit" name="submit" value="'.$lang['pageModerateApprove'].'">&nbsp;&nbsp;<a href="'.$config['blogPath'].$config['cleanIndex'].'/adminModerateSubmit/delete"><input type="button" value="'.$lang['pageModerateDelete'].'"></a>';
+          $theme_main['content'] .= '</form>';
+       }
+       else {
+          $theme_main['content'].= $lang['errorPasswordIncorrect'].' .. <br/>';
+       }
+  }
+
 
   function readAuthors() {
     /* Read Author information from file. */
@@ -1582,8 +1982,6 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
              $authorsEmail[$authors[$i]]=$authorLine[2];
              $authorsActCode[$authors[$i]]=(trim($authorLine[3]) == "")?11111:$authorLine[3];
              $authorsActStatus[$authors[$i]]=(trim($authorLine[4]) == "")?0:$authorLine[4];
-             //echo $authorLine[0].' - '.$authorsActCode[$authors[$i]].'<br>';
-             //echo $authors[$i].'  '.$authorsPass[$authors[$i]].'  '.$authorsEmail[$authors[$i]].'<br>';
              $i++;
         }
     }
@@ -1594,9 +1992,22 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
 
   function readConfig() {
     /* Read config information from file. */
-    global $config;
-
-    $contents = file( getcwd()."/data/".'config_admin.php' );
+    global $config,$user,$user1;
+    //echo $user.' '.$user1.'<br>';
+    $configFile = getcwd()."/data/".$user."/config.php";
+	//$configFile = "/home/tipsfor1/public_html/pritlog.com/labs/pritlog8/data/user/config.php";
+	//echo $configFile.'<br>';
+	//die();
+    if (!file_exists($configFile)) {
+        $configFile = getcwd()."/data/".$user1."/config.php";
+        $user = $user1;
+        if (!file_exists($configFile)) {
+            //@header("Location: index.html");
+            //die("Please contact prit@pritlog.com to setup an account for you");
+			die("Your config file does not exist");
+        }
+    }
+    $contents = file( $configFile );
     $contents[0]=trim(str_replace("<?php /*","",$contents[0]));
     $contents[0]=trim(str_replace("*/ ?>","",$contents[0]));
     if ( $contents[0] ) {
@@ -1633,7 +2044,11 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
                   'showCategoryCloud',
                   'allowRegistration',
                   'sendRegistMail',
-                  'timeoutDuration');
+                  'timeoutDuration',
+                  'theme',
+                  'commentModerate',
+                  'limitLogins',
+                  'cleanUrl');
 
       for ( $i = 0; $i < count( $tempConfigs ); $i++ ) {
         $key = $configKeys[ $i ];
@@ -1680,20 +2095,25 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
         if ( !isset( $config[ 'menuLinks' ] ) )                  { $config[ 'menuLinksOrig' ]              = 'http://google.com,Google;http://pplog.infogami.com/,Get PPLOG;http://hardkap.net/pritlog,Get PRITLOG';
                                                                    $config[ 'menuLinks' ]                  = 'http://google.com,Google;http://pplog.infogami.com/,Get PPLOG;http://hardkap.net/pritlog,Get PRITLOG'; }
         if ( !isset( $config[ 'blogLanguage' ] ) )               { $config[ 'blogLanguage' ]               = 'english-us'; }
+        if ( !isset( $config[ 'theme' ] ) )                      { $config[ 'theme' ]                      = 'default'; }
         if ( !isset( $config[ 'blogPath' ] ) )                   { $config[ 'blogPath' ]                   = 'http://localhost'; }
         if ( !isset( $config[ 'showCategoryCloud' ] ) )          { $config[ 'showCategoryCloud' ]          = 1; }
         if ( !isset( $config[ 'allowRegistration' ] ) )          { $config[ 'allowRegistration' ]          = 0; }
         if ( !isset( $config[ 'sendRegistMail' ] ) )             { $config[ 'sendRegistMail' ]             = 1; }
+        if ( !isset( $config[ 'commentModerate' ] ) )            { $config[ 'commentModerate' ]            = 0; }
+        if ( !isset( $config[ 'cleanUrl' ] ) )                   { $config[ 'cleanUrl' ]                   = 0; }
         if ( !isset( $config[ 'timeoutDuration' ] ) )            { $config[ 'timeoutDuration' ]            = 900; }
+        if ( !isset( $config[ 'limitLogins' ] ) )                { $config[ 'limitLogins' ]                = 10; }
         $config['menuLinksOrig']=$config['menuLinks'];
         $config['menuLinksArray']=explode(';',$config['menuLinks']);
 
   }
 
   function writeConfig($message=true) {
-        global $config, $lang;
-        $configFile=getcwd()."/data/".'config_admin.php';
-        $configContent='<?php /* ';
+        global $config, $lang, $user;
+        $configFile=getcwd()."/data/".$user.'/config.php';
+        /*$configContent='<?php /* ';*/
+		$configContent = '';
         if (file_exists($configFile)) {
             $configContent=$configContent.
                           $config['blogTitle'].'|'.
@@ -1728,18 +2148,25 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
                           $config['showCategoryCloud'].'|'.
                           $config['allowRegistration'].'|'.
                           $config['sendRegistMail'].'|'.
-                          $config['timeoutDuration'];
-            $configContent=$configContent.' */ ?>';
+                          $config['timeoutDuration'].'|'.
+                          $config['theme'].'|'.
+                          $config['commentModerate'].'|'.
+                          $config['limitLogins'].'|'.
+                          $config['cleanUrl'];
+            //echo $configContent.'<br/>';
+			$configContent='<?php /* '.$configContent.' */ ?>';
             $fp=fopen($configFile,"w");
-            fwrite($fp,$configContent);
+			$fwrite = fwrite($fp,$configContent);
+            if ($fwrite === false) {echo 'Error updating config<br/>';}
             fclose($fp);
             if ($message) {echo '<br>'.$lang['msgConfigSaved'].'<br>';}
+			//die('dying');
         }
   }
 
 
   function createRSS() {
-    global $config, $separator, $entries, $optionValue;
+    global $config, $separator, $entries, $optionValue, $lang;
 	$base = 'http://'.$_SERVER['HTTP_HOST'].substr($_SERVER['REQUEST_URI'],0,-3);
 
 	echo header('Content-type: text/xml').'<?xml version="1.0" encoding="ISO-8859-1"?><rss version="2.0">';
@@ -1766,17 +2193,21 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
             $rssTitle      = $row['title'];
             $rssTitleModified=titleModify($rssTitle);
             $rssContent    = explode("*readmore*",$row['content']);
+            if (trim($rssContent[1]) !== "") $readmore = '<br><br><a href="'.$link.'">'.$lang['pageViewFullPost'].'</a>';
+            else $readmore = "";
             $date1         = $row['date'];
             $rssEntry      = $row['postid'];
             $rssCategory   = $row['category'];
             $postType      = $row['type'];
             $allowComments = $row['allowcomments'];
             $visits        = $row['visits'];
+            $link          = $base.htmlspecialchars('posts/'.$rssEntry."/".$rssTitleModified);
             if (trim($visits) == "") { $visits=0; }
             if ($optionValue === $rssCategory || trim($optionValue) == "") {
-                   echo '<item><link>'.$base.htmlspecialchars('viewEntry/'.$rssEntry."/".$rssTitleModified).'</link>';
+                   echo '<item><link>'.$link.'</link>';
     		   echo '<title>'.$rssTitle.'</title><category>'.$rssCategory.'</category>';
-    		   echo '<description>'.htmlspecialchars($rssContent[0]).'</description></item>';
+    		   echo '<description>'.htmlspecialchars(html_entity_decode($rssContent[0].$readmore)).'</description></item>';
+    		   //echo '<description>'.htmlspecialchars($rssContent[0]).'<br><a href="'.$link.'">'.$lang['pageViewFullPost'].'</a></description></item>';
             }
         }
 
@@ -1785,9 +2216,9 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
 
   function titleModify($myTitle)
   {
-          $myTitle=str_replace('"','',str_replace("'","",html_entity_decode($myTitle,ENT_QUOTES)));
-          $myTitleMod1=preg_replace("/[^a-z\d\'\"]/i", "-", substr($myTitle,0,strlen($myTitle)-1));
-	  $myTitleMod2=preg_replace("/[^a-z\d]/i", "", substr($myTitle,strlen($myTitle)-1,1));
+          $myTitle=removeAccent(str_replace('"','',str_replace("'","",html_entity_decode($myTitle,ENT_QUOTES))));
+          $myTitleMod1=@preg_replace("/[^a-z\d\'\"]/i", "-", substr($myTitle,0,strlen($myTitle)-1));
+	  $myTitleMod2=@preg_replace("/[^a-z\d]/i", "", substr($myTitle,strlen($myTitle)-1,1));
           $myTitleModified=rtrim($myTitleMod1.$myTitleMod2,'-');
           return $myTitleModified;
   }
@@ -1802,7 +2233,8 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
            $result = sqlite_query($config['db'], "select * from posts WHERE type = 'post' ORDER BY stick desc, postid desc LIMIT $start, $end;");
        }
        else {
-           $result = sqlite_query($config['db'], "select * from posts WHERE type = 'post' AND category = '$requestCategory' ORDER BY stick desc, postid desc LIMIT $start, $end;");
+           //$result = sqlite_query($config['db'], "select * from posts WHERE type = 'post' AND category = '$requestCategory' ORDER BY stick desc, postid desc LIMIT $start, $end;");
+           $result = sqlite_query($config['db'], "select * from posts WHERE type = 'post' AND (category = '$requestCategory' or category like '$requestCategory,%' or category like '%,$requestCategory' or category like '%,$requestCategory,%') ORDER BY stick desc, postid desc LIMIT $start, $end;");
        }
        //sqlite_seek($result,11);
        while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
@@ -1846,7 +2278,7 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
           $statcount = $row['statcount'] + 1;
       }
 
-      if ($logThis != 1) {
+      if (($logThis != 1) && ($_SESSION['start'])) {
           sqlite_query($config['db'], "UPDATE stats SET statcount = '$statcount' WHERE stattype = '$stattype';");
       }
       if (!(isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false)) {
@@ -1892,16 +2324,19 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
           else { $users++; }
       }
       $online = $users + $guests;
+      $stats = "";
+      //if ($_SESSION['start']) { $stats = 'Session Start<br>'; }
       //echo $lang['sidebarStatsUsersOnline'].': '.$online.'<br>';
-      echo $users  . ' '.$lang['sidebarStatsMembersOnline'].'<br>';
-      echo $guests . ' '.$lang['sidebarStatsGuestsOnline'].'<br>';
-      echo $lang['sidebarStatsHits'].': '.$statcount.'<br>';
+      $stats .= $users  . ' '.$lang['sidebarStatsMembersOnline'].'<br>';
+      $stats .= $guests . ' '.$lang['sidebarStatsGuestsOnline'].'<br>';
+      $stats .= $lang['sidebarStatsHits'].': '.$statcount.'<br>';
+      return $stats;
   }
 
 
   function listPosts() {
       global $separator, $entries, $config, $requestCategory;
-      global $userFileName, $optionValue3, $lang;
+      global $userFileName, $optionValue3, $lang, $theme_main, $SHP, $theme_post;
       $config_Teaser=0;
       $filterEntries=array();
 
@@ -1910,12 +2345,13 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
           while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
               $totalEntries = $row['view'];
               if ($row['view'] == 0) {
-                 echo '<br><br>'.$lang['msgNoPosts'].' <a href="'.$_SERVER['SCRIPT_NAME'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
+                 $theme_main['content'] = '<br><br>'.$lang['msgNoPosts'].' <a href="'.$config['blogPath'].$config['cleanIndex'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
               }
           }
       }
       else {
-          $result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE type = 'post' AND category = '$requestCategory';");
+          //$result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE type = 'post' AND category = '$requestCategory';");
+          $result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE type = 'post' AND (category = '$requestCategory' or category like '$requestCategory,%'or category like '%,$requestCategory' or category like '%,$requestCategory,%');");
           while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
               $totalEntries = $row['view'];
           }
@@ -1945,40 +2381,76 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
            $title  =$entry[0];
            $titleModified=titleModify($title);
            $date1   =date("d M Y H:i",strtotime($entry[2]));
+           $postMonth=date("M",strtotime($entry[2]));
+           $postDay  =date("d",strtotime($entry[2]));
+           $postYear =date("Y",strtotime($entry[2]));
            $fileName=$entry[3];
-           $category=$entry[4];
+           $category=html_entity_decode($entry[4]);
            $postType=$entry[5];
            $visits  =$entry[7];
            $author  =(trim($entry[8])== "")?'admin':$entry[8];
            if (trim($visits) == "") { $visits=0; }
-           if (strstr($entry[1],"*readmore*")) { $readmore='<br><br><a href="'.$_SERVER["SCRIPT_NAME"].'/viewEntry/'.$fileName."/".$titleModified.'">'.$lang['pageViewFullPost'].' &raquo;</a>'; }
+           if (strstr($entry[1],"*readmore*")) { $readmore='<br><br><a href="'.$config['blogPath'].$config['cleanIndex'].'/posts/'.$fileName."/".$titleModified.'">'.$lang['pageViewFullPost'].' &raquo;</a>'; }
            else { $readmore=""; }
            $content =explode("*readmore*",$entry[1]);
 
-           echo "<h2><a class=\"postTitle\" href=".$_SERVER["SCRIPT_NAME"]."/viewEntry/".$fileName."/".$titleModified.">".$title."</a></h2>";
-           echo $content[0].$readmore;
+           $theme_post['loc_top']           = "";
+           $theme_post['loc_title_after']   = "";
+           $theme_post['loc_content_after'] = "";
+           $theme_post['loc_footer']        = "";
+           $theme_post['loc_bottom']        = "";
+           $theme_post['postLink'] = $config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified;
+           $theme_post['title']    = $title;
+           $theme_post['content']  = html_entity_decode($content[0].$readmore);
            $categoryText=str_replace("."," ",$category);
-           echo "<br><center><i>".$lang['pageAuthorsNew1'].": ".$author."&nbsp;-&nbsp; ".$lang['postFtPosted'].": ".$date1."<br>".$lang['postFtCategory'].": <a href=".$_SERVER['SCRIPT_NAME']."/viewCategory/".urlencode($category).">".$categoryText."</a>&nbsp;-&nbsp; ".$lang['postFtVisits'].": ".$visits;
+           $theme_post['authorLabel']    = $lang['pageAuthorsNew1'];
+           $theme_post['author']         = $author;
+           $theme_post['dateLabel']     = $lang['postFtPosted'];
+           $theme_post['date']          = $date1;
+           $theme_post['postMonth']     = $postMonth;
+           $theme_post['postDay']       = $postDay;
+           $theme_post['postYear']      = $postYear;
+           //$theme_post['categoryLabel'] = $lang['postFtCategory'];
+           $theme_post['categoryLabel'] = $lang['postFtTags'];
+           $theme_post['category'] = "";
+           unset($listcats);
+           foreach (explode(",",$category) as $singlecat) $listcats[$singlecat]="1";
+           $catsep="";
+           foreach ($listcats as $catkey => $catvalue)
+           {
+              $categoryText=str_replace("."," ",$catkey);
+              $theme_post['category'] .= $catsep."<a href=".$config['blogPath'].$config['cleanIndex']."/category/".$catkey.">".$categoryText."</a>";
+              $catsep=",";
+           }
+           //$theme_post['category']      = "<a href=".$_SERVER['SCRIPT_NAME']."/viewCategory/".urlencode($category).">".$categoryText."</a>";
+           $theme_post['visitsLabel']   = $lang['postFtVisits'];
+           $theme_post['visits']        = $visits;
+
+           if ($SHP->hooks_exist('hook-post')) {
+           	$SHP->execute_hooks('hook-post');
+           }
+
            $commentFile=$config['commentDir'].$fileName.$config['dbFilesExtension'];
-           $result = sqlite_query($config['db'], "select count(*) AS view from comments WHERE postid='$fileName';");
+           $result = sqlite_query($config['db'], "select count(*) AS view from comments WHERE postid='$fileName' AND status='approved';");
            $commentCount = sqlite_fetch_array($result);
            if ($commentCount['view'] > 0) {
                $commentText=$lang['postFtComments'].": ".$commentCount['view'];
            }
            else {$commentText=$lang['postFtNoComments'];}
-           echo "&nbsp;-&nbsp; <a href=".$_SERVER["SCRIPT_NAME"]."/viewEntry/".$fileName."/".$titleModified."#Comments>".$commentText."</a></i><br></center>";
+           $theme_post['comments']        = "<a href=".$config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified."#Comments>".$commentText."</a>";
+           $theme_post['edit'] = $theme_post['delete'] = "";
            if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
-               echo "<center><a href=".$_SERVER['SCRIPT_NAME']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
-               echo "&nbsp;-&nbsp;<a href=".$_SERVER['SCRIPT_NAME']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a></center><br/>";
+               $theme_post['edit']       = "<a href=".$config['blogPath'].$config['cleanIndex']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
+               $theme_post['delete']    = "&nbsp;-&nbsp;<a href=".$config['blogPath'].$config['cleanIndex']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a></center><br/>";
            }
-           echo "<br/><br/>";
+           $theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_post["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/post.tpl"));
            $i++;
       }
       $totalEntries++;
       $totalPages = ceil(($totalEntries)/($config['entriesPerPage']));
       if($totalPages >= 1)
       {
-	   echo '<center> '.$lang['msgPages'].': ';
+	   $theme_main['content'] .= '<center> '.$lang['msgPages'].': ';
       }
       else
       {
@@ -1998,48 +2470,52 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
                         }
                         else
                         {
-                                $categoryText='/viewCategory/'.urlencode($requestCategory);
+                                $categoryText=$config['blogPath'].$config['cleanIndex'].'/category/'.urlencode($requestCategory);
                         }
 
                         if($i == (($page-1)+$config['maxPagesDisplayed']) && (($page-1)+$config['maxPagesDisplayed']) < $totalPages)
 			{
-				echo  '<a href='.$_SERVER['SCRIPT_NAME'].$categoryText.'/page/'.$i.'>['.$i.']</a> ...';
+				$theme_main['content'] .=  '<a href='.$config['blogPath'].$config['cleanIndex'].$categoryText.'/page/'.$i.'>['.$i.']</a> ...';
 			}
 			elseif($startPage > 1 && $displayed == 0)
 			{
-				echo '... <a href='.$_SERVER['SCRIPT_NAME'].$categoryText.'/page/'.$i.'>['.$i.']</a> ';
+				$theme_main['content'] .= '... <a href='.$config['blogPath'].$config['cleanIndex'].$categoryText.'/page/'.$i.'>['.$i.']</a> ';
 	 			$displayed = 1;
 			}
 			else
 			{
-				echo '<a href='.$_SERVER['SCRIPT_NAME'].$categoryText.'/page/'.$i.'>['.$i.']</a> ';
+				$theme_main['content'] .= '<a href='.$config['blogPath'].$config['cleanIndex'].$categoryText.'/page/'.$i.'>['.$i.']</a> ';
 			}
 		}
 		else
 		{
-			echo '['.$i.'] ';
+			$theme_main['content'] .= '['.$i.'] ';
 		}
 	    }
 	}
-	print '</center>';
+	$theme_main['content'] .= '</center>';
   }
 
 
   function sidebarListEntries() {
-      global $separator, $entries, $config;
+      global $separator, $entries, $config, $theme_main;
       $i=0;
       $limit = $config['menuEntriesLimit'];
       $result = sqlite_query($config['db'], "select * from posts ORDER BY postid DESC LIMIT $limit;");
+      $latest="";
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
             $title         = $row['title'];
             $titleModified = titleModify($title);
             $fileName      = $row['postid'];
             $postType      = $row['type'];
             if ($postType!="page") {
-                     echo "<a href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$fileName."/".$titleModified.">".$title."</a>";
-                     $i++;
+                $theme_latest['link']     = $config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified;
+                $theme_latest['linktext'] = $title;
+                $latest .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_latest["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/latestentries.tpl"));
+                $i++;
             }
       }
+      $theme_main['latestEntries'] = $latest;
   }
 
   function sidebarPopular() {
@@ -2047,6 +2523,7 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
       $i=1;
       $multiArray= Array();
       $limit = $config['menuEntriesLimit'];
+      $popular = "";
       $result = sqlite_query($config['db'], "select * from posts WHERE type = 'post' ORDER BY visits DESC LIMIT $limit;");
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $title         = $row['title'];
@@ -2059,8 +2536,11 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
           $allowComments = $row['allowcomments'];
           $visits        = $row['visits'];
           if (trim($visits) == "") { $visits=0; }
-          echo '<a href="'.$_SERVER['SCRIPT_NAME'].'/viewEntry/'.$fileName.'/'.$titleModified.'">'.$title.'</a>';
+          $theme_popular['link']     = $config['blogPath'].$config['cleanIndex'].'/posts/'.$fileName.'/'.$titleModified;
+          $theme_popular['linktext'] = $title;
+          $popular .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_popular["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/popularentries.tpl"));
       }
+      return $popular;
   }
 
 
@@ -2079,14 +2559,18 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
       global $separator, $entries, $config;
       $latestCommentsFile=$config['commentDir']."latest".$config['dbFilesExtension'];
       $limit = $config['menuEntriesLimit'];
-      $result = sqlite_query($config['db'], "select * from comments ORDER BY date DESC LIMIT $limit;");
+      $result = sqlite_query($config['db'], "select * from comments WHERE status = 'approved' ORDER BY date DESC LIMIT $limit;");
+      $comments = "";
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $commentFileName = $row['postid'];
           $commentNum      = $row['sequence'];
           $commentTitle    = $row['title'];
           $postTitle=getTitleFromFilename($commentFileName);
-          echo "<a href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$commentFileName."/".$postTitle."#".$commentNum.">".$commentTitle."</a>";
+          $theme_listcomment['link']     = $config['blogPath'].$config['cleanIndex']."/posts/".$commentFileName."/".$postTitle."#".$commentNum;
+          $theme_listcomment['linktext'] = $commentTitle;
+          $comments .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_listcomment["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/listcomments.tpl"));
       }
+      return $comments;
   }
 
   function sidebarPageEntries() {
@@ -2094,20 +2578,32 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
       $i=0;
       $limit = $config['menuEntriesLimit'];
       $result = sqlite_query($config['db'], "select * from posts WHERE type = 'page' ORDER BY date DESC LIMIT $limit;");
+      $pages = "";
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
             $title         = $row['title'];
             $titleModified = titleModify($title);
             $fileName         = $row['postid'];
             $postType         = $row['type'];
-            echo "<a href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$fileName."/".$titleModified.">".$title."</a>";
+            $theme_listpages['link']     = $config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified;
+            $theme_listpages['linktext'] = $title;
+            $pages .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_listpages["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/listpages.tpl"));;
             $i++;
       }
+      return $pages;
+  }
+  
+  function removeAccent($string="") {
+     $search = explode(",","ç,æ,œ,á,é,í,ó,ú,à,è,ì,ò,ù,ä,ë,ï,ö,ü,ÿ,â,ê,î,ô,û,å,e,i,ø,u");
+     $replace = explode(",","c,ae,oe,a,e,i,o,u,a,e,i,o,u,a,e,i,o,u,y,a,e,i,o,u,a,e,i,o,u");
+     $string = str_replace($search, $replace, $string);
+     return $string;
   }
 
   function printTagCloudAgain($tags) {
         // $tags is the array
         //arsort($tags);
         //shuffle($tags);
+        global $config;
 
         $max_size = 42; // max font size in pixels
         $min_size = 16; // min font size in pixels
@@ -2130,14 +2626,16 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
         $colors = array("#D65421", "#000000", "#D5B94C", "#D92178", "#20A0CF", "#7777A7");
 
         // loop through the tag array
-        echo '<ul class="tagcloud">';
+        $tagCloud = '<ul class="tagcloud">';
         foreach ($tags as $key => $value) {
             $size = $min_size + (($value - $min_qty) * $step);
             $rand_colors = array_rand($colors);
-            echo '<li><a href="'.$_SERVER['SCRIPT_NAME'].'/viewCategory/'.urlencode(str_replace(" ",".",$key)).'" class="tag" style="font-size:'.$size.'px; color:'.$colors[$rand_colors].'" onmouseout="this.style.color=\''.$colors[$rand_colors].'\'" onmouseover="this.style.color=\'#fff\'" title="'.$value.' things tagged with '.$key.'">'.$key.'</a>';
-            echo '<span class="count"> ('.$value.')</span></li>';
+            //$tagCloud .= '<li><a href="'.$_SERVER['SCRIPT_NAME'].'/viewCategory/'.urlencode(str_replace(" ",".",$key)).'" class="tag" style="font-size:'.$size.'px; color:'.$colors[$rand_colors].'" onmouseout="this.style.color=\''.$colors[$rand_colors].'\'" onmouseover="this.style.color=\'#fff\'" title="'.$value.' things tagged with '.$key.'">'.$key.'</a>';
+            $tagCloud .= '<li><a href="'.$config['blogPath'].$config['cleanIndex'].'/category/'.removeAccent(str_replace(" ",".",$key)).'" class="tag" style="font-size:'.$size.'px; color:'.$colors[$rand_colors].'" onmouseout="this.style.color=\''.$colors[$rand_colors].'\'" onmouseover="this.style.color=\'#fff\'" title="'.$value.' things tagged with '.$key.'">'.$key.'</a>';
+            $tagCloud .= '<span class="count"> ('.$value.')</span></li>';
         }
-        echo '</ul>';
+        $tagCloud .= '</ul>';
+        return $tagCloud;
   }
 
 
@@ -2145,13 +2643,22 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
       global $separator, $entries, $config, $tags;
       $category_array_unsorted=array();
       $result = sqlite_query($config['db'], 'select DISTINCT category from posts;');
+      unset($listcats);
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
-          $category = $row['category'];
-          $categoryText=str_replace("."," ",$category);
-          $result1 = sqlite_query($config['db'], "select count(category) AS view from posts WHERE category = '$category';");
-          while ($row1 = sqlite_fetch_array($result1, SQLITE_ASSOC)) {
-              $catcount = $row1['view'];
-              $tags[$categoryText] = $catcount;
+          //$category = $row['category'];
+          foreach (explode(",",$row['category']) as $singlecat) $listcats[$singlecat]="1";
+      }
+      if (@is_array($listcats)) {
+          foreach ($listcats as $catkey => $catvalue)
+          {
+              $category = $catkey;
+              $categoryText=str_replace("."," ",$category);
+              //$result1 = sqlite_query($config['db'], "select count(category) AS view from posts WHERE category = '$category';");
+              $result1 = sqlite_query($config['db'], "select count(category) AS view from posts WHERE (category = '$category' or category like '$category,%' or category like '%,$category' or category like '%,$category,%') and type = 'post';");
+              while ($row1 = sqlite_fetch_array($result1, SQLITE_ASSOC)) {
+                  $catcount = $row1['view'];
+                  $tags[$categoryText] = $catcount;
+              }
           }
       }
   }
@@ -2159,35 +2666,53 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
   function sidebarCategories() {
       global $separator, $entries, $config, $tags, $categories;
       $result = sqlite_query($config['db'], 'select DISTINCT category from posts ORDER BY category;');
+      unset($listcats);
+      $categories = "";
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
-          $categoryText=str_replace("."," ",$row['category']);
-          echo "<a href=".$_SERVER['SCRIPT_NAME']."/viewCategory/".urlencode($row['category']).">".$categoryText."</a>";
+          //$categoryText=str_replace("."," ",$row['category']);
+          foreach (explode(",",$row['category']) as $singlecat) $listcats[$singlecat]="1";
       }
+      if (@is_array($listcats)) {
+          ksort($listcats);
+          foreach ($listcats as $catkey => $catvalue)
+          {
+              $categoryText=str_replace("."," ",$catkey);
+              $theme_categories['link']     = $config['blogPath'].$config['cleanIndex']."/category/".urlencode($catkey);
+              $theme_categories['linktext'] = $categoryText;
+              $categories .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_categories["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/categories.tpl"));
+          }
+      }
+      return $categories;
   }
 
   function sidebarLinks() {
       global $config;
+      $links = "";
       foreach ($config['menuLinksArray'] as $value) {
           $fullLink=explode(",",$value);
-          echo '<a href="'.$fullLink[0].'">'.$fullLink[1].'</a>';
+          $theme_links['link']     = $fullLink[0];
+          $theme_links['linktext'] = $fullLink[1];
+          $links .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_links["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/links.tpl"));
       }
+      return $links;
   }
 
   function listAllComments() {
-      global $config, $separator, $lang;
+      global $config, $separator, $lang, $theme_main;
+      $theme_main['content'] = "";
       $latestCommentsFile=$config['commentDir']."latest".$config['dbFilesExtension'];
       $userFileName=$config['commentDir']."users".$config['dbFilesExtension'].".dat";
-      echo '<h3>'.$lang['pageAllComments'].'</h3>';
-      $result = sqlite_query($config['db'], 'select count(commentid) AS view from comments');
+      $theme_main['content'].= '<h3>'.$lang['pageAllComments'].'</h3>';
+      $result = sqlite_query($config['db'], "select count(commentid) AS view from comments WHERE status = 'approved'");
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $commentCount  = $row['view'];
           if ($commentCount > 0) {
-              echo '<table><tr><th>'.$lang['pageAllCommentsTitle'].'</th><th>'.$lang['pageAllCommentsDate'].'</th><th>'.$lang['pageAllCommentsBy'].'</th></tr>';
+              $theme_main['content'].= '<table><tr><th>'.$lang['pageAllCommentsTitle'].'</th><th>'.$lang['pageAllCommentsDate'].'</th><th>'.$lang['pageAllCommentsBy'].'</th></tr>';
           }
           else {
-              echo $lang['pageAllCommentsNo'].'!<br>';
+              $theme_main['content'].= $lang['pageAllCommentsNo'].'!<br>';
           }
-          $result = sqlite_query($config['db'], 'select * from comments ORDER BY date DESC');
+          $result = sqlite_query($config['db'], "select * from comments WHERE status = 'approved' ORDER BY date DESC");
           while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
               $postid        = $row['postid'];
               $sequence      = $row['sequence'];
@@ -2199,125 +2724,131 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
               $url           = $row['url'];
               $email         = $row['email'];
               $titleModified=getTitleFromFilename($postid);
-              echo "<tr><td><a style='font-style:normal' href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$postid."/".$titleModified."#Comments>".$title."</a></td>";
-              echo "<td>".$date."</td><td>".$author."</td></tr>";
+              $theme_main['content'].= "<tr><td><a style='font-style:normal' href=".$config['blogPath'].$config['cleanIndex']."/posts/".$postid."/".$titleModified."#Comments>".$title."</a></td>";
+              $theme_main['content'].= "<td>".$date."</td><td>".$author."</td></tr>";
           }
-          echo "</table>";
+          $theme_main['content'].= "</table>";
       }
-  }
-
-  function nicEditStuff() {
-      global $nicEditType, $blogPath, $nicEditUrl;
-      switch ($nicEditType) {
-        case "nicFile":
-            echo $nicEditUrl;
-            echo '<script type="text/javascript">';
-            $_SESSION['auth'] = "allow";
-            echo 'prit="?'.SID.'";';
-            echo '</script>';
-            $nicPanel="          new nicEditor({fullPanel : true, iconsPath : '".$blogPath."/nicFile/nicEditorIcons.gif'}).panelInstance('posts');";
-            break;
-        case "nicUpload":
-            echo $nicEditUrl;
-            $_SESSION['auth'] = "allow";
-            $nicPanel="          new nicEditor({fullPanel : true, uploadURI : '".$blogPath."/nicUpload.php?".SID."'}).panelInstance('posts');";
-            break;
-        case "default":
-            echo $nicEditUrl;
-            $nicPanel="          new nicEditor({fullPanel : true, iconsPath : '".$blogPath."/images/nicEditorIcons.gif'}).panelInstance('posts');";
-            break;
-      }
-      echo '<script type="text/javascript">';
-      echo '    bkLib.onDomLoaded(function(){';
-      echo $nicPanel;
-      echo "          });";
-      echo "</script>";
   }
 
 
   function newEntryForm() {
       global $separator, $newPostFile, $newFullPostNumber, $debugMode, $config, $blogPath, $lang, $authors, $authorsPass, $ss;
+      global $theme_main, $SHP, $theme_new;
       $newPostFileName=$config['postDir'].$newPostFile;
-      echo '<h3>'.$lang['pageNew'].'...</h3>';
+      $theme_new['newEntryHeader'] = $lang['pageNew'];
+      $theme_main['content'] = "";
       if ($debugMode=="on") {
-         echo $_SERVER['PHP_SELF']."<br>";
-         echo "Post will be written to ".$newPostFileName."  ".$newFullPostNumber;
+         $theme_main['content'] .= $_SERVER['PHP_SELF']."<br>";
+         $theme_main['content'] .= "Post will be written to ".$newPostFileName."  ".$newFullPostNumber;
       }
       $thisAuthor = $_SESSION['username'];
       $do = 1;
       if (trim($thisAuthor) == "") {
-           $lang['errorAllFields'].'<br>';
+           $theme_main['content'] .= $lang['errorAllFields'].'<br>';
            $do = 0;
       }
       if ($do == 1) {
           if (is_array($authors)) {
               if (isset($authorsPass[$thisAuthor])) {
                    if ($_SESSION['logged_in']) {
-                        nicEditStuff();
-                        echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/newEntrySubmit>";
-                        echo "<fieldset>";
-                        echo '<legend>'.$lang['pageNewForm'].'</legend>';
-                        echo '<p><label for="title">'.$lang['pageNewTitle'].'</label><br>';
-                        echo '<input type="text" class="ptitle" name="title" id="title" value=""></p>';
-                        echo '<script>';
-                        echo 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
-                        echo 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-                        echo '</script>';
-                        echo '<br><label for="posts">'.$lang['pageNewContent'].'</label><br>('.$lang['pageNewReadmore'].')<br>';
-                        echo '<textarea name="posts" cols="'.$config['textAreaCols'].'" rows="'.$config['textAreaRows'].'"';
-                        echo ' style="height: 400px; width: 550px;" id="posts"></textarea><br><br>';
-                        echo '<p><label for="category">'.$lang['pageNewCategory'].'</label><br>';
-                        echo '<input type="text" class="ptext" id="category" name="category" value=""></p>';
-                        echo '<script>';
-                        echo 'var category = new LiveValidation( "category", {onlyOnSubmit: true } );';
-                        echo 'category.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-                        echo '</script>';
-                        echo '<p><label>'.$lang['pageNewOptions'].'</label><br>';
-                        echo '<input type="checkbox" name="allowComments" value="yes" checked="checked">'.$lang['pageNewAllowComments'].'<br>';
-                        echo '<input type="checkbox" name="isPage" value="1">'.$lang['pageNewIsPage'].' <a href="javascript:alert(\''.$lang['pageNewIsPageDesc'].'\')">(?)</a><br>';
-                        echo '<input type="checkbox" name="isSticky" value="yes">'.$lang['pageNewIsSticky'].'</p>';
-                        echo '<input name="process" type="hidden" id="process" value="newEntry">';
-                        echo '<input name="author" type="hidden" id="author" value="'.$thisAuthor.'">';
-                        echo '<p><input type="submit" class="submit" style="width:100px;" value="'.$lang['pageNewSubmit'].'"></p>';
-                        echo '</fieldset>';
-                        echo '</form>';
+                        $theme_new['loc_top']            = "";
+                        $theme_new['loc_form_top']       = "";
+                        $theme_new['loc_content_before'] = "";
+                        $theme_new['loc_content_after']  = "";
+                        $theme_new['loc_form_bottom']    = "";
+                        $theme_new['loc_bottom']         = "";
+                        if ($SHP->hooks_exist('hook-new')) {
+                         	$SHP->execute_hooks('hook-new');
+                        }
+
+
+                        $theme_new['script']           = $config['blogPath'].$config['cleanIndex'];
+                        $theme_new['pageLegend']       = $lang['pageNewForm'];
+                        $theme_new['title']            = $lang['pageNewTitle'];
+                        $theme_new['titleValidate']    = '<script>';
+                        $theme_new['titleValidate']   .= 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
+                        $theme_new['titleValidate']   .= 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+                        $theme_new['titleValidate']   .= '</script>';
+                        $theme_new['content']          = $lang['pageNewContent'];
+                        $theme_new['readmore']         = $lang['pageNewReadmore'];
+                        $theme_new['textAreaCols']     = $config['textAreaCols'];
+                        $theme_new['textAreaRows']     = $config['textAreaRows'];
+                        $theme_new['category']         = $lang['pageNewCategory'];
+                        $theme_new['categoryValidate'] = '<script>';
+                        $theme_new['categoryValidate'].= 'var category = new LiveValidation( "category", {onlyOnSubmit: true } );';
+                        $theme_new['categoryValidate'].= 'category.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+                        $theme_new['categoryValidate'].= '</script>';
+                        $theme_new['options']          = $lang['pageNewOptions'];
+                        $theme_new['allowComments']    = $lang['pageNewAllowComments'];
+                        $theme_new['isPage']           = $lang['pageNewIsPage'];
+                        $theme_new['isPageHelp']       = $lang['pageNewIsPageDesc'];
+                        $theme_new['isSticky']         = $lang['pageNewIsSticky'];
+                        $theme_new['hidden']           = '<input name="process" type="hidden" id="process" value="newEntry">';
+                        $theme_new['hidden']          .= '<input name="author" type="hidden" id="author" value="'.$thisAuthor.'">';
+                        $theme_new['submit']           = $lang['pageNewSubmit'];
+                        $theme_main['content']        .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_new["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/newentry.tpl"));
                    }
                    else {
-                        echo $lang['errorUserPassIncorrect'].'<br>';
+                        $theme_main['content'] .= $lang['errorUserPassIncorrect'].'<br>';
                    }
               }
               else {
-                   echo $lang['errorUserPassIncorrect'].'<br>';
+                   $theme_main['content'] .= $lang['errorUserPassIncorrect'].'<br>';
               }
           }
       }
       else {
-           echo $lang['errorPleaseGoBack'].'<br>';
+           $theme_main['content'] .= $lang['errorPleaseGoBack'].'<br>';
       }
 
   }
 
   function newEntrySubmit() {
       global $separator, $newPostFile, $newFullPostNumber, $debugMode, $config, $lang, $authors, $authorsPass;
+      global $theme_main, $SHP, $public_data, $blogPath;
       $newPostFileName=$config['postDir'].$newPostFile;
-      $postTitle=sqlite_escape_string(str_replace("\\","",$_POST["title"]));
-      $postContent=sqlite_escape_string(str_replace("\\","",$_POST["posts"]));
-      $postDate=date("Y-m-d H:i:s");
-      $isPage=isset($_POST["isPage"])?$_POST["isPage"]:0;
-      $stick=isset($_POST["isSticky"])?$_POST["isSticky"]:"no";
-      $allowComments=isset($_POST["allowComments"])?$_POST["allowComments"]:"no";
-      $thisAuthor = $_POST['author'];
+      unset($GLOBALS['$public_data']);
+      $public_data['postTitle']     = $postTitle=htmlentities(sqlite_escape_string(str_replace("\\","",$_POST["title"])));
+      $public_data['postContent']   = $postContent=htmlentities(sqlite_escape_string(str_replace("\\","",$_POST["posts"])));
+      $public_data['postDate']      = $postDate=date("Y-m-d H:i:s");
+      $public_data['isPage']        = $isPage=isset($_POST["isPage"])?$_POST["isPage"]:0;
+      $public_data['stick']         = $stick=isset($_POST["isSticky"])?$_POST["isSticky"]:"no";
+      $public_data['allowComments'] = $allowComments=isset($_POST["allowComments"])?$_POST["allowComments"]:"no";
+      $public_data['thisAuthor']    = $thisAuthor = $_POST['author'];
       $visits=0;
-      $postCategory=strtolower($_POST["category"]);
-      echo "<h3>".$lang['pageNew']."...</h3>";
+      $public_data['postCategory'] = $postCategory=htmlentities(sqlite_escape_string(removeAccent(strtolower($_POST["category"]))));
+      $theme_main['content'] = "<h3>".$lang['pageNew']."...</h3>";
       $do = 1;
+      unset($listcats);
+      foreach (explode(",",$postCategory) as $singlecat) $listcats[$singlecat]="1";
+      $catsep="";
+      $postCategory="";
+      foreach ($listcats as $catkey => $catvalue)
+      {
+         $postCategory .= $catsep.trim($catkey);
+         $catsep=",";
+      }
+      if ($SHP->hooks_exist('hook-newsubmit-before')) {
+         $SHP->execute_hooks('hook-newsubmit-before');
+      }
+      $postTitle     = $public_data['postTitle'];
+      $postContent   = $public_data['postContent'];
+      $postDate      = $public_data['postDate'];
+      $isPage        = $public_data['isPage'];
+      $stick         = $public_data['stick'];
+      $allowComments = $public_data['allowComments'];
+      $thisAuthor    = $public_data['thisAuthor'];
+
       if(trim($postTitle) == '' || trim($postContent) == '' || trim($postCategory) == '' || strstr($postCategory,'.'))
       {
-      	   echo $lang['errorAllFields'].'.<br>';
-      	   echo $lang['errorCatName'].'<br>';
-		   $do = 0;
+      	   $theme_main['content'] .= $lang['errorAllFields'].'.<br>';
+      	   $theme_main['content'] .= $lang['errorCatName'].'<br>';
+           $do = 0;
       }
-
+      if ($SHP->hooks_exist('hook-newsubmit-validate')) {
+         $SHP->execute_hooks('hook-newsubmit-validate', $public_data);
+      }
       $result = sqlite_query($config['db'], "select * from posts WHERE title = '$postTitle';");
       $dupMsg = "";
       if (sqlite_num_rows($result) > 0) {
@@ -2327,7 +2858,7 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
       if ($do == 1) {
           if ($authorsPass[$thisAuthor] === $authorsPass[$_SESSION['username']] && (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false)) {
               $postCategory=str_replace(" ",".",$postCategory);
-              if ($debugMode=="on") {echo "Writing to ".$newPostFileName;}
+              if ($debugMode=="on") {$theme_main['content'] .= "Writing to ".$newPostFileName;}
               $errorMessage='<br><span style="color: rgb(204, 0, 51);">'.$lang['errornewPostFile'].'<br>';
               $errorMessage=$errorMessage.'<br>'.$lang['errorReportBug'].'<br>';
               if ($isPage == 1) {
@@ -2339,33 +2870,40 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
               $postContent=str_replace("\\","",$postContent);
               $content=$postTitle.$separator.str_replace("\\","",$postContent).$separator.$postDate.$separator.$newFullPostNumber.$separator.$postCategory.$separator.$postType.$separator.$allowComments.$separator.$visits.$separator.$thisAuthor;
               sqlite_query($config['db'], "INSERT INTO posts (postid, title, content, date, category, type, stick, allowcomments, visits, author) VALUES('$newFullPostNumber', '$postTitle', '$postContent', '$postDate', '$postCategory', '$postType', '$stick', '$allowComments','$visits', '$thisAuthor');");
-              echo $dupMsg.$lang['msgNewPost'];
+              if ($SHP->hooks_exist('hook-newsubmit-after')) {
+                 $SHP->execute_hooks('hook-newsubmit-after');
+              }
+              $theme_main['content'] .= $dupMsg.$lang['msgNewPost'].'&nbsp;&nbsp;<a href="'.$blogPath.'">'.$lang['msgGoBack'].'</a>';
           }
           else {
-              echo $lang['errorPasswordIncorrect'].'<br>';
-              echo $lang['errorPleaseGoBack'];
+              $theme_main['content'] .= $lang['errorPasswordIncorrect'].'<br>';
+              $theme_main['content'] .= $lang['errorPleaseGoBack'];
           }
       }
       else {
-       	   echo $lang['errorPleaseGoBack'];
+       	   $theme_main['content'] .= $lang['errorPleaseGoBack'];
       }
   }
 
   function deleteEntryForm() {
-      global $debugMode, $optionValue, $lang;
+      global $debugMode, $optionValue, $lang, $theme_main,$config;
       $fileName = $optionValue;
-      echo "<h3>".$lang['pageDelete']."...</h3>";
-      echo "<form name=\"form1\" method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/deleteEntry>";
-      echo $lang['msgSure'].'<br><br>';
-      echo '<input name="process" type="hidden" id="process" value="deleteEntrySubmit">';
-      echo '<input name="fileName" type="hidden" id="fileName" value="'.$fileName.'">';
-      echo '<input type="submit" name="Submit" value="'.$lang['pageBasicConfigSubmit'].'">';
-      echo "</form>";
+      $theme_main['content'] = "";
+      $theme_main['content'] .= "<h3>".$lang['pageDelete']."...</h3>";
+      $theme_main['content'] .= "<form name=\"form1\" method=\"post\" action=".$config['blogPath'].$config['cleanIndex']."/deleteEntry>";
+      $theme_main['content'] .= $lang['msgSure'].'<br><br>';
+      $theme_main['content'] .= '<input name="process" type="hidden" id="process" value="deleteEntrySubmit">';
+      $theme_main['content'] .= '<input name="fileName" type="hidden" id="fileName" value="'.$fileName.'">';
+      $theme_main['content'] .= '<input type="submit" name="Submit" value="'.$lang['pageBasicConfigSubmit'].'">';
+	  //$theme_main['content'] .= '<a href="'.$_SESSION['referrer'].'"><button>'.$lang['msgGoBack'].'</button></a>';
+      $theme_main['content'] .= "</form>";
   }
 
   function deleteEntrySubmit() {
        global $separator, $newPostFile, $newFullPostNumber, $config, $debugMode, $optionValue, $lang, $authors, $authorsPass;
-       if ($debugMode=="on") {echo "Inside deleteEntrySubmit ..<br>";}
+       global $theme_main, $SHP;
+       $theme_main['content'] = "";
+       if ($debugMode=="on") {$theme_main['content'] .=  "Inside deleteEntrySubmit ..<br>";}
        $entryName= $_POST['fileName'];
        $fileName = $config['postDir'].$entryName.$config['dbFilesExtension'];
        $result = sqlite_query($config['db'], "select * from posts WHERE postid = '$entryName';");
@@ -2374,7 +2912,7 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
            $author=$row['author'];
            $category=$row['category'];
        }
-       echo "<h3>".$lang['pageDelete']."...</h3>";
+       $theme_main['content'] .=  "<h3>".$lang['pageDelete']."...</h3>";
        $errorMessage='<br><span style="color: rgb(204, 0, 51);">'.$lang['errorDeleteEntry'].'<br>';
        $errorMessage=$errorMessage.$lang['errorReportBug'].'<br>';
        $thisAuthor = $_SESSION['username'];
@@ -2382,20 +2920,24 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
            (($config['authorEditPost'] == 0) && ($thisAuthor == 'admin' || $thisAuthor == $author) && $_SESSION['logged_in'])) {
           @sqlite_query($config['db'], "DELETE FROM posts WHERE postid = '$entryName';");
           @sqlite_query($config['db'], "DELETE FROM comments WHERE postid = '$entryName';");
-          echo $lang['msgDeleteSuccess'].'...<br/>';
+          $theme_main['content'] .= $lang['msgDeleteSuccess'].'...<a href="'.$_SESSION['referrer'].'">'.$lang['msgGoBack'].'</a>';
+          if ($SHP->hooks_exist('hook-delete-entry')) {
+              $SHP->execute_hooks('hook-delete-entry');
+          }
        }
        else {
-          echo $lang['errorNotAuthorized'].' .. <br>';
+          $theme_main['content'] .= $lang['errorNotAuthorized'].' .. <br>';
        }
   }
 
   function editEntryForm() {
       global $separator, $newPostFile, $newFullPostNumber, $debugMode, $config, $authors, $authorsPass;
-      global $optionValue, $blogPath, $lang;
+      global $optionValue, $blogPath, $lang, $theme_main, $SHP, $theme_edit;
       $fileName = $optionValue;
       $editFileName=$config['postDir'].$fileName.$config['dbFilesExtension'];
-      echo "<h3>".$lang['pageEdit']."...</h3>";
-      if ($debugMode=="on") {echo "Editing .. ".$editFileName."<br>";}
+      $theme_main['content'] = "";
+      $theme_edit['header']  = $lang['pageEdit'];
+      if ($debugMode=="on") {$theme_main['content'] .= "Editing .. ".$editFileName."<br>";}
       $thisAuthor = $_SESSION['username'];
       //$thisPass = md5($config['randomString'].$_POST['pass']);
       $result = sqlite_query($config['db'], "select * from posts WHERE postid = '$fileName';");
@@ -2435,44 +2977,55 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
                 $thisAuthor = $author;
                 $thisPass   = $authorsPass[$thisAuthor];
             }
-            nicEditStuff();
 
-            echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/editEntrySubmit>";
-            echo "<fieldset>";
-            echo '<legend>'.$lang['pageEditForm'].'</legend>';
-            echo '<p><label for="title">'.$lang['pageNewTitle'].'</label><br>';
-            echo '<input type="text" class="ptitle" name="title" id="title" value="'.$title.'"></p>';
-            echo '<script>';
-            echo 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
-            echo 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-            echo '</script>';
-            echo '<br><label for="posts">'.$lang['pageNewContent'].'</label><br>('.$lang['pageNewReadmore'].')<br>';
-            echo '<textarea name="posts" cols="'.$config['textAreaCols'].'" rows="'.$config['textAreaRows'].'"';
-            echo ' style="height: 400px; width: 550px;" id="posts">';
-            echo $content;
-            echo '</textarea><br><br>';
-            echo '<p><label for="category">'.$lang['pageNewCategory'].'</label><br>';
+            $theme_edit['loc_top']            = "";
+            $theme_edit['loc_form_top']       = "";
+            $theme_edit['loc_content_before'] = "";
+            $theme_edit['loc_content_after']  = "";
+            $theme_edit['loc_form_bottom']    = "";
+            $theme_edit['loc_bottom']         = "";
+            if ($SHP->hooks_exist('hook-edit')) {
+             	$SHP->execute_hooks('hook-edit');
+            }
+
+            $theme_edit['script'] = $config['blogPath'].$config['cleanIndex'];
+            $theme_edit['pageLegend'] = $lang['pageEditForm'];
+            $theme_edit['labelTitle'] = $lang['pageNewTitle'];
+            $theme_edit['title'] = $title;
+            $theme_edit['titleValidate']    = '<script>';
+            $theme_edit['titleValidate']   .= 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
+            $theme_edit['titleValidate']   .= 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+            $theme_edit['titleValidate']   .= '</script>';
+            $theme_edit['labelContent'] = $lang['pageNewContent'];
+            $theme_edit['readmore']     = $lang['pageNewReadmore'];
+            $theme_edit['textAreaCols']     = $config['textAreaCols'];
+            $theme_edit['textAreaRows']     = $config['textAreaRows'];
+            $theme_edit['content']     = $content;
+            $theme_edit['labelCategory']     = $lang['pageNewCategory'];
             $category=str_replace("."," ",$category);
-            echo '<input type="text" class="ptext" id="category" name="category" value="'.$category.'"></p>';
-            echo '<script>';
-            echo 'var category = new LiveValidation( "category", {onlyOnSubmit: true } );';
-            echo 'category.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-            echo '</script>';
-            echo '<p><label>'.$lang['pageNewOptions'].'</label><br>';
-            echo '<input type="checkbox" name="allowComments" value="yes" '.$checkAllowComments.'>'.$lang['pageNewAllowComments'].'<br>';
-            echo '<input type="checkbox" name="isPage" value="1" '.$checking.'>'.$lang['pageNewIsPage'].' <a href="javascript:alert(\''.$lang['pageNewIsPageDesc'].'\')">(?)</a><br>';
-            echo '<input type="checkbox" name="isSticky" value="yes" '.$checkStick.'>'.$lang['pageNewIsSticky'].'</p>';
-            echo '<input name="fileName" type="hidden" id="fileName" value="'.$fileName.'">';
-            echo '<input name="visits" type="hidden" id="visits" value="'.$visits.'">';
-            echo '<input name="process" type="hidden" id="process" value="editEntrySubmit">';
-            echo '<input name="author" type="hidden" id="author" value="'.$thisAuthor.'">';
-            echo '<input name="pass" type="hidden" id="pass" value="'.$thisPass.'">';
-            echo '<p><input type="submit" value="'.$lang['pageEditSubmit'].'"></p>';
-            echo '</fieldset>';
-            echo '</form>';
+            $theme_edit['category']     = $category;
+            $theme_edit['categoryValidate'] = '<script>';
+            $theme_edit['categoryValidate'].= 'var category = new LiveValidation( "category", {onlyOnSubmit: true } );';
+            $theme_edit['categoryValidate'].= 'category.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+            $theme_edit['categoryValidate'].= '</script>';
+            $theme_edit['options'] = $lang['pageNewOptions'];
+            $theme_edit['checkAllowComments'] = $checkAllowComments;
+            $theme_edit['allowComments'] = $lang['pageNewAllowComments'];
+            $theme_edit['checkIsPage'] = $checking;
+            $theme_edit['isPage'] = $lang['pageNewIsPage'];
+            $theme_edit['isPageHelp'] = $lang['pageNewIsPageDesc'];
+            $theme_edit['checkSticky'] = $checkStick;
+            $theme_edit['isSticky'] = $lang['pageNewIsSticky'];
+            $theme_edit['hidden'] = '<input name="fileName" type="hidden" id="fileName" value="'.$fileName.'">';
+            $theme_edit['hidden'].= '<input name="visits" type="hidden" id="visits" value="'.$visits.'">';
+            $theme_edit['hidden'].= '<input name="process" type="hidden" id="process" value="editEntrySubmit">';
+            $theme_edit['hidden'].= '<input name="author" type="hidden" id="author" value="'.$thisAuthor.'">';
+            $theme_edit['hidden'].= '<input name="pass" type="hidden" id="pass" value="'.$thisPass.'">';
+            $theme_edit['submit'] = $lang['pageEditSubmit'];
+            $theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_edit["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/editentry.tpl"));
         }
         else {
-          echo $lang['errorNotAuthorized'].' .. <br>';
+          $theme_main['content'] .= $lang['errorNotAuthorized'].' .. <br>';
        }
 
       }
@@ -2481,51 +3034,70 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
 
   function editEntrySubmit() {
       global $separator, $newPostFile, $newFullPostNumber, $config, $debugMode, $authors, $authorsPass;
-      global $optionValue, $lang;
-      if ($debugMode=="on") {echo "Inside editEntrySubmit ..".$_POST['fileName']."<br>";}
-      echo "<h3>".$lang['pageEdit']."...</h3>";
-      $entryName= $_POST['fileName'];
-      $fileName = $config['postDir'].$entryName.$config['dbFilesExtension'];
-      $postTitle=sqlite_escape_string(str_replace("\\","",$_POST["title"]));
-      $postContent=sqlite_escape_string(str_replace("\\","",$_POST["posts"]));
-      $postDate=date("Y-m-d H:i:s");
-      $isPage=isset($_POST["isPage"])?$_POST["isPage"]:0;
-      $stick=isset($_POST["isSticky"])?$_POST["isSticky"]:"no";
-      $allowComments=isset($_POST["allowComments"])?$_POST["allowComments"]:"no";
-      $visits=isset($_POST["visits"])?$_POST["visits"]:0;
-      $postCategory=strtolower($_POST["category"]);
-      $thisAuthor = $_POST['author'];
+      global $optionValue, $lang, $theme_main, $SHP, $public_data, $blogPath;
+      $theme_main['content'] = "";
+      if ($debugMode=="on") {$theme_main['content'] .= "Inside editEntrySubmit ..".$_POST['fileName']."<br>";}
+      $theme_main['content'] .= "<h3>".$lang['pageEdit']."...</h3>";
+      unset($GLOBALS['$public_data']);
+      $public_data['entryName']     = $entryName= $_POST['fileName'];
+      $public_data['postTitle']     = $postTitle=htmlentities(sqlite_escape_string(str_replace("\\","",$_POST["title"])));
+      $public_data['postContent']   = $postContent=htmlentities(sqlite_escape_string(str_replace("\\","",$_POST["posts"])));
+      $public_data['postDate']      = $postDate=date("Y-m-d H:i:s");
+      $public_data['isPage']        = $isPage=isset($_POST["isPage"])?$_POST["isPage"]:0;
+      $public_data['stick']         = $stick=isset($_POST["isSticky"])?$_POST["isSticky"]:"no";
+      $public_data['allowComments'] = $allowComments=isset($_POST["allowComments"])?$_POST["allowComments"]:"no";
+      $public_data['visits']        = $visits=isset($_POST["visits"])?$_POST["visits"]:0;
+      $public_data['postCategory']  = $postCategory=htmlentities(sqlite_escape_string(removeAccent(strtolower($_POST["category"]))));
+      $public_data['thisAuthor']    = $thisAuthor = $_POST['author'];
       $thisPass   = $_POST['pass'];
       $do = 1;
+      unset($listcats);
+      foreach (explode(",",$postCategory) as $singlecat) $listcats[$singlecat]="1";
+      $catsep="";
+      $postCategory="";
+      foreach ($listcats as $catkey => $catvalue)
+      {
+         $postCategory .= $catsep.trim($catkey);
+         $catsep=",";
+      }
+      if ($SHP->hooks_exist('hook-editsubmit-before')) {
+         $SHP->execute_hooks('hook-editsubmit-before');
+      }
       if(trim($postTitle) == '' || trim($postContent) == '' || trim($postCategory) == '' || strstr($postCategory,'.'))
       {
-      	   echo $lang['errorAllFields'].'.<br>';
-      	   echo $lang['errorCatName'].'<br>';
+      	   $theme_main['content'] .= $lang['errorAllFields'].'.<br>';
+      	   $theme_main['content'] .= $lang['errorCatName'].'<br>';
 	   $do = 0;
       }
 
       if ($do == 1) {
           if ($isPage == 1) {
-              $postType="page";
+              $public_data['postType'] = $postType="page";
           }
           else {
-              $postType="post";
+              $public_data['postType'] = $postType="post";
           }
           if ($debugMode=="on") {echo "Writing to ".$fileName;}
           $errorMessage='<br><span style="color: rgb(204, 0, 51);">'.$lang['errornewPostFile'].'<br>';
           $errorMessage=$errorMessage.'<br>'.$lang['errorReportBug'].'<br>';
           if ($_SESSION['logged_in']) {
+              if ($SHP->hooks_exist('hook-editsubmit-validate')) {
+                 $SHP->execute_hooks('hook-editsubmit-validate', $public_data);
+              }
               $postCategory=str_replace(" ",".",$postCategory);
               $content=$postTitle.$separator.str_replace("\\","",$postContent).$separator.$postDate.$separator.$entryName.$separator.$postCategory.$separator.$postType.$separator.$allowComments.$separator.$visits.$separator.$thisAuthor;
               sqlite_query($config['db'], "UPDATE posts SET title='$postTitle', content='$postContent', category='$postCategory', type='$postType', stick='$stick', allowcomments='$allowComments', visits='$visits', author='$thisAuthor' WHERE postid='$entryName';");
-              echo $lang['msgEditSuccess'].' .. <br>';
+              $theme_main['content'] .= $lang['msgEditSuccess'].' .. <a href="'.$_SESSION['referrer'].'">'.$lang['msgGoBack'].'</a> .. <a href="'.$blogPath.'">'.$lang['msgGoHome'].'</a>';
+              if ($SHP->hooks_exist('hook-editsubmit-after')) {
+                 $SHP->execute_hooks('hook-editsubmit-after');
+              }
           }
           else {
-              echo $lang['errorNotAuthorized'].' .. <br>';
+              $theme_main['content'] .= $lang['errorNotAuthorized'].' .. <br>';
           }
       }
       else {
-           echo $lang['errorPleaseGoBack'];
+           $theme_main['content'] .= $lang['errorPleaseGoBack'];
       }
   }
   
@@ -2541,11 +3113,12 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
   }
 
   function viewEntry() {
-      global $optionValue, $blogPath, $lang, $nicEditUrl;
-      global $separator, $newPostFile, $newFullPostNumber, $debugMode, $config;
+      global $optionValue, $blogPath, $lang, $nicEditUrl, $SHP, $theme_post;
+      global $separator, $newPostFile, $newFullPostNumber, $debugMode, $config, $theme_main, $public_data;
       $fileName=$optionValue;
       $viewFileName=$config['postDir'].$fileName.$config['dbFilesExtension'];
       $cool=true;
+      $theme_main['content'] = "";
       if ($debugMode=="on") {echo "Editing .. ".$viewFileName."<br>";}
       if (strstr($fileName,'%') || strstr($fileName,'.')) {
           $cool=false;
@@ -2555,10 +3128,13 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $title         = $row['title'];
           $titleModified = titleModify($title);
-          $content       = (str_replace("*readmore*","",$row['content']));
+          $content       = html_entity_decode(str_replace("*readmore*","",$row['content']));
           $date1         = date("d M Y H:i",strtotime($row['date']));
+          $postMonth     = date("M",strtotime($row['date']));
+          $postDay       = date("d",strtotime($row['date']));
+          $postYear      = date("Y",strtotime($row['date']));
           $fileName      = $row['postid'];
-          $category      = $row['category'];
+          $category      = html_entity_decode($row['category']);
           $postType      = $row['type'];
           $allowComments = $row['allowcomments'];
           $visits        = $row['visits'];
@@ -2568,163 +3144,233 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
           sqlite_query($config['db'], "UPDATE posts SET visits = '$visits' WHERE postid = '$fileName';");
           $categoryText=str_replace("."," ",$category);
 
-          echo "<h2>".$title."</h2>";
-          echo $content;
-          echo '<br><center><i>'.$lang['pageAuthorsNew1'].': '.$author.'&nbsp;-&nbsp; '.$lang['postFtPosted'].': '.$date1.'<br>'.$lang['postFtCategory'].': <a href='.$_SERVER['SCRIPT_NAME'].'/viewCategory/'.urlencode($category).'>'.$categoryText.'</a>&nbsp;-&nbsp; '.$lang['postFtVisits'].': '.$visits;
+          $theme_post['loc_top']           = "";
+          $theme_post['loc_title_after']   = "";
+          $theme_post['loc_content_after'] = "";
+          $theme_post['loc_footer']        = "";
+          $theme_post['loc_bottom']        = "";
+
+          $theme_post['postLink'] = $config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified;
+          $theme_post['title']    = $title;
+          $theme_post['content']  = $content;
+          $categoryText=str_replace("."," ",$category);
+          $theme_post['authorLabel']    = $lang['pageAuthorsNew1'];
+          $theme_post['author']         = $author;
+          $theme_post['dateLabel']    = $lang['postFtPosted'];
+          $theme_post['date']         = $date1;
+          $theme_post['postMonth']     = $postMonth;
+          $theme_post['postDay']       = $postDay;
+          $theme_post['postYear']      = $postYear;
+          //$theme_post['categoryLabel'] = $lang['postFtCategory'];
+          $theme_post['categoryLabel'] = $lang['postFtTags'];
+          $theme_post['category'] = "";
+          unset($listcats);
+          foreach (explode(",",$category) as $singlecat) $listcats[$singlecat]="1";
+          $catsep="";
+	  foreach ($listcats as $catkey => $catvalue)
+	  {
+	     $categoryText=str_replace("."," ",$catkey);
+	     $theme_post['category'] .= $catsep."<a href=".$config['blogPath'].$config['cleanIndex']."/category/".urlencode($catkey).">".$categoryText."</a>";
+             $catsep=",";
+	  }
+          //$theme_post['category']      = "<a href=".$config['blogPath'].$config['cleanIndex']."/viewCategory/".urlencode($category).">".$categoryText."</a>";
+          $theme_post['visitsLabel']   = $lang['postFtVisits'];
+          $theme_post['visits']        = $visits;
+
+          if ($SHP->hooks_exist('hook-post')) {
+           	$SHP->execute_hooks('hook-post');
+          }
+
           $commentFile=$config['commentDir'].$fileName.$config['dbFilesExtension'];
-          $result = sqlite_query($config['db'], "select count(*) AS view from comments WHERE postid='$fileName';");
+          if (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false)
+               $result = sqlite_query($config['db'], "select count(*) AS view from comments WHERE postid='$fileName';");
+          else
+               $result = sqlite_query($config['db'], "select count(*) AS view from comments WHERE postid='$fileName' AND status = 'approved';");
           $commentCount = sqlite_fetch_array($result);
           if ($commentCount['view'] > 0) {
               $commentText=$lang['postFtComments'].": ".$commentCount['view'];
           }
           else {$commentText=$lang['postFtNoComments'];}
 
-          echo "&nbsp;-&nbsp; <a href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$fileName."/".$titleModified."#Comments>".$commentText."</a></i><br></center>";
+          $theme_post['comments']        = "<a href=".$config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified."#Comments>".$commentText."</a>";
+          $theme_post['edit'] = $theme_post['delete'] = "";
           if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
-              echo "<center><a href=".$_SERVER['SCRIPT_NAME']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
-              echo "&nbsp;-&nbsp;<a href=".$_SERVER['SCRIPT_NAME']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a></center>";
+              $theme_post['edit'] = "<a href=".$config['blogPath'].$config['cleanIndex']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
+              $theme_post['delete'] = "&nbsp;-&nbsp;<a href=".$config['blogPath'].$config['cleanIndex']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a>";
           }
-          echo "<br><br>";
 
-
+          $theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_post["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/post.tpl"));
           $commentFullName=$config['commentDir'].$fileName.$config['dbFilesExtension'];
           $i=0;
-          echo "<a name='Comments'></a><h3>".$lang['pageViewComments'].":</h3>";
+          $theme_main['content'] .= "<a name='Comments'></a><h3>".$lang['pageViewComments'].":</h3>";
 
           if($allowComments == "yes")
           {
-                $result = sqlite_query($config['db'], "select * from comments WHERE postid = '$fileName';");
-                while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
-                    $postid        = $row['postid'];
-                    $sequence      = $row['sequence'];
-                    $author        = $row['author'];
-                    $title         = $row['title'];
-                    $content       = $row['content'];
-                    $date          = $row['date'];
-                    $ip            = $row['ip'];
-                    $url           = $row['url'];
-                    $email         = $row['email'];
-                    $authorLink    = (trim($url) == "")?$author:'<a href="'.$url.'">'.$author.'</a>';
-                    echo '<a name="'.$sequence.'">'.$lang['pageCommentsBy'].'</a>&nbsp;<strong>'.$authorLink.'</strong>&nbsp;'.$lang['pageViewCommentsOn'].'&nbsp;<b>'.$date.'</b><br>';
-                    echo $content;
-                    echo '<br>';
-                    if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
-                        echo '<a href="'.$_SERVER['SCRIPT_NAME'].'/deleteComment/'.$fileName.'/'.$sequence.'">'.$lang['postFtDelete'].'</a>';
-                        if (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false) {
-                            echo '&nbsp;&nbsp;-&nbsp;&nbsp;'.$ip;
-                        }
-                    }
-                    echo '<br><br>';
-                    $i++;
+                unset($GLOBALS['$public_data']);
+                $public_data['postid'] = $fileName;
+                if ($SHP->hooks_exist('hook-comment-replace')) {
+               	     $SHP->execute_hooks('hook-comment-replace', $public_data);
                 }
-                if ($i == 0) {echo $lang['pageViewCommentsNo']."<br>";}
-                echo $nicEditUrl;
-                echo '<br /><br /><h3>'.$lang['pageComments'].'</h3>';
-	 	echo '<script type="text/javascript">';
-                echo '    bkLib.onDomLoaded(function(){';
-                echo "          new nicEditor({buttonList : ['bold','italic','underline','link','unlink'], iconsPath : '".$blogPath."/images/nicEditorIcons.gif'}).panelInstance('comment');";
-                echo "          });";
-                echo "</script>";
+                else {
+                    if (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false)
+                         $result = sqlite_query($config['db'], "select * from comments WHERE postid = '$fileName';");
+                    else
+                         $result = sqlite_query($config['db'], "select * from comments WHERE postid = '$fileName' AND status = 'approved';");
+                    while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+                        $postid        = $row['postid'];
+                        $sequence      = $row['sequence'];
+                        $author        = $row['author'];
+                        $title         = $row['title'];
+                        $content       = $row['content'];
+                        $date          = $row['date'];
+                        $ip            = $row['ip'];
+                        $url           = $row['url'];
+                        $email         = $row['email'];
+                        $authorLink    = (trim($url) == "")?$author:'<a href="'.$url.'">'.$author.'</a>';
+                        $theme_comment['sequence']    = $sequence;
+                        $theme_comment['commentsBy']  = $lang['pageCommentsBy'];
+                        $theme_comment['authorLink']  = $authorLink;
+                        $theme_comment['commentDate'] = $lang['pageViewCommentsOn'];
+                        $theme_comment['date'] = $date;
+                        $theme_comment['content'] = $content;
+                        if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
+                            $theme_comment['delete'] = '<a href="'.$config['blogPath'].$config['cleanIndex'].'/deleteComment/'.$fileName.'/'.$sequence.'">'.$lang['postFtDelete'].'</a>';
+                            if (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false) {
+                                $theme_comment['ip'] =  '&nbsp;&nbsp;-&nbsp;&nbsp;'.$ip;
+                            }
+                        }
+                        $theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_comment["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/comment.tpl"));
+                        $i++;
+                    }
+                    if ($i == 0) {$theme_main['content'] .= $lang['pageViewCommentsNo']."<br>";}
+                }
 
-                echo "<form name=\"submitform\" method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/sendComment>";
-                echo "<fieldset>";
-                echo '<legend>'.$lang['pageCommentsForm'].'</legend>';
-                echo '<p><label for="author">'.$lang['pageCommentsAuthor'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$lang['pageCommentsRequired'].')</font><br>';
-                echo '<input type="text" class="ptext" id="author" name="author" value=""></p>';
-                echo '<script>';
-                echo 'var author = new LiveValidation( "author", {onlyOnSubmit: true } );';
-                echo 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-                echo '</script>';
-                echo '<p><label for="commentEmail">'.$lang['pageAuthorsNewEmail'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$lang['pageCommentsOptionalEmail'].')</font><br>';
-                echo '<input type="text" class="ptext" name="commentEmail" id="commentEmail" value=""></p>';
-                echo '<script>';
-                echo 'var commentEmail = new LiveValidation( "commentEmail", {onlyOnSubmit: true } );';
-                echo 'commentEmail.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
-                echo '</script>';
-                echo '<p><label for="commentUrl">'.$lang['pageCommentsUrl'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$lang['pageCommentsOptionalUrl'].')</font><br>';
-                echo '<input type="text" class="ptext" name="commentUrl" id="commentUrl" value=""></p>';
-                echo '<script>';
-                echo 'var commentUrl = new LiveValidation( "commentUrl", {onlyOnSubmit: true } );';
-                echo 'commentUrl.add( Validate.Format, { pattern: /(http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/i,  failureMessage: "'.$lang['errorInvalidUrl'].'" } );';
-                echo '</script>';
-                echo '<label for="comment">'.$lang['pageCommentsContent'].'</label><br>';
-                echo '<textarea name="comment" cols="'.$config['textAreaCols'].'" rows="'.$config['textAreaRows'].'"';
-                echo ' style="height: 200px; width: 400px;" id="comment"></textarea><br>';
-		if($config['commentsSecurityCode'] == 1)
-		{
-			$code = '';
-			if($config['onlyNumbersOnCAPTCHA'] == 1)
-			{
-				$code = substr(rand(0,999999),1,$config['CAPTCHALength']);
-			}
-			else
-			{
-				//$code = strtoupper(substr(crypt(rand(0,999999), $config['randomString']),1,$config['CAPTCHALength']));
-				$code = genRandomString($config['CAPTCHALength']);
-			}
-			echo '<p><label for="code">'.$lang['pageCommentsCode'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$code.')</font><br>';
-			echo '<input name="code" class="s" type="text" id="code"></p>';
-                        echo '<input name="originalCode" value="'.$code.'" type="hidden" id="originalCode">';
-		}
+                if ($SHP->hooks_exist('hook-commentform-replace')) {
+                    $SHP->execute_hooks('hook-commentform-replace');
+                }
+                else {
+                    $theme_commentform['nicEdit']  = '';
+                    $theme_commentform['nicEdit'] .= $nicEditUrl;
+                    $theme_commentform['nicEdit'] .= '<br /><br /><h3>'.$lang['pageComments'].'</h3>';
+    	 	    $theme_commentform['nicEdit'] .= '<script type="text/javascript">';
+                    $theme_commentform['nicEdit'] .= '    bkLib.onDomLoaded(function(){';
+                    $theme_commentform['nicEdit'] .= "          new nicEditor({buttonList : ['bold','italic','underline','link','unlink'], iconsPath : '".$blogPath."/images/nicEditorIcons.gif'}).panelInstance('comment');";
+                    $theme_commentform['nicEdit'] .= "          });";
+                    $theme_commentform['nicEdit'] .= "</script>";
+    
+    
+                    $theme_commentform['commentAction'] = $config['blogPath'].$config['cleanIndex']."/sendComment";
+                    $theme_commentform['legend']        = $lang['pageCommentsForm'];
+                    $theme_commentform['authorLabel']   = $lang['pageCommentsAuthor'];
+                    $theme_commentform['required']      = $lang['pageCommentsRequired'];
+                    $theme_commentform['authorValidate'] = '<script>';
+                    $theme_commentform['authorValidate'].= 'var author = new LiveValidation( "author", {onlyOnSubmit: true } );';
+                    $theme_commentform['authorValidate'].= 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+                    $theme_commentform['authorValidate'].= '</script>';
+                    $theme_commentform['emailLabel']     = $lang['pageAuthorsNewEmail'];
+                    $theme_commentform['optional']       = $lang['pageCommentsOptionalEmail'];
+                    $theme_commentform['emailValidate'] = '<script>';
+                    $theme_commentform['emailValidate'].= 'var commentEmail = new LiveValidation( "commentEmail", {onlyOnSubmit: true } );';
+                    $theme_commentform['emailValidate'].= 'commentEmail.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
+                    $theme_commentform['emailValidate'].= '</script>';
+                    $theme_commentform['url']           = $lang['pageCommentsUrl'];
+                    $theme_commentform['optionalUrl']   = $lang['pageCommentsOptionalUrl'];
+                    $theme_commentform['urlValidate'] = '<script>';
+                    $theme_commentform['urlValidate'].= 'var commentUrl = new LiveValidation( "commentUrl", {onlyOnSubmit: true } );';
+                    $theme_commentform['urlValidate'].= 'commentUrl.add( Validate.Format, { pattern: /(http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/i,  failureMessage: "'.$lang['errorInvalidUrl'].'" } );';
+                    $theme_commentform['urlValidate'].= '</script>';
+                    $theme_commentform['contentLabel'] = $lang['pageCommentsContent'];
+                    $theme_commentform['textAreaCols'] = $config['textAreaCols'];
+                    $theme_commentform['textAreaRows'] = $config['textAreaRows'];
+    		    if($config['commentsSecurityCode'] == 1)
+    		    {
+    			$code = '';
+    			if($config['onlyNumbersOnCAPTCHA'] == 1)
+    			{
+    				$code = substr(rand(0,999999),1,$config['CAPTCHALength']);
+    			}
+    			else
+    			{
+    				//$code = strtoupper(substr(crypt(rand(0,999999), $config['randomString']),1,$config['CAPTCHALength']));
+    				$code = genRandomString($config['CAPTCHALength']);
+    			}
+    			$theme_commentform['securityCode'] = '<p><label for="code">'.$lang['pageCommentsCode'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$code.')</font><br>';
+    			$theme_commentform['securityCode'].= '<input name="code" class="s" type="text" id="code"><p>';
+                            $theme_commentform['securityCode'].= '<input name="originalCode" value="'.$code.'" type="hidden" id="originalCode">';
+    		    }
 
-                echo '<input name="sendComment" value="'.$fileName.'" type="hidden" id="sendComment">';
-                echo '<p><input type="submit" class="submit" style="width:100px" value="'.$lang['pageCommentsSubmit'].'">&nbsp;&nbsp;<input type="reset" class="submit" value="'.$lang['pageCommentsReset'].'"></p>';
-                echo '</fieldset>';
-                echo '</form>';
+                    $theme_commentform['hidden'] = '<input name="sendComment" value="'.$fileName.'" type="hidden" id="sendComment">';
+                    $theme_commentform['loc_form'] = '';
+                    if ($SHP->hooks_exist('hook-commentform')) {
+                        $SHP->execute_hooks('hook-commentform');
+                    }
+                    $theme_commentform['submit'] = $lang['pageCommentsSubmit'];
+                    $theme_commentform['reset']  = $lang['pageCommentsReset'];
+                    $theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_commentform["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/commentform.tpl"));
+                }
           }
-          else {echo $lang['pageCommentsDisabled'].'!<br>';}
+          else {$theme_main['content'] .= $lang['pageCommentsDisabled'].'!<br>';}
       }
   }
 
   function sendComment() {
 	# Send Comment Process
-        global $separator, $config, $lang;
-	echo "<h3>".$lang['pageViewComments']."</h3>";
-        $commentFileName = isset($_POST['sendComment'])?$_POST['sendComment']:$_GET['sendComment'];
-	$author          = isset($_POST['author'])?$_POST['author']:"";
-	$commentTitle    = $lang['pageCommentsBy'].' '.$author;
-	$comment         = isset($_POST['comment'])?$_POST['comment']:"";
-	$url             = isset($_POST['commentUrl'])?$_POST['commentUrl']:"";
-	$email           = isset($_POST['commentEmail'])?$_POST['commentEmail']:"";
-	$code            = $_POST['code'];
-	$originalCode    = $_POST['originalCode'];
+        global $separator, $config, $lang, $theme_main, $SHP, $public_data;
+        unset($GLOBALS['$public_data']);
+        $theme_main['content'] = "";
+	$theme_main['content'] .= "<h3>".$lang['pageViewComments']."</h3>";
+        $public_data['commentFileName'] = $commentFileName = isset($_POST['sendComment'])?$_POST['sendComment']:$_GET['sendComment'];
+	$public_data['author']          = $author          = isset($_POST['author'])?$_POST['author']:"";
+	$public_data['commentTitle']    = $commentTitle    = $lang['pageCommentsBy'].' '.$author;
+	$public_data['comment']         = $comment         = isset($_POST['comment'])?$_POST['comment']:"";
+	$public_data['url']             = $url             = isset($_POST['commentUrl'])?$_POST['commentUrl']:"";
+	$public_data['email']           = $email           = isset($_POST['commentEmail'])?$_POST['commentEmail']:"";
+	$public_data['code']            = $code            = $_POST['code'];
+	$public_data['originalCode']    = $originalCode    = $_POST['originalCode'];
 	$do              = 1;
 	$triedAsAdmin    = 0;
 
-	if(trim($commentTitle) == '' || trim($author) == '' || trim($comment) == '')
-	{
-		echo $lang['errorAllFields'].'<br>';
-		$do = 0;
-	}
+	if (!$SHP->hooks_exist('hook-commentform-replace')) {
+            if(trim($commentTitle) == '' || trim($author) == '' || trim($comment) == '')
+    	    {
+    		$theme_main['content'] .= $lang['errorAllFields'].'<br>';
+    		$do = 0;
+    	    }
 
-	if($config['commentsSecurityCode'] == 1)
-	{
-		$code = $_POST['code'];
-		$originalCode = $_POST['originalCode'];
-		if ($code !== $originalCode)
-		{
-			echo $lang['errorSecurityCode'].'<br>';
-			$do = 0;
-		}
-	}
+    	    if($config['commentsSecurityCode'] == 1)
+    	    {
+    		$code = $_POST['code'];
+    		$originalCode = $_POST['originalCode'];
+    		if ($code !== $originalCode)
+    		{
+    			$theme_main['content'] .= $lang['errorSecurityCode'].'<br>';
+    			$do = 0;
+    		}
+    	    }
 
-	$hasPosted = 0;
+    	    $hasPosted = 0;
 
-        $forbiddenAuthors=explode(',',$config['commentsForbiddenAuthors']);
-        foreach($forbiddenAuthors as $value)
-	{
-		if($value == $author)
-		{
-                     echo $lang['errorCommentUser1']." ".$author." ".$lang['errorCommentUser2'];
-  		     $do=0;
-		}
+            $forbiddenAuthors=explode(',',$config['commentsForbiddenAuthors']);
+            foreach($forbiddenAuthors as $value)
+    	    {
+    		if($value == $author)
+    		{
+                         $theme_main['content'] .= $lang['errorCommentUser1']." ".$author." ".$lang['errorCommentUser2'];
+      		         $do=0;
+    	 	}
+    	    }
 	}
+        $public_data['do'] = $do;
+        if ($SHP->hooks_exist('hook-comment-validate')) {
+            $SHP->execute_hooks('hook-comment-validate', $public_data);
+        }
+        $do = $public_data['do'];
 
 	if($do == 1)
 	{
 		if(strlen($comment) > $config['commentsMaxLength'])
 		{
-		     echo $lang['errorLongComment1'].' '.$config['commentsMaxLength'].' '.$lang['errorLongComment2'].' '.strlen($comment);
+		     $theme_main['content'] .= $lang['errorLongComment1'].' '.$config['commentsMaxLength'].' '.$lang['errorLongComment2'].' '.strlen($comment);
 		}
                 else
 		{
@@ -2744,9 +3390,17 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
                      //echo $date;
                      //die();
                      $ip      = $_SERVER["REMOTE_ADDR"];
-                     sqlite_query($config['db'], "INSERT INTO comments (postid, sequence, title, author, content, date, ip, url, email) VALUES('$commentFileName', '$thisCommentSeq', '$commentTitle', '$author', '$comment', '$date', '$ip', '$url', '$email');");
+                     if ($config['commentModerate'] == 1) {
+                         $status = 'pending';
+                         $message = $lang['msgCommentModerate'];
+                     }
+                     else {
+                         $status = 'approved';
+                         $message = $lang['msgCommentAdded'];
+                     }
+                     sqlite_query($config['db'], "INSERT INTO comments (postid, sequence, title, author, content, date, ip, url, email, status) VALUES('$commentFileName', '$thisCommentSeq', '$commentTitle', '$author', '$comment', '$date', '$ip', '$url', '$email', '$status');");
 
-                     echo $lang['msgCommentAdded'].' '.$author.'!<br />';
+                     $theme_main['content'] .= $message.' '.$author.'!<br />';
 
                      # If Comment Send Mail is active
 		     if($config['sendMailWithNewComment'] == 1)
@@ -2767,61 +3421,75 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
 		 	 @mail($config['sendMailWithNewCommentMail'], $subject, $message, $headers);
   		     }
 		}
+		if ($SHP->hooks_exist('hook-comment-success')) {
+                    $SHP->execute_hooks('hook-comment-success');
+                }
 	}
 	else {
-             echo $lang['errorPleaseGoBack'];
+             $theme_main['content'] .= $lang['errorPleaseGoBack'];
+             if ($SHP->hooks_exist('hook-comment-fail')) {
+                 $SHP->execute_hooks('hook-comment-fail');
+             }
         }
   }
 
   function deleteCommentForm() {
-      global $debugMode, $optionValue, $optionValue2, $lang;
+      global $debugMode, $optionValue, $optionValue2, $lang, $theme_main, $config;
       $fileName = $optionValue;
       $commentNum = $optionValue2;
-      echo "<h3>".$lang['pageCommentDel']."...</h3>";
-      echo "<form name=\"form1\" method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/deleteComment>";
-      echo $lang['msgSure'].'<br><br>';
-      echo '<input name="process" type="hidden" id="process" value="deleteCommentSubmit">';
-      echo '<input name="fileName" type="hidden" id="fileName" value="'.$fileName.'">';
-      echo '<input name="commentNum" type="hidden" id="commentNum" value="'.$commentNum.'">';
-      echo '<input type="submit" name="Submit" value="'.$lang['pageBasicConfigSubmit'].'">';
-      echo "</form>";
+      $theme_main['content'] = "";
+      $theme_main['content'] .= "<h3>".$lang['pageCommentDel']."...</h3>";
+      $theme_main['content'] .= "<form name=\"form1\" method=\"post\" action=".$config['blogPath'].$config['cleanIndex']."/deleteComment>";
+      $theme_main['content'] .= $lang['msgSure'].'<br><br>';
+      $theme_main['content'] .= '<input name="process" type="hidden" id="process" value="deleteCommentSubmit">';
+      $theme_main['content'] .= '<input name="fileName" type="hidden" id="fileName" value="'.$fileName.'">';
+      $theme_main['content'] .= '<input name="commentNum" type="hidden" id="commentNum" value="'.$commentNum.'">';
+      $theme_main['content'] .= '<input type="submit" name="Submit" value="'.$lang['pageBasicConfigSubmit'].'">';
+      $theme_main['content'] .= "</form>";
   }
 
   function deleteCommentSubmit() {
        global $separator, $newPostFile, $newFullPostNumber, $config, $debugMode, $lang, $authors, $authorsPass;
-       global $fileName;
+       global $fileName, $theme_main, $SHP, $public_data;
+       $theme_main['content'] = "";
        if ($debugMode=="on") {echo "Inside deleteCommentSubmit ..<br>";}
-       $fileName   = $_POST['fileName'];
-       $commentNum = $_POST['commentNum'];
+       $public_data['fileName'] = $fileName   = $_POST['fileName'];
+       $public_data['commentNum'] = $commentNum = $_POST['commentNum'];
        $postFile = $config['postDir'].$fileName.$config['dbFilesExtension'];
        $result = sqlite_query($config['db'], "select * from posts WHERE postid = '$fileName';");
        while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
            $author = $row['author'];
        }
-       $thisAuthor = $_SESSION['username'];
-       echo "<h3>".$lang['pageCommentDel']."...</h3>";
+       $public_data['thisAuthor'] = $thisAuthor = $_SESSION['username'];
+       $theme_main['content'] .= "<h3>".$lang['pageCommentDel']."...</h3>";
        $commentNum=$_POST['commentNum'];
        if ((($config['authorDeleteComment'] == 1) && ($_SESSION['logged_in'])) ||
            (($config['authorDeleteComment'] == 0) && ($thisAuthor == 'admin' || $thisAuthor == $author) && ($_SESSION['logged_in']))) {
             sqlite_query($config['db'], "delete from comments WHERE postid = '$fileName' and sequence = '$commentNum';");
-            echo $lang['msgCommentDeleted']." ...<br>";
+            //$theme_main['content'] .= $lang['msgCommentDeleted']." ...<br>";
+			$theme_main['content'] .= $lang['msgCommentDeleted'].'...<a href="'.$_SESSION['referrer'].'">'.$lang['msgGoBack'].'</a>';
+            unset($GLOBALS['$public_data']);
+            if ($SHP->hooks_exist('hook-deletecomment')) {
+                $SHP->execute_hooks('hook-deletecomment', $public_data);
+            }
        }
        else {
-          echo $lang['errorNotAuthorized'].' .. <br>';
+          $theme_main['content'] .= $lang['errorNotAuthorized'].' .. <br>';
        }
   }
 
 
   function viewArchive() {
-      global $separator, $entries, $config, $lang;
+      global $separator, $entries, $config, $lang, $theme_main;
+      $theme_main['content'] = "";
       $i=0;
-      echo "<h3>".$lang['pageArchive']."</h3>";
+      $theme_main['content'].= "<h3>".$lang['pageArchive']."</h3>";
       $archiveArray   = array();
       $archiveArrayUnique = array();
       $archiveArrayFormat = array();
       $result = sqlite_query($config['db'], "select * from posts ORDER BY date;");
       if (sqlite_num_rows($result) == 0) {
-          echo '<br><br>'.$lang['msgNoPosts'].' <a href="'.$_SERVER['SCRIPT_NAME'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
+          $theme_main['content'].= '<br><br>'.$lang['msgNoPosts'].' <a href="'.$config['blogPath'].$config['cleanIndex'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
       }
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $title         = $row['title'];
@@ -2834,58 +3502,99 @@ div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>")
       }
       $archiveArrayUnique=array_unique($archiveArray);
       foreach ($archiveArrayUnique as $archiveMonthYear) {
-          echo "<a style='font-style:normal' href=".$_SERVER['SCRIPT_NAME']."/viewArchiveMonth/".str_replace(" ","-",$archiveMonthYear).">".$archiveArrayFormat[$archiveMonthYear]."</a><br>";
+          $theme_main['content'].= "<a style='font-style:normal' href=\"".$config['blogPath'].$config['cleanIndex']."/month/".str_replace(" ","-",$archiveMonthYear)."\">".$archiveArrayFormat[$archiveMonthYear]."</a><br>";
       }
   }
 
 
   function viewArchiveMonth() {
-      global $separator, $entries, $config, $optionValue, $lang;
+      global $separator, $entries, $config, $optionValue, $lang, $theme_main;
       $i=0;
-      echo "<h3>".$lang['pageArchiveFor']." ".date("M Y",strtotime($optionValue))."</h3>";
+      $theme_main['content'] = "";
+      $theme_main['content'].= "<h3>".$lang['pageArchiveFor']." ".date("M Y",strtotime($optionValue))."</h3>";
       //$requestMonth = str_replace("-"," ",$optionValue);
       $requestMonth = $optionValue;
       //echo $requestMonth.'<br>';
-      echo "<table>";
+      $theme_main['content'].= "<table>";
       $result = sqlite_query($config['db'], "select * from posts WHERE date LIKE '%$requestMonth%';");
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $title         = $row['title'];
           $titleModified = titleModify($title);
           $postDate      = $row['date'];
           $fileName      = $row['postid'];
-          echo "<tr><td>".$postDate.":&nbsp;</td><td><a style='font-style:normal' href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$fileName."/".$titleModified.">".$title."</a></td></tr>";
+          $theme_main['content'].= "<tr><td>".$postDate.":&nbsp;</td><td><a href=".$config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified.">".$title."</a></td></tr>";
       }
-      echo "</table>";
+      $theme_main['content'].= "</table>";
   }
 
 
   function searchPosts() {
-      global $separator, $config, $entries, $lang;
+      global $separator, $config, $entries, $lang, $theme_main, $SHP, $public_data;
+      $theme_main['content'] = "";
       $searchkey   = isset($_POST['searchkey'])?$_POST['searchkey']:$_GET['searchkey'];
-      echo "<h3>".$lang['pageSearch']."</h3>";
+      $theme_main['content'].= "<h3>".$lang['pageSearch']."</h3>";
       $i=0;
+      $searchResults = array();
+      unset($GLOBALS['$public_data']);
       if (trim($searchkey) == "") {
-          echo $lang['errorSearchNothing'].'<br>';
+          $theme_main['content'].= $lang['errorSearchNothing'].'<br>';
       }
       else {
-          $result = sqlite_query($config['db'], "select * from posts WHERE title LIKE '%$searchkey%' OR content LIKE '%$searchkey%';");
-          while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
-              $title         = $row['title'];
-              $titleModified = titleModify($title);
-              $content       = $row['content'];
-              $date          = $row['date'];
-              $fileName      = $row['postid'];
-              $category      = $row['category'];
-              $postType      = $row['type'];
-              $allowComments = $row['allowcomments'];
-              $visits        = $row['visits'];
-              echo "<a style='font-style:normal' href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$fileName."/".$titleModified.">".$title."</a><br/>";
-              $i++;
+          $public_data['searchkey'] = $searchkey;
+          if ($SHP->hooks_exist('hook-searchposts-replace')) {
+              $SHP->execute_hooks('hook-searchposts-replace', $public_data);
           }
-          if ($i == 0) {echo $lang['errorSearchEmptyResult'];}
+          else {
+              $searcharray=explode(" ",$searchkey);
+              $searchexpr="";
+              foreach ($searcharray as $singlekey) {
+                  if ($searchexpr!="") $searchexpr.=" and ";
+                  $searchexpr.="(lower(title) like lower('%$singlekey%') or lower(content) like lower('%$singlekey%'))";
+              }
+              //$result = sqlite_query($config['db'], "select * from posts WHERE title LIKE '%$searchkey%' OR content LIKE '%$searchkey%';");
+              $result = sqlite_query($config['db'], "select * from posts WHERE $searchexpr;");
+              while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+                  $title         = $row['title'];
+                  $titleModified = titleModify($title);
+                  $content       = $row['content'];
+                  $date          = $row['date'];
+                  $fileName      = $row['postid'];
+                  $category      = $row['category'];
+                  $postType      = $row['type'];
+                  $allowComments = $row['allowcomments'];
+                  $visits        = $row['visits'];
+                  $theme_main['content'].= "<a href=".$config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified.">".$title."</a><br/>";
+                  $i++;
+                  array_push($searchResults, $fileName);
+              }
+              $searchexpr="";
+              foreach ($searcharray as $singlekey) {
+                  if ($searchexpr!="") $searchexpr.=" or ";
+                  $searchexpr.="(lower(title) like lower('%$singlekey%') or lower(content) like lower('%$singlekey%'))";
+              }
+              //$result = sqlite_query($config['db'], "select * from posts WHERE title LIKE '%$searchkey%' OR content LIKE '%$searchkey%';");
+              $result = sqlite_query($config['db'], "select * from posts WHERE $searchexpr;");
+              while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+                  $title         = $row['title'];
+                  $titleModified = titleModify($title);
+                  $content       = $row['content'];
+                  $date          = $row['date'];
+                  $fileName      = $row['postid'];
+                  $category      = $row['category'];
+                  $postType      = $row['type'];
+                  $allowComments = $row['allowcomments'];
+                  $visits        = $row['visits'];
+                  if (!in_array($fileName, $searchResults)) {
+                      $theme_main['content'].= "<a href=".$config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified.">".$title."</a><br/>";
+                      $i++;
+                  }
+              }
+          }
+          if ($i == 0) {$theme_main['content'].= $lang['errorSearchEmptyResult'];}
       }
   }
 
 
 ?>
+
 

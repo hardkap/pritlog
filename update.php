@@ -1,11 +1,19 @@
 <?php
 
 /*#######################################################################
-# 	PRITLOG		                                                #
-#	                                                                #
-#	Version: 0.8                                                    #
-#######################################################################*/
+ 	PRITLOG
 
+	Version: 0.81
+#######################################################################*/
+  
+  // Example loading an extension based on OS
+  if (!extension_loaded('sqlite')) {
+	if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
+		@dl('php_sqlite.dll');
+	} else {
+		@dl('sqlite.so');
+	}
+  }   
 
   $separator    = "#~#";                                        // Separator used between fields when the entry files are created.
 
@@ -14,24 +22,38 @@
   if (file_exists(getcwd().'/config_admin.php')) { require("config_admin.php"); }
   else {die("Old config file not found"); }
   */
-
-  $postdb = getcwd()."/data/postdb.sqlite";
+  $old_postdb = getcwd()."/data/postdb.sqlite";
+  $new_postdb = getcwd()."/data/user/postdb.sqlite";
+  if (!file_exists($new_postdb)) {
+	  mkdir(getcwd()."/data/user");
+	  if (!copy($old_postdb,$new_postdb)) {
+		  die("Failed copying postdb.sqlite from $old_postdb to $new_postdb. Please do this manually and rerun this script");
+	  } 
+  }
+  $old_config = getcwd()."/data/config_admin.php";
+  $new_config = getcwd()."/data/user/config.php";
+  if (!file_exists($new_config)) {
+	  if (!copy($old_config,$new_config)) {
+		  die("Failed copying config file from $old_config to $new_config. Please do this manually and rerun this script");
+	  } 
+  }
+  $old_authors = getcwd()."/data/authors.php";
+  $new_authors = getcwd()."/data/user/authors.php";
+  if (!file_exists($new_authors)) {
+	  if (!copy($old_authors,$new_authors)) {
+		  die("Failed copying config file from $old_authors to $new_authors. Please do this manually and rerun this script");
+	  } 
+  }
+  $postdb = $new_postdb;
   if (function_exists('sqlite_open')) {
-      if ($db = sqlite_open($postdb, 0666, $sqliteerror)) {
-          @sqlite_query($db, 'DROP TABLE posts');
-          @sqlite_query($db, 'DROP TABLE comments');
-          @sqlite_query($db, 'DROP TABLE stats');
-          @sqlite_query($db, 'DROP TABLE active_guests');
-          @sqlite_query($db, 'DROP TABLE active_users');
-          sqlite_query($db, 'CREATE TABLE posts (title CHAR(100), content CHAR(4500), date DATETIME, postid PRIMARY KEY, category CHAR(20), type CHAR(5), stick CHAR(5), allowcomments CHAR(4), visits INTEGER, author CHAR(25));');
-          sqlite_query($db, 'CREATE TABLE comments (commentid INTEGER PRIMARY KEY, postid CHAR(6), sequence INTEGER, author CHAR(25), title CHAR(100), content CHAR(4500), date DATETIME, ip CHAR(16), url CHAR(50), email CHAR(50));');
-          sqlite_query($db, 'CREATE TABLE stats (statid INTEGER PRIMARY KEY, stattype CHAR(10), statcount INTEGER);');
-          sqlite_query($db, 'CREATE TABLE active_guests (id INTEGER PRIMARY KEY, ip CHAR(16), logtime DATETIME);');
-          sqlite_query($db, 'CREATE TABLE active_users (id INTEGER PRIMARY KEY, ip CHAR(16), logtime DATETIME);');
-          $config['postDir']=getcwd().'/posts/';
-          $config['commentsDir']=getcwd().'/comments/';
-          $config['statFile']=getcwd()."/comments/online.prt.dat";
-          $entries = getPosts();
+      if ($config['db'] = sqlite_open($postdb, 0666, $sqliteerror)) {
+          @sqlite_query($config['db'], 'DROP TABLE plugins');
+          @sqlite_query($config['db'], 'DROP TABLE ipban');
+          @sqlite_query($config['db'], 'DROP TABLE logs');
+          sqlite_query($config['db'], 'CREATE TABLE plugins (id PRIMARY KEY, name CHAR(50), author CHAR(50), url CHAR(80), description CHAR(300), status INTEGER);');
+          sqlite_query($config['db'], 'CREATE TABLE ipban (id INTEGER PRIMARY KEY, ip CHAR(16));');
+          sqlite_query($config['db'], 'CREATE TABLE logs (id INTEGER PRIMARY KEY, ip CHAR(16), action CHAR(30), date DATE);');
+          sqlite_query($config['db'], "INSERT INTO plugins (id, name, author, url, description, status) VALUES('nicedit', 'nicEdit Plugin', 'Prit', 'http://hardkap.net/forums', 'Plugin to add nicEdit WYSIWYG editor to Pritlog', 1);");
           //unset($db);
       }
       else {die("Update failed. Please make sure the <strong>data</strong> folder has write permissions."); }
@@ -53,7 +75,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-US">
 <head>
 <title>
-Pritlog Update to 0.8
+Pritlog Update to 0.81
 </title>
 <meta name="Keywords" content="Pritlog Update"/>
 <meta name="Description" content="Pritlog Update"/>
@@ -84,7 +106,7 @@ Pritlog Update to 0.8
 
 <div id="container">
 
-<h1>Updating Pritlog to 0.8</h1>
+<h1>Updating Pritlog to 0.81</h1>
 <hr>
 
 <p>
@@ -114,17 +136,18 @@ Pritlog Update to 0.8
   }
 
   function startProcess() {
-         echo '<p>You are about to update Pritlog to the latest test version 0.8.</p>';
+         echo '<p>You are about to update Pritlog to the latest test version 0.81.</p>';
          echo '<p><strong>Before you start:</strong><br>';
+		 echo '<li>Delete all files except the following:';
+		 echo '<ul><li>data/postdb.sqlite</li><li>data/config_admin.php</li><li>data/authors.php</li></ul></li>';
          echo '<li>Extract latest Pritlog files to your blog path - overwriting any old ones</li>';
-         echo '<li>Move the files <strong>config_admin.php</strong> and <strong>authors.php</strong> to the "data" folder (overwriting the existing files in this folder)</li>';
          echo '</p>';
          echo '<p><strong>All this script does is: </strong><br>';
-         echo '<li>Load the posts and comments to Sqlite database</li>';
-         echo '<li>Create additional tables in the Sqlite database</li>';
+         echo '<li>Adds, modifies the new or updated tables</li>';
+         echo '<li>Load the tables with appropriate date</li>';
          echo '<li>List additional language variables that need to be added</li>';
          echo '</p>';
-         echo '<p>It is recommended that you take a backup of your posts and comments directories before the update process</p>';
+         echo '<p>It is recommended that you take a backup of your <strong>data</strong> folder before the update process</p>';
          echo '<form action="'.$_SERVER['SCRIPT_NAME'].'?action=performProcess" method="post">';
          echo '<p><strong>Ready to start the update process?</strong></p>';
          echo '<p><input type="submit" value="Start update"></p>';
@@ -134,16 +157,14 @@ Pritlog Update to 0.8
   function performProcess() {
          global $blogPath;
          echo '<p>Starting the process ... </p>';
+         modifyComments();
          readConfig();
          writeConfig();
-         loadPosts();
-         loadComments();
-         loadStats();
-         echo '<p><strong>You may now delete the following files/folders from your blog path: </strong>';
-         echo '<li>posts</li>';
-         echo '<li>comments</li>';
-         echo '<li>update.php</li>';
-         echo '<p><strong>CONGRATULATIONS !! Your Pritlog installation has been updated to the 0.8</strong></p>';
+         echo '<p><strong>You may now delete the following files/folders from your blog path: </strong><br/>(Keeping a backup of these files for sometime is a great idea too)';
+		 echo '<li>data/authors.php</li>';
+		 echo '<li>data/config_admin.php</li>';
+		 echo '<li>data/postdb.sqlite</li>';
+         echo '<p><strong>CONGRATULATIONS !! Your Pritlog installation has been updated to the 0.81</strong></p>';
          echo '<p><a href="'.$blogPath.'">Home page</a></p>';
          translationInfo();
   }
@@ -173,113 +194,34 @@ Pritlog Update to 0.8
       }
   }
 
-  function getPosts() {
-      global $config;
-      if (file_exists($config['postDir'])) {
-          if ($handle = opendir($config['postDir'])) {
-              $file_array_unsorted = array();
-              $file_array_sorted   = array();
-              while (false !== ($file = readdir($handle))) {
-                  array_push($file_array_unsorted,$file);
-              }
-              sort($file_array_unsorted);
-              foreach ($file_array_unsorted as $value) {
-                  $filename=$config['postDir'].$value;
-                  if ((file_exists($filename)) && ($filename !== $config['postDir'].".") && ($filename !== $config['postDir']."..")) {
-                    $fp = fopen($filename, "rb");
-                    array_push($file_array_sorted,fread($fp, filesize($filename)));
-                    fclose($fp);
-                  }
-              }
-              closedir($handle);
-          }
-      }
-      return $file_array_sorted;
-  }
 
-  function loadPosts() {
+  function modifyComments() {
       global $config, $entries, $separator, $db;
-      foreach ($entries as $value) {
-          $posts         =explode($separator,$value);
-          $title         =trim(sqlite_escape_string($posts[0]));
-          $content       =sqlite_escape_string($posts[1]);
-          $date          =date("Y-m-d H:i:s",strtotime(trim($posts[2])));
-          $postid        =trim($posts[3]);
-          $category      =trim(sqlite_escape_string($posts[4]));
-          $type          =trim($posts[5]);
-          $allowComments =$posts[6];
-          $visits        =$posts[7];
-          $author        =trim(sqlite_escape_string($posts[8]));
-          $stick         ="no";
-          //echo $visits.'<br>';
-          //echo $title.' '.$date.' '.trim($posts[2]).'<br>';
-          //echo $postid.'  '.$content.'<br>';
-          sqlite_query($db, "INSERT INTO posts (postid, title, content, date, category, type, stick, allowcomments, visits, author) VALUES('$postid', '$title', '$content', '$date', '$category', '$type', '$stick', '$allowComments','$visits', '$author');");
+      $result = sqlite_query($config['db'], "select * from comments");
+      @sqlite_query($config['db'], 'DROP TABLE comments');
+      sqlite_query($config['db'], 'CREATE TABLE comments (commentid INTEGER PRIMARY KEY, postid CHAR(6), sequence INTEGER, author CHAR(25), title CHAR(100), content CHAR(4500), date DATETIME, ip CHAR(16), url CHAR(50), email CHAR(50), status CHAR(10));');
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $commentid     = $row['commentid'];
+          $postid        = $row['postid'];
+          $sequence      = $row['sequence'];
+          $author        = sqlite_escape_string($row['author']);
+          $title         = sqlite_escape_string($row['title']);
+          $content       = sqlite_escape_string($row['content']);
+          $date          = $row['date'];
+          $ip            = $row['ip'];
+          $url           = sqlite_escape_string($row['url']);
+          $email         = sqlite_escape_string($row['email']);
+          $status        = 'approved';
+          sqlite_query($config['db'], "INSERT INTO comments (postid, sequence, title, author, content, date, ip, url, email, status) VALUES('$postid', '$sequence', '$title', '$author', '$content', '$date', '$ip', '$url', '$email', '$status');");
       }
-      echo '<p>Posts have been loaded to the Sqlite database ... </p>';
+      echo '<p>Comment table has been modified ... </p>';
   }
 
-  function loadComments() {
-      global $config, $db, $separator;
-      if (file_exists($config['commentsDir'])) {
-          if ($handle = opendir($config['commentsDir'])) {
-              $file_array_unsorted = array();
-              $file_array_sorted   = array();
-              while (false !== ($file = readdir($handle))) {
-                  array_push($file_array_unsorted,$file);
-              }
-              sort($file_array_unsorted);
-              foreach ($file_array_unsorted as $value) {
-                  $filename=$config['commentsDir'].$value;
-                  if ((file_exists($filename)) && ($filename !== $config['commentsDir'].".") && ($filename !== $config['commentsDir']."..") && strstr($filename,'00') && strstr($filename,'.prt')) {
-                     $fp = fopen($filename, "rb");
-                     $allcomments=explode("\n",fread($fp, filesize($filename)));
-                     fclose($fp);
-                     foreach ($allcomments as $value) {
-                        if (trim($value) != "") {
-                             $comment = explode($separator,$value);
-                             $title   = sqlite_escape_string($comment[0]);
-                             $author  = sqlite_escape_string($comment[1]);
-                             $content = sqlite_escape_string($comment[2]);
-                             $date    = date("Y-m-d H:i:s",strtotime(trim($comment[3])));
-                             $postid  = $comment[4];
-                             $sequence= $comment[5];
-                             $ip      = '127.0.0.1';
-                             $url     = '';
-                             $email   = '';
-                             sqlite_query($db, "INSERT INTO comments (postid, sequence, title, author, content, date, ip, url, email) VALUES('$postid', '$sequence', '$title', '$author', '$content', '$date', '$ip', '$url', '$email');");
-                             //echo $title.' '.$date.' '.trim($comment[3]).'<br>';
-                        }
-                     }
-                  }
-              }
-              closedir($handle);
-          }
-      }
-      echo '<p>Comments have been loaded to the Sqlite database ... </p>';
-  }
-
-  function loadStats() {
-      global $config, $db, $separator;
-      $filename=$config['statFile'];
-      if (file_exists($filename)) {
-          $fp = fopen($filename, "rb");
-          $allstats=explode("\n",fread($fp, filesize($filename)));
-          fclose($fp);
-          $total = count($allstats);
-          $stattype  = "total";
-          $statcount = $total;
-          //echo $statcount.'<br>';
-          sqlite_query($db, "INSERT INTO stats (stattype, statcount) VALUES('$stattype', '$statcount');");
-      }
-      echo '<p>Statistics have been updated to the Sqlite database ... </p>';
-  }
 
   function readConfig() {
     /* Read config information from file. */
-    global $config;
-
-    $contents = file( getcwd()."/data/".'config_admin.php' ) or die("Config file not found in the 'data' subfolder");
+    global $config,$new_config;	
+    $contents = file( $new_config ) or die("Config file not found in the 'data' subfolder");
     $contents[0]=trim(str_replace("<?php /*","",$contents[0]));
     $contents[0]=trim(str_replace("*/ ?>","",$contents[0]));
     if ( $contents[0] ) {
@@ -313,7 +255,14 @@ Pritlog Update to 0.8
                   'menuLinks',
                   'blogLanguage',
                   'blogPath',
-                  'showCategoryCloud');
+                  'showCategoryCloud',
+                  'allowRegistration',
+                  'sendRegistMail',
+                  'timeoutDuration',
+                  'theme',
+                  'commentModerate',
+                  'limitLogins',
+				  'cleanUrl');
 
       for ( $i = 0; $i < count( $tempConfigs ); $i++ ) {
         $key = $configKeys[ $i ];
@@ -360,16 +309,23 @@ Pritlog Update to 0.8
         if ( !isset( $config[ 'menuLinks' ] ) )                  { $config[ 'menuLinksOrig' ]              = 'http://google.com,Google;http://pplog.infogami.com/,Get PPLOG;http://hardkap.net/pritlog,Get PRITLOG';
                                                                    $config[ 'menuLinks' ]                  = 'http://google.com,Google;http://pplog.infogami.com/,Get PPLOG;http://hardkap.net/pritlog,Get PRITLOG'; }
         if ( !isset( $config[ 'blogLanguage' ] ) )               { $config[ 'blogLanguage' ]               = 'english-us'; }
+        if ( !isset( $config[ 'theme' ] ) )                      { $config[ 'theme' ]                      = 'default'; }
         if ( !isset( $config[ 'blogPath' ] ) )                   { $config[ 'blogPath' ]                   = 'http://localhost'; }
         if ( !isset( $config[ 'showCategoryCloud' ] ) )          { $config[ 'showCategoryCloud' ]          = 1; }
         if ( !isset( $config[ 'allowRegistration' ] ) )          { $config[ 'allowRegistration' ]          = 0; }
         if ( !isset( $config[ 'sendRegistMail' ] ) )             { $config[ 'sendRegistMail' ]             = 1; }
+        if ( !isset( $config[ 'commentModerate' ] ) )            { $config[ 'commentModerate' ]            = 0; }
         if ( !isset( $config[ 'timeoutDuration' ] ) )            { $config[ 'timeoutDuration' ]            = 900; }
+		if ( !isset( $config[ 'limitLogins' ] ) )                { $config[ 'limitLogins' ]                = 10; }
+        if ( !isset( $config[ 'cleanUrl' ] ) )                   { $config[ 'cleanUrl' ]                   = 0; }
+		$config['menuLinksOrig']=$config['menuLinks'];
+        $config['menuLinksArray']=explode(';',$config['menuLinks']);
+
   }
 
-  function writeConfig($message=true) {
-        global $config, $lang;
-        $configFile=getcwd()."/data/".'config_admin.php';
+  function writeConfig() {
+        global $config, $lang, $new_config;
+        $configFile=$new_config;
         $configContent='<?php /* ';
         if (file_exists($configFile)) {
             $configContent=$configContent.
@@ -405,7 +361,11 @@ Pritlog Update to 0.8
                           $config['showCategoryCloud'].'|'.
                           $config['allowRegistration'].'|'.
                           $config['sendRegistMail'].'|'.
-                          $config['timeoutDuration'];
+                          $config['timeoutDuration'].'|'.
+                          $config['theme'].'|'.
+                          $config['commentModerate'].'|'.
+                          $config['limitLogins'].'|'.
+						  $config['cleanUrl'];
             $configContent=$configContent.' */ ?>';
             $fp=fopen($configFile,"w");
             fwrite($fp,$configContent);
