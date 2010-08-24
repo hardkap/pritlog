@@ -19,7 +19,7 @@
 #	YAGNI: Only add things, when you actually 	                #
 #	need them, not because you think you will.	                #
 #							                #
-#	Version: 1.1					                #
+#	Version: 0.4                                                    #
 #######################################################################*/
 
 
@@ -110,9 +110,9 @@ else
 ?>
 <h1>Stats</h1>
 <?php sidebarStats() ?>
-<h1>Version</h1>
+<h1>Pritlog Version</h1>
 <script type="text/javascript">
-var clientVersion=0.3;
+var clientVersion=0.4;
 </script>
 <script src="http://hardkap.net/pritlog/checkversion.js" type="text/javascript"></script>
 
@@ -226,6 +226,8 @@ var clientVersion=0.3;
           $errorMessage="<br><span style=\"color: rgb(204, 0, 51);\">Unable to create posts and comments directories<br>Please create them manually. <br>";
           $errorMessage=$errorMessage."Here are the directory names: <br>- ".$justPostsDir."<br>- ".$justCommentsDir."<br>";
           $errorMessage=$errorMessage."<br>Make sure the permissions on these directories and the main blog directory are set to 755.<br></span>";
+          
+
           if (is_writable(getcwd())) {
               if (!file_exists($commentdir) || !file_exists($postdir)) {  /* Looks like first time running */
                   mkdir($commentdir,0755) or die($errorMessage);
@@ -274,7 +276,7 @@ var clientVersion=0.3;
            else {$commentText="No Comments";}
            echo "<a href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$fileName.">".$commentText."</a>";
            echo "&nbsp;-&nbsp;<a href=".$_SERVER['PHP_SELF']."?option=editEntry&filename=".$fileName.">Edit</a>";
-           echo "&nbsp;-&nbsp;<a href=".$_SERVER['PHP_SELF']."?option=deleteEntry&filename=".$fileName.">Delete</a><br/><br/></center>";
+           echo "&nbsp;-&nbsp;<a href=".$_SERVER['PHP_SELF']."?option=deleteEntry&filename=".$fileName.">Delete</a></center><br/><br/><br/>";
            $i++;
       }
       $totalEntries++;
@@ -518,7 +520,7 @@ var clientVersion=0.3;
       $do = 1;
       if($postTitle == '' || $postContent == '' || $postCategory == '')
       {
-      	   echo 'All fields are neccessary. Go back and fill them all.';
+      	   echo 'All fields are neccessary. Please fill them all.';
 	   $do = 0;
       }
       if ($do == 1) {
@@ -565,14 +567,52 @@ var clientVersion=0.3;
        $entryName= $_POST['fileName'];
        $fileName = $postdir.$entryName.$config_dbFilesExtension;
        echo "<h1>Deleting entry...</h1>";
+       $errorMessage='<br><span style="color: rgb(204, 0, 51);">There was an error deleting entry '.$entryName.'. <br>Please check the folder permissions<br>';
+       $errorMessage=$errorMessage."If this problem continues, please report as a bug to the author of PRITLOG<br>";
        if ($_POST['pass']===$configPass) {
-          unlink($fileName);
-          echo "Entry ".$entryName." deleted succesfully...<br/>";
+          if (file_exists($fileName)) {unlink($fileName);}
+          if (deleteEntryComment($entryName)) {
+             echo "Entry ".$entryName." deleted succesfully...<br/>";
+          }
+          else { exit($errorMessage); }
        }
        else {
           echo "Password Incorrect .. <br/>";
-          echo "<a href=".$_SERVER['PHP_SELF']."?option=deleteEntry&filename=".$entryName.">Goback</a>";
        }
+  }
+
+  function deleteEntryComment($entryName) {
+       global $commentdir,$config_dbFilesExtension,$separator;
+       $commentFullName=$commentdir.$entryName.$config_dbFilesExtension;
+       $thisCommentFileName=$entryName;
+       if (file_exists($commentFullName)) {unlink($commentFullName);}
+       //echo "<br>$commentFullName deleted<br>";
+       $latestFileName=$commentdir."/latest".$config_dbFilesExtension;
+       if (file_exists($latestFileName)) {
+             $latestLines= file($latestFileName);
+             $errorMessage='<br><span style="color: rgb(204, 0, 51);">Error opening or writing to latestFileName '.$latestFileName.'. <br>Please check the folder permissions<br>';
+             $errorMessage=$errorMessage."If this problem continues, please report as a bug to the author of PRITLOG<br>";
+             $fp=fopen($latestFileName, "w") or die($errorMessage);
+             $i=0;
+             foreach ($latestLines as $value) {
+                 $latestSplit=explode($separator,$value);
+                 $commentFileName=trim($latestSplit[0]);
+                 if (trim($value) != "") {
+                     //echo "commentFileName=$commentFileName,thisCommentFileName=$thisCommentFileName,<br>";
+                     //echo "commentSeq=$commentSeq,thisCommentSeq=".trim($thisCommentSeq).",<br>";
+                     if (($commentFileName == $thisCommentFileName)){
+                         //echo "Deleted Indeed!<br>";
+                     }
+                     else {
+                         fwrite($fp,$value);
+                     }
+                  }
+                  $i++;
+             }
+             fclose($fp);
+         }
+         if (file_exists($commentFullName)) {return false;}
+         else {return true;}
   }
 
   function editEntryForm() {
@@ -639,7 +679,7 @@ var clientVersion=0.3;
       $do = 1;
       if($postTitle == '' || $postContent == '' || $postCategory == '')
       {
-      	   echo 'All fields are neccessary. Go back and fill them all.';
+      	   echo 'All fields are neccessary. Please fill them all.';
 	   $do = 0;
       }
       if ($do == 1) {
@@ -662,7 +702,6 @@ var clientVersion=0.3;
           }
           else {
               echo "Password Incorrect .. <br/>";
-              echo "<a href=".$_SERVER['PHP_SELF']."?option=editEntry&filename=".$entryName.">Goback</a>";
           }
       }
   }
@@ -780,7 +819,7 @@ var clientVersion=0.3;
 
 	if($commentTitle == '' || $author == '' || $comment == '' || $pass == '')
 	{
-		echo 'All fields are neccessary. Go back and fill them all.';
+		echo 'All fields are neccessary. Please fill them all.';
 		$do = 0;
 	}
 
@@ -811,10 +850,10 @@ var clientVersion=0.3;
 	//$fp = fopen($userFileName, "rb");
 	//$users=explode("\n",fread($fp, filesize($userFileName)));
 	//fclose($fp);
+	$newUser = 1;
 	if (file_exists($userFileName)) {
             $users=file($userFileName);
   	    $data = '';
-  	    $newUser=1;
   	    if ($do == 1) {
                 foreach($users as $value)
                 {
@@ -874,7 +913,7 @@ var clientVersion=0.3;
 		     if($config_sendMailWithNewComment == 1)
                      {
 		 	 $content = "Hello, i am sending this mail because $author commented on your blog. \r\nTitle: $commentTitle\r\nComment: ".str_replace("\\","",$comment)."\r\nDate: ".date("d M Y h:i")."\r\nRemember you can disallow this option changing the ".'$config_sendMailWithNewComment Variable to 0';
-		 	 mail("prithish@hardkap.com",
+		 	 mail($config_sendMailWithNewCommentMail,
                          "PRITLOG: New Comment",
                          $content
                          ,"FROM: PRITLOG");
@@ -906,40 +945,40 @@ var clientVersion=0.3;
        echo "<h1>Deleting comment...</h1>";
        $commentNum=$_POST['commentNum'];
        if ($_POST['pass']===$configPass) {
-          $commentFullName=$commentdir.$fileName.$config_dbFilesExtension;
-          $i=0;
-          $j=0;
-    	  if (file_exists($commentFullName)) {
-    	       $allcomments=file($commentFullName);
-    	       $errorMessage='<br><span style="color: rgb(204, 0, 51);">Error opening or writing to commentFile '.$commentFullName.'. <br>Please check the folder permissions<br>';
-               $errorMessage=$errorMessage."<br>If this problem continues, please report as a bug to the author of PRITLOG<br>";
-               $fp=fopen($commentFullName, "w");
-               foreach ($allcomments as $value) {
-                    //echo "value=$value,";
-                    if (trim($value) != "") {
-                       //echo "commentNum=$commentNum,i=$i,<br>";
-                       if ($commentNum != $i) {
-                           //$value=$value."\n";
-                           if (fwrite($fp,$value)===FALSE) {
-                                echo "Cannot write to comment file<br>";
-                           }
-                           else { $j++;}
-                       }
-                       else {
-                           $commentSplit=explode($separator,$value);
-                           $thisCommentFileName=$commentSplit[4];
-                           $thisCommentSeq=$commentSplit[5];
-                           echo "Comment deleted ...<br>";
-                       }
+            $commentFullName=$commentdir.$fileName.$config_dbFilesExtension;
+            $i=0;
+            $j=0;
+            if (file_exists($commentFullName)) {
+            $allcomments=file($commentFullName);
+            $errorMessage='<br><span style="color: rgb(204, 0, 51);">Error opening or writing to commentFile '.$commentFullName.'. <br>Please check the folder permissions<br>';
+            $errorMessage=$errorMessage."<br>If this problem continues, please report as a bug to the author of PRITLOG<br>";
+            $fp=fopen($commentFullName, "w");
+            foreach ($allcomments as $value) {
+                //echo "value=$value,";
+                if (trim($value) != "") {
+                    //echo "commentNum=$commentNum,i=$i,<br>";
+                    if ($commentNum != $i) {
+                        //$value=$value."\n";
+                        if (fwrite($fp,$value)===FALSE) {
+                             echo "Cannot write to comment file<br>";
+                        }
+                        else { $j++;}
                     }
-                    $i++;
-               }
-               fclose($fp);
-               //echo "Final i=$i<br>";
-               $i=$i-2;
-               if ($j == 0) {unlink($commentFullName);}
-               $latestFileName=$commentdir."/latest".$config_dbFilesExtension;
-    	       if (file_exists($latestFileName)) {
+                    else {
+                        $commentSplit=explode($separator,$value);
+                        $thisCommentFileName=$commentSplit[4];
+                        $thisCommentSeq=$commentSplit[5];
+                        echo "Comment deleted ...<br>";
+                    }
+                }
+                $i++;
+             }
+             fclose($fp);
+             //echo "Final i=$i<br>";
+             $i=$i-2;
+             if ($j == 0) {unlink($commentFullName);}
+             $latestFileName=$commentdir."/latest".$config_dbFilesExtension;
+             if (file_exists($latestFileName)) {
                    $latestLines= file($latestFileName);
                    $errorMessage='<br><span style="color: rgb(204, 0, 51);">Error opening or writing to latestFileName '.$latestFileName.'. <br>Please check the folder permissions<br>';
                    $errorMessage=$errorMessage."If this problem continues, please report as a bug to the author of PRITLOG<br>";
@@ -970,6 +1009,7 @@ var clientVersion=0.3;
           echo "Password Incorrect .. <br/>";
        }
   }
+
 
   function viewArchive() {
       global $separator, $postdir, $entries, $config_menuEntriesLimit;

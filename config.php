@@ -31,7 +31,7 @@
   $config_entriesOnRSS               = 0;                                            // 0 = ALL ENTRIES, if you want a limit, change this
   $config_metaDescription            = "Pritlog";                                    // Also for search engines...
   $config_metaKeywords               = 'Pritlog, my blog, pplog';	             // Also for search engines...
-  $config_menuLinks                  = array('http://google.com,google', 'http://pplog.infogami.com/,Get PPLOG', 'http://hardkap.com/pritlog,Get PRITLOG');  // Links to be displayed at the menu
+  $config_menuLinks                  = array('http://google.com,google', 'http://pplog.infogami.com/,Get PPLOG', 'http://hardkap.net/pritlog,Get PRITLOG');  // Links to be displayed at the menu
   $debugMode                         = "off";                                        // Turn this on for debugging displays. But is not fully functional yet.
   $separator                         = "#~#";                                        // Separator used between fields when the entry files are created.
 
