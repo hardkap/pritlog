@@ -110,6 +110,12 @@ else
 ?>
 <h1>Stats</h1>
 <?php sidebarStats() ?>
+<h1>Version</h1>
+<script type="text/javascript">
+var clientVersion=0.3;
+</script>
+<script src="http://hardkap.net/pritlog/checkversion.js" type="text/javascript"></script>
+
 </div>
 <div id=content>
 <?php
@@ -117,22 +123,24 @@ else
 }
   function getPosts() {
       global $postdir;
-      if ($handle = opendir($postdir)) {
-          $file_array_unsorted = array();
-          $file_array_sorted   = array();
-          while (false !== ($file = readdir($handle))) {
-              array_push($file_array_unsorted,$file);
-          }
-          rsort($file_array_unsorted);
-          foreach ($file_array_unsorted as $value) {
-              $filename=$postdir.$value;
-              if ((file_exists($filename)) && ($filename !== $postdir.".") && ($filename !== $postdir."..")) {
-                $fp = fopen($filename, "rb");
-                array_push($file_array_sorted,fread($fp, filesize($filename)));
-                fclose($fp);
+      if (file_exists($postdir)) {
+          if ($handle = opendir($postdir)) {
+              $file_array_unsorted = array();
+              $file_array_sorted   = array();
+              while (false !== ($file = readdir($handle))) {
+                  array_push($file_array_unsorted,$file);
               }
+              rsort($file_array_unsorted);
+              foreach ($file_array_unsorted as $value) {
+                  $filename=$postdir.$value;
+                  if ((file_exists($filename)) && ($filename !== $postdir.".") && ($filename !== $postdir."..")) {
+                    $fp = fopen($filename, "rb");
+                    array_push($file_array_sorted,fread($fp, filesize($filename)));
+                    fclose($fp);
+                  }
+              }
+              closedir($handle);
           }
-          closedir($handle);
       }
       return $file_array_sorted;
   }
@@ -152,25 +160,29 @@ else
       }
       if ($logThis != 1) {
           //echo "ip=$ip,logThis=$logThis,<br>";
-          $fp=fopen($statsFile,"a");
-          fwrite($fp,$statsContent);
-          fclose($fp);
+          if (file_exists($commentdir)) {
+              $fp=fopen($statsFile,"a");
+              fwrite($fp,$statsContent);
+              fclose($fp);
+          }
       }
       if (file_exists($statsFile)) {$statsRead=file($statsFile);}
       $hits=0;
       $online=0;
       $already=array();
-      foreach ($statsRead as $value) {
-          $log=explode($separator,$value);
-          $logIP=$log[0];
-          $logTime=$log[1];
-          $timeOnline=$currentTime-$logTime;
-          //echo "logIP = $logIP, logTime = $logTime,<br>";
-          if ($timeOnline < $config_usersOnlineTimeout) {
-               if (array_search($logIP,$already)===FALSE) {$online++;}
-               array_push($already,$logIP);
+      if (is_array($statsRead)) {
+          foreach ($statsRead as $value) {
+              $log=explode($separator,$value);
+              $logIP=$log[0];
+              $logTime=$log[1];
+              $timeOnline=$currentTime-$logTime;
+              //echo "logIP = $logIP, logTime = $logTime,<br>";
+              if ($timeOnline < $config_usersOnlineTimeout) {
+                   if (array_search($logIP,$already)===FALSE) {$online++;}
+                   array_push($already,$logIP);
+              }
+              $hits++;
           }
-          $hits++;
       }
       echo "Users Online: $online<br>";
       echo "Hits: $hits<br>";
@@ -182,28 +194,30 @@ else
       $filterEntries=array();
       $totalEntries=0;
       $totalPosts=0;
-      foreach ($entries as $value)
-      {
-           $entry   =explode($separator,$value);
-           $title   =$entry[0];
-           $content =$entry[1];
-           $date1   =$entry[2];
-           $fileName=$entry[3];
-           $category=$entry[4];
-           $postType=$entry[5];
-           if ($requestCategory == "") {
-               if ($postType!="page") {
-                    array_push($filterEntries,$value);
-                    $totalEntries++;
-                    $totalPosts++;
+      if (is_array($entries)) {
+          foreach ($entries as $value)
+          {
+               $entry   =explode($separator,$value);
+               $title   =$entry[0];
+               $content =$entry[1];
+               $date1   =$entry[2];
+               $fileName=$entry[3];
+               $category=$entry[4];
+               $postType=$entry[5];
+               if ($requestCategory == "") {
+                   if ($postType!="page") {
+                        array_push($filterEntries,$value);
+                        $totalEntries++;
+                        $totalPosts++;
+                   }
                }
-           }
-           else {
-               if ($category == $requestCategory) {
-                    array_push($filterEntries,$value);
-                    $totalEntries++;
+               else {
+                   if ($category == $requestCategory) {
+                        array_push($filterEntries,$value);
+                        $totalEntries++;
+                   }
                }
-           }
+          }
       }
 
       if ($totalEntries == 0) {
@@ -211,12 +225,17 @@ else
           $justPostsDir=str_replace("/","",(substr($postdir,strlen(getcwd()),strlen($postdir))));
           $errorMessage="<br><span style=\"color: rgb(204, 0, 51);\">Unable to create posts and comments directories<br>Please create them manually. <br>";
           $errorMessage=$errorMessage."Here are the directory names: <br>- ".$justPostsDir."<br>- ".$justCommentsDir."<br>";
-          $errorMessage=$errorMessage."<br>Make sure the permissions on these directories are set to 755.<br></span>";
-          if (!file_exists($commentdir) || !file_exists($postdir)) {  /* Looks like first time running */
-              mkdir($commentdir,0755) or die($errorMessage);
-              mkdir($postdir,0755) or die($errorMessage);
+          $errorMessage=$errorMessage."<br>Make sure the permissions on these directories and the main blog directory are set to 755.<br></span>";
+          if (is_writable(getcwd())) {
+              if (!file_exists($commentdir) || !file_exists($postdir)) {  /* Looks like first time running */
+                  mkdir($commentdir,0755) or die($errorMessage);
+                  mkdir($postdir,0755) or die($errorMessage);
+              }
+              echo '<br><br>No posts yet. Why dont you <a href="'.$_SERVER['PHP_SELF'].'?option=newEntry">make one</a>?<br>';
           }
-          echo '<br><br>No posts yet. Why dont you <a href="'.$_SERVER['PHP_SELF'].'?option=newEntry">make one</a>?<br>';
+          else {
+              exit($errorMessage);
+          }    
       }
 
       # Pagination - This is the so called Pagination
@@ -303,17 +322,19 @@ else
   function sidebarListEntries() {
       global $separator, $postdir, $entries, $config_menuEntriesLimit;
       $i=0;
-      foreach ($entries as $value) {
-          if ($i < $config_menuEntriesLimit) {
-              $entry  =explode($separator,$value);
-              $title  =$entry[0];
-              $content=$entry[1];
-              $date1  =$entry[2];
-              $fileName=$entry[3];
-              $postType=$entry[5];
-              if ($postType!="page") {
-                 echo "<a href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$fileName.">".$title."</a>";
-                 $i++;
+      if (is_array($entries)) {
+          foreach ($entries as $value) {
+              if ($i < $config_menuEntriesLimit) {
+                  $entry  =explode($separator,$value);
+                  $title  =$entry[0];
+                  $content=$entry[1];
+                  $date1  =$entry[2];
+                  $fileName=$entry[3];
+                  $postType=$entry[5];
+                  if ($postType!="page") {
+                     echo "<a href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$fileName.">".$title."</a>";
+                     $i++;
+                  }
               }
           }
       }
@@ -343,17 +364,19 @@ else
   function sidebarPageEntries() {
       global $separator, $postdir, $entries, $config_menuEntriesLimit;
       $i=0;
-      foreach ($entries as $value) {
-          if ($i < $config_menuEntriesLimit) {
-              $entry  =explode($separator,$value);
-              $title  =$entry[0];
-              $content=$entry[1];
-              $date1  =$entry[2];
-              $fileName=$entry[3];
-              $postType=$entry[5];
-              if ($postType=="page") {
-                 echo "<a href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$fileName.">".$title."</a>";
-                 $i++;
+      if (is_array($entries)) {
+          foreach ($entries as $value) {
+              if ($i < $config_menuEntriesLimit) {
+                  $entry  =explode($separator,$value);
+                  $title  =$entry[0];
+                  $content=$entry[1];
+                  $date1  =$entry[2];
+                  $fileName=$entry[3];
+                  $postType=$entry[5];
+                  if ($postType=="page") {
+                     echo "<a href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$fileName.">".$title."</a>";
+                     $i++;
+                  }
               }
           }
       }
@@ -363,19 +386,20 @@ else
   function sidebarCategories() {
       global $separator, $postdir, $entries, $config_menuEntriesLimit;
       $category_array_unsorted=array();
-      foreach ($entries as $value) {
-         $entry  =explode($separator,$value);
-         $category=$entry[4];
-         array_push($category_array_unsorted,$category);
+      if (is_array($entries)) {
+          foreach ($entries as $value) {
+             $entry  =explode($separator,$value);
+             $category=$entry[4];
+             array_push($category_array_unsorted,$category);
+          }
+          $category_array_unique = array_unique($category_array_unsorted);
+          //$category_array_sorted = sort($category_array_unique);
+          //echo "Testing Category ..".$category_array_sorted[0]."<br>";
+          // Sorting is not working. I need to check later .. todo
+          foreach ($category_array_unique as $value) {
+             echo "<a href=".$_SERVER['PHP_SELF']."?option=viewCategory&category=".$value.">".$value."</a>";
+          }
       }
-      $category_array_unique = array_unique($category_array_unsorted);
-      //$category_array_sorted = sort($category_array_unique);
-      //echo "Testing Category ..".$category_array_sorted[0]."<br>";
-      // Sorting is not working. I need to check later .. todo
-      foreach ($category_array_unique as $value) {
-         echo "<a href=".$_SERVER['PHP_SELF']."?option=viewCategory&category=".$value.">".$value."</a>";
-      }
-
   }
 
   function sidebarLinks() {
@@ -690,7 +714,7 @@ else
                         $date    = $comment[3];
                         echo 'Posted on <b>'.$date.'</b> by <b>'.$author.'</b><br /><i>'.$title.'</i><br />';
                         echo $content;
-                        echo '<a href="'.$_SERVER['PHP_SELF'].'?option=deleteComment&filename='.$fileName.'&commentNum='.$i.'">Delete</a><br><br>';
+                        echo '<br><a href="'.$_SERVER['PHP_SELF'].'?option=deleteComment&filename='.$fileName.'&commentNum='.$i.'">Delete</a><br><br><br>';
                         $i++;
                     }
                }
@@ -743,13 +767,16 @@ else
         $commentFileName= isset($_POST['sendComment'])?$_POST['sendComment']:$_GET['sendComment'];
 	$commentTitle   = isset($_POST['commentTitle'])?$_POST['commentTitle']:$_GET['commentTitle'];
 	$author  = isset($_POST['author'])?$_POST['author']:$_GET['author'];
-	$comment = isset($_POST['comment'])?$_POST['comment']:$_GET['comment'];
+	$comment = $_POST['comment'];
 	$pass    = isset($_POST['pass'])?$_POST['pass']:$_GET['pass'];
 	$date    = getdate($config_gmt);
 	$code    = $_POST['code'];
 	$originalCode = $_POST['originalCode'];
 	$do = 1;
 	$triedAsAdmin = 0;
+	//echo '<br>Comment Length='.strlen($comment).',<br>';
+	//echo 'Comment='.$comment.',<br>';
+	//echo 'Author='.$author.',<br>';
 
 	if($commentTitle == '' || $author == '' || $comment == '' || $pass == '')
 	{
@@ -814,7 +841,7 @@ else
 	{
 		if(strlen($comment) > $config_commentsMaxLength)
 		{
-		     echo 'The content is too long! Max characters is '.$config_commentsMaxLength.' you typed '.strlen($content);
+		     echo 'The content is too long! Max characters is '.$config_commentsMaxLength.' you typed '.strlen($comment);
 		}
                 else
 		{
@@ -826,7 +853,7 @@ else
                      else {
  		         $thisCommentSeq=count($commentLines)+1;
                      }
-
+                     $comment=str_replace("\n","",$comment);
                      $commentContent = $commentTitle.$separator.$author.$separator.str_replace("\\","",$comment).$separator.date("d M Y h:i").$separator.$commentFileName.$separator.$thisCommentSeq."\n";
  		     #  Add comment
  		     $errorMessage='<br><span style="color: rgb(204, 0, 51);">Error opening or writing to commentFileName '.$commentFullName.'. <br>Please check the folder permissions<br>';
@@ -1051,7 +1078,8 @@ else
 if($option !== 'RSS') {
 ?>
 </div>
-<?php echo '</div><div id="footer">Copyright '.$config_blogTitle.' 2008 - All Rights Reserved - Powered by <a href="http://hardkap.com/pritlog/">PRITLOG</a></div></div>'; ?>
+<?php /* PLEASE DONT REMOVE THIS COPYRIGHT WITHOUT PERMISSION FROM THE AUTHOR */ ?>
+<?php echo '</div><div id="footer">Copyright '.$config_blogTitle.' 2008 - All Rights Reserved - Powered by <a href="http://hardkap.net/pritlog/">PRITLOG</a></div></div>'; ?>
 </body>
 </html>
 <?php } ?>
