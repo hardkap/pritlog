@@ -23,41 +23,7 @@
 #######################################################################*/
 
 
-
-/***********************************************************************************/
-/* The below section has all the configuration options available. Modify as needed */
-/***********************************************************************************/
-  $config_blogTitle                  = "PRITLOG - Simple and Powerful";              // BLOG Title
-  $configPass                        = "password";                                   // Admin password for adding entries
-  $postdir                           = getcwd()."/posts/";                           // Name of the folder where entries will be saved.
-  $commentdir                        = getcwd()."/comments/";                        // Name of the folder where comments will be saved.
-  $config_menuEntriesLimit           = 7;                                            // Limits of entries to show in the menu
-  $config_textAreaCols               = 50;                                           // Cols of the textarea to add and edit entries
-  $config_textAreaRows               = 10;                                           // Rows of the textarea to add and edit entries
-  $config_entriesPerPage             = 5;                                            // For pagination... How many entries will be displayed per page?
-  $config_maxPagesDisplayed          = 5;                                            // Maximum number of pages displayed at the bottom
-  $config_allowComments              = 1;                                            // Allow comments
-  $config_commentsMaxLength          = 200;                                          // Comment maximum characters
-  $config_commentsSecurityCode       = 1;                                            // Allow security code for comments (0 = No, 1 = Yes)
-  $config_onlyNumbersOnCAPTCHA       = 0;                                            // Use only numbers on CAPTCHA
-  $config_CAPTCHALength              = 8;                                            // Just to make different codes
-  $config_randomString               = 'ajhd092nmbd20dbJASDK1BFGAB1';                // Just for creating random captcha. Not used otherwise.
-  $config_commentsForbiddenAuthors   = array("admin","Prit","Prit1","prit","prit1"); // These are the usernames that normal users cant use.
-  $config_statsDontLog               = array("127.0.0.1","192.168.0.1");             // These IP will not be considered for logging statistics.
-  $config_dbFilesExtension           = ".prt";                                       // Extension of the files used as databases
-  $config_sendMailWithNewComment     = 1;                                            // Receive a mail when someone posts a comment. (0 = No, 1 = Yes) It works only if you host allows sendmail
-  $config_sendMailWithNewCommentMail = "yourid@yourmail.com";                        // Email adress to send mail if allowed
-  $config_usersOnlineTimeout         = 120;                                          // How long is an user considered online? In seconds
-  $config_entriesOnRSS               = 0;                                            // 0 = ALL ENTRIES, if you want a limit, change this
-  $config_metaDescription            = "Pritlog";                                    // Also for search engines...
-  $config_metaKeywords               = 'Pritlog, my blog, pplog';	             // Also for search engines...
-  $config_menuLinks                  = array('http://google.com,google', 'http://pplog.infogami.com/,Get PPLOG', 'http://hardkap.com/pritlog,Get PRITLOG');  // Links to be displayed at the menu
-  $debugMode                         = "off";                                        // Turn this on for debugging displays. But is not fully functional yet.
-  $separator                         = "#~#";                                        // Separator used between fields when the entry files are created.
-
-/********************************************************************************************/
-/* END OF CONFIRATION. Dont modify anything below unless you are sure of what you are doing */
-/********************************************************************************************/
+  require("config.php");
 
   $entries=getPosts();
   $lastEntry=explode($separator,$entries[0]);
@@ -111,7 +77,7 @@ else
 <body>
 <div id=all>
 <div id="myhead">
-<center><br><table><tr><td><img src="dog.gif"/></td><td><h1><?php echo $config_blogTitle; ?></h1></td></tr></table></center>
+<center><br><table><tr><td><img src="dog.gif"/></td><td style="padding-bottom:0px;padding-top:8px;"><h1><?php echo $config_blogTitle; ?></h1></td></tr></table></center>
 </div>
 <script src="http://js.nicedit.com/nicEdit-latest.js" type="text/javascript"></script>
 <div id="menu">
@@ -179,17 +145,18 @@ else
       $statsFile=$commentdir."online$config_dbFilesExtension.dat";
       $logThis=0;
       foreach ($config_statsDontLog as $value) {
-          if ($ip != $value ) {
+          //echo "ip = $ip,value=$value,<br>";
+          if ($ip == $value ) {
               $logThis=1;
           }
-          else {$logThis=0;}
       }
-      if ($logThis == 1) {
+      if ($logThis != 1) {
+          //echo "ip=$ip,logThis=$logThis,<br>";
           $fp=fopen($statsFile,"a");
           fwrite($fp,$statsContent);
           fclose($fp);
       }
-      $statsRead=file($statsFile);
+      if (file_exists($statsFile)) {$statsRead=file($statsFile);}
       $hits=0;
       $online=0;
       $already=array();
@@ -276,7 +243,8 @@ else
            $fileName=$entry[3];
            $category=$entry[4];
            $postType=$entry[5];
-           echo "<a href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$fileName."><h1>".$title."</h1></a>";
+           echo "<h1><a class=\"postTitle\" href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$fileName.">".$title."</a></h1>";
+           //echo "<h1>".$title."</h1>";
            echo $content;
            echo "<center><br/><i>Posted on ".$date1."&nbsp;-&nbsp; Category: <a href=".$_SERVER['PHP_SELF']."?option=viewCategory&category=".$category.">".$category."</a></i><br/>";
            $commentFile=$commentdir.$fileName.$config_dbFilesExtension;
@@ -356,19 +324,20 @@ else
       global $separator, $postdir, $entries, $config_menuEntriesLimit;
       global $commentdir,$config_dbFilesExtension;
       $latestCommentsFile=$commentdir."latest".$config_dbFilesExtension;
-      $allComments=file($latestCommentsFile);
-      $allCommentsReversed=array_reverse($allComments);
-      $i=0;
-      foreach ($allCommentsReversed as $value) {
-          if ($i < $config_menuEntriesLimit) {
-              $entry  =explode($separator,$value);
-              $commentFileName=$entry[0];
-              $commentTitle   =$entry[1];
-              echo "<a href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$commentFileName.">".$commentTitle."</a>";
-              $i++;
+      if (file_exists($latestCommentsFile)) {
+          $allComments=file($latestCommentsFile);
+          $allCommentsReversed=array_reverse($allComments);
+          $i=0;
+          foreach ($allCommentsReversed as $value) {
+              if ($i < $config_menuEntriesLimit) {
+                  $entry  =explode($separator,$value);
+                  $commentFileName=$entry[0];
+                  $commentTitle   =$entry[1];
+                  echo "<a href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$commentFileName.">".$commentTitle."</a>";
+                  $i++;
+              }
           }
       }
-
   }
 
   function sidebarPageEntries() {
@@ -735,7 +704,6 @@ else
 	 	echo '<br /><br /><h1>Add Comment</h1>';
 	 	echo '<script type="text/javascript">';
                 echo '    bkLib.onDomLoaded(function(){';
-                echo "          new nicEditor({fullPanel : true}).panelInstance('comment');";
                 echo "          new nicEditor({buttonList : ['bold','italic','underline','link','unlink']}).panelInstance('comment');";
                 echo "          });";
                 echo "</script>";
@@ -816,19 +784,21 @@ else
 	//$fp = fopen($userFileName, "rb");
 	//$users=explode("\n",fread($fp, filesize($userFileName)));
 	//fclose($fp);
-	$users=file($userFileName);
-	$data = '';
-	$newUser=1;
-	if ($do == 1) {
-            foreach($users as $value)
-    	    {
-    		$userLine=explode($separator,$value);
-    		if ($userLine[0] == $author) {
-                        $newUser=0;
-                        if (crypt($pass,$userLine[1]) !== $userLine[1]) {echo "Password is incorrect, please try again";$do=0;}
-                        else {$do=1;}
-                    }
-            }
+	if (file_exists($userFileName)) {
+            $users=file($userFileName);
+  	    $data = '';
+  	    $newUser=1;
+  	    if ($do == 1) {
+                foreach($users as $value)
+                {
+        		$userLine=explode($separator,$value);
+        		if ($userLine[0] == $author) {
+                            $newUser=0;
+                            if (crypt($pass,trim($userLine[1])) !== trim($userLine[1])) {echo "Password is incorrect, please try again";$do=0;}
+                            else {$do=1;}
+                        }
+                }
+	    }
 	}
 
 	if ($newUser == 1 && $do ==1)
@@ -849,7 +819,7 @@ else
                 else
 		{
                      $commentFullName=$commentdir.$commentFileName.$config_dbFilesExtension;
- 		     $commentLines=file($commentFullName);
+ 		     if (file_exists($commentFullName)) {$commentLines=file($commentFullName);}
  		     if (trim($commentLines[0])=="") {
                          $thisCommentSeq=1;
                      }
@@ -897,7 +867,7 @@ else
       echo "<input name=\"process\" type=\"hidden\" id=\"process\" value=\"deleteCommentSubmit\">";
       echo "<input name=\"fileName\" type=\"hidden\" id=\"fileName\" value=\"".$fileName."\">";
       echo "<input name=\"commentNum\" type=\"hidden\" id=\"commentNum\" value=\"".$commentNum."\"></td>";
-      echo "</tr><tr><td>&nbsp;</td><td><input type=\"submit\" name=\"Submit\" value=\"Delete Comment\"></td>";
+      echo "</tr><tr><td>&nbsp;</td><td><input onclick=\"javascript:this.disabled=true\" type=\"submit\" name=\"Submit\" value=\"Delete Comment\"></td>";
       echo "</tr></table></form>";
   }
 
@@ -911,15 +881,22 @@ else
        if ($_POST['pass']===$configPass) {
           $commentFullName=$commentdir.$fileName.$config_dbFilesExtension;
           $i=0;
+          $j=0;
     	  if (file_exists($commentFullName)) {
     	       $allcomments=file($commentFullName);
     	       $errorMessage='<br><span style="color: rgb(204, 0, 51);">Error opening or writing to commentFile '.$commentFullName.'. <br>Please check the folder permissions<br>';
                $errorMessage=$errorMessage."<br>If this problem continues, please report as a bug to the author of PRITLOG<br>";
-               $fp=fopen($commentFullName, "w") or die($errorMessage);
+               $fp=fopen($commentFullName, "w");
                foreach ($allcomments as $value) {
+                    //echo "value=$value,";
                     if (trim($value) != "") {
+                       //echo "commentNum=$commentNum,i=$i,<br>";
                        if ($commentNum != $i) {
-                           fwrite($fp,$value."\n")or die($errorMessage);
+                           //$value=$value."\n";
+                           if (fwrite($fp,$value)===FALSE) {
+                                echo "Cannot write to comment file<br>";
+                           }
+                           else { $j++;}
                        }
                        else {
                            $commentSplit=explode($separator,$value);
@@ -931,8 +908,9 @@ else
                     $i++;
                }
                fclose($fp);
+               //echo "Final i=$i<br>";
                $i=$i-2;
-               if ($i == 0) {unlink($commentFullName);}
+               if ($j == 0) {unlink($commentFullName);}
                $latestFileName=$commentdir."/latest".$config_dbFilesExtension;
     	       if (file_exists($latestFileName)) {
                    $latestLines= file($latestFileName);
@@ -945,11 +923,13 @@ else
                         $commentFileName=trim($latestSplit[0]);
                         $commentSeq     =trim($latestSplit[2]);
                         if (trim($value) != "") {
-                           if (($commentFileName == $thisCommentFileName) && ($commentSeq == $thisCommentSeq)){
+                           //echo "commentFileName=$commentFileName,thisCommentFileName=$thisCommentFileName,<br>";
+                           //echo "commentSeq=$commentSeq,thisCommentSeq=".trim($thisCommentSeq).",<br>";
+                           if (($commentFileName == $thisCommentFileName) && ($commentSeq == trim($thisCommentSeq))){
                                //echo "Deleted Indeed!<br>";
                            }
                            else {
-                               fwrite($fp,$value) or die($errorMessage);
+                               fwrite($fp,$value);
                            }
                         }
                         $i++;
@@ -957,11 +937,10 @@ else
                    fclose($fp);
                }
     	  }
-          else {echo "No comments posted yet!<br>";}
+          //else {echo "No comments posted yet!<br>";}
        }
        else {
           echo "Password Incorrect .. <br/>";
-          echo "<a href=".$_SERVER['PHP_SELF']."?option=deleteComment&commentNum=".$commentNum.">Goback</a>";
        }
   }
 

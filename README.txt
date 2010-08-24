@@ -20,7 +20,7 @@ SIMPLE INSTALLATION:
 ====================
 Upload all files to your server. Make sure the PHP file is executable by changing the permissions.
 
-To configure it open index.php and edit the configuration options.
+To configure it open config.php and edit the configuration options.
 They are pretty self explainatory.
 
 Enjoy!

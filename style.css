@@ -20,8 +20,10 @@ table {
 
 input, button, textarea, select, radio {
 	padding: 2px;
-	border: 1px solid #8FB236;
-	color: #8FB236;
+	/*border: 1px solid #8FB236;
+	color: #8FB236;    */
+	border: 1px solid #2773a5;
+	color: #2773a5;
 	background-color: white;
 	font-family: Verdana, Arial, Helvetica, sans-serif;
 	font-size: 11px;
@@ -37,13 +39,15 @@ div#all {
 	/*padding-top: 160px;*/
 	background-color: white;
 	border-top: 1px dashed silver;
-	border-left: 1px dashed silver;
-	border-right: 1px dashed silver;
+	/*border-left: 1px dashed silver;*/
+	/*border-right: 1px dashed silver; */
 }
 
 #myhead {
         background-color: #99b93c;
         /*color: #993c3c;*/
+        background-image:url(hd.jpg);
+        background-repeat:repeat-x;
         color: #ffffff;
         padding:10px 10px;
 }
@@ -71,11 +75,14 @@ div#menu {
 	float: left;
 	padding-left: 20px;
 	width: 200px;
-	letter-spacing: -1px;
+	/*letter-spacing: -1px;*/
+	min-height: 600px;
+	border-left: 1px dashed silver;
 }
 
 #menu h1 {
-	color: #8FB236;
+	/*color: #8FB236;*/
+	color:#2773a5;
 	padding: 0px;
 	margin-top: 10px;
 	margin-bottom: 0px;
@@ -84,7 +91,8 @@ div#menu {
 
 #menu a {
 	display: block;
-	color: #8FB236;
+	/*color: #8FB236;*/
+	color:#2773a5;
 	text-transform: capitalize;
 	padding-left: 5px;
 	text-decoration: none;
@@ -92,7 +100,8 @@ div#menu {
 
 #menu a:hover {
 	/*padding-left: 7px;*/
-	color: #d07514;
+	/*color: #d07514;*/
+	color:red;
 	text-decoration: underline;
 }
 
@@ -101,8 +110,18 @@ div#content {
 	padding-right: 20px;
 	width: 520px;
 	border-left: 1px dashed silver;
+	border-right: 1px dashed silver;
 	padding-left: 10px;
 	min-height: 600px;
+}
+
+#content .postTitle {
+        color:black;
+}
+
+#content .postTitle:hover {
+        color:blue;
+        text-decoration:none;
 }
 
 #content h1 {
@@ -140,7 +159,7 @@ div#footer {
 #footer a {
 	color: black;
 	text-decoration: none;
-	letter-spacing: -1px;
+	/*letter-spacing: -1px;*/
 }
 
 .code {
