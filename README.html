@@ -1,0 +1,106 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.1//EN" "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-US">
+<head>
+<style type="text/css">
+	body {background:#ccc; font:normal normal 12px Verdana, Arial, Helvetica, sans-serif;}
+	#container {width:580px; padding:10px; border:#333 3px solid; background:#fff; color:#333; margin:0 auto; position:relative; padding-bottom:5px;}
+	#myhead h1{font-size:26px;}
+        h1 {font-size:1.8em; text-align:center;}
+		h1 span {color:#aaa;}
+	h2 {font-size:1.4em; color:#555; margin:20px 0 5px;}
+        .script {display:block; background:#ddd; border:#aaa 1px solid; margin:5px 0; padding:4px;}
+	.indent {display:block; padding-left:10px;}
+	#myhead {margin-bottom:10px;}
+	#topmenu {padding:20px;}
+        #topmenu a {padding:5px 10px;border:1px solid silver;color:#008DC2;text-decoration:none;}
+	#topmenu a:hover {background-color:#008DC2; color:white;}
+	#footer {margin:20px 0px;}
+	#content {margin-top:30px;}
+	a {color:#008DC2; cursor:pointer;}
+	a:hover {color:#333;}
+</style>
+</head>
+<body>
+<div id="container">
+
+<h1>PRITLOG - Blogging made simple</h1>
+<hr>
+
+<p>Pritlog is a simple, fatfree blog, made in PHP.</p>
+
+<p>The idea of this blog, is directly taken from a very simple yet powerful blog software called PPLOG (Perl Powered Blog). PPLOG is a creation of Federico Ramírez (fedekun) - fedekiller@gmail.com.</p>
+
+<p>I just wanted to experiment with creating a similar blog in PHP. Hence PRITLOG.
+
+<h2>Thanks to</h2>
+<ul>
+<li>Ken, Bert and John (and few others) for all the testing, feedback and valuable suggestions for developing this version.</li>
+<li>Federico Ramírez, for the inspiration.</li>
+<li>Barry K, the creator of Puppy Linux, for introducing me to PPLOG.</li>
+<li>My wife, for the support and encouragement.</li>
+<li>God, for enabling me to program.</li>
+</ul>
+
+<h2>Support/Feedback</h2>
+pritlog @ hardkap.com or <a href="http://hardkap.net/forums">Hardkap Forums</a> or <a href="http://hardkap.net/pritlog">Pritlog Website</a>
+
+<h2>License</h2>
+<p>PRITLOG now uses the MIT License.
+<br><a href="http://www.opensource.org/licenses/mit-license.php">http://www.opensource.org/licenses/mit-license.php</a></p>
+
+<p>Powered by YAGNI (You Ain't Gonna Need It).
+<br><strong>YAGNI:</strong> Only add things, when you actually
+need them, not because you think you will.</p>
+
+<h2>Changes for Version 0.7</h2>
+<p>Significant changes are highlighted in bold</p>
+<ul>
+<li><strong>Admin interface </strong>(change site properties, add authors, change password)</li>
+<li><strong>Easy translation. </strong>Language selection available in the admin panel</strong></li>
+<li><strong>Pretty Urls</strong></li>
+<li><strong>SEO Optimization</strong></li>
+<li><strong>md5sum encrypted passwords</strong></li>
+<li><strong>Social Bookmarking widget: </strong> to enable easy sharing of post/blog</li>
+<li><strong>Additional authors </strong> can be added by the admin</li>
+<li>New look - 2 additional themes</li>
+<li>Archive has year-month collapsible feature like blogspot</li>
+<li>Catch comment users and other fields with just spaces</li>
+<li>Use CSS framework and change all forms</li>
+<li>Post Options w/ Teaser + Full Story (using *readmore* in the post)</li>
+<li>RSS shorter - summary instead of the whole post? (*readmore* can be used)</li>
+<li>Move the Pritlog version info to the admin page</li>
+<li>Ability to enable / disable comments per post</li>
+<li>Added the number of visits for each post</li>
+<li>Added popular entries block that works based of this visits</li>
+<li>Added author field for posts</li>
+<li>Category cloud</li>
+</ul>
+
+
+<h2>Installation</h2>
+
+<p>If this is your first time installing:</p>
+
+<ul>
+<li>Download the package and extract the contents to your hard disk.</li>
+<li>Make sure you have a web hosting account with PHP.</li>
+<li>Connect to your hosting account using an FTP client.</li>
+<li>Create a folder on your website. (Example: "blog")</li>
+<li>Change the permissions of this folder to 755. (In some cases 777 is required)</li>
+<li>Upload the contents to this folder using the FTP client.</li>
+<li>In your browser, go to the Pritlog url (Example: http://yoursite.com/blog/)</li>
+<li>Visit the admin panel using the default admin password - 'password' and change this default password</li>
+<li><strong>Start Pritlogging!</strong></li>
+</ul>
+
+<h2>Updating from an earlier version</h2>
+
+<p>Run the update.php script. You can only use this to update from 0.4 and 0.41.</p>
+
+
+<h2>Reset Admin Password</h2>
+<p>If you lose or forget your main admin password, the only way to reset it is to manually edit the config_admin.php file and change the characters between the first and the second '|' character to a0c551398833948214f921e984868883. After you change this on your server, you can use 'password' to login to the admin menu. Now you can change the password as you wish.</p>
+<p style="font-weight:bold;color:red;">It is recommended to delete this README.html file after Pritlog installation</p>
+</div>
+</body>
+</html>
