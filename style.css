@@ -1,0 +1,164 @@
+/****************************************
+*	This is the style sheet of PPLOG	*
+*	Edit this as you wish.				*
+*	Designed by Federico Ramírez		*
+*	A.K.A fedekun						*
+****************************************/
+
+body {
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: 11px;
+	color: #333333;
+	background-color: white;
+	background-image:url(bg.gif);
+	background-repeat: repeat-x;
+}
+
+table {
+	font-size: 11px;
+}
+
+input, button, textarea, select, radio {
+	padding: 2px;
+	border: 1px solid #8FB236;
+	color: #8FB236;
+	background-color: white;
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	font-size: 11px;
+}
+
+div#all {
+	width: 780px;
+	margin: auto;
+	min-height: 600px;
+	/*background-image:url(header.gif);*/
+	background-position: 50% 0%;
+	background-repeat: no-repeat;
+	/*padding-top: 160px;*/
+	background-color: white;
+	border-top: 1px dashed silver;
+	border-left: 1px dashed silver;
+	border-right: 1px dashed silver;
+}
+
+#myhead {
+        background-color: #99b93c;
+        /*color: #993c3c;*/
+        color: #ffffff;
+        padding:10px 10px;
+}
+
+#myhead h1 {
+        font-size:33px;
+}
+
+div#myhead {
+        border-bottom: 1px solid silver;
+}
+
+#myhead td {
+        padding:0px 20px 10px 20px;
+        color:#ffffff;
+}        
+
+
+*::-moz-selection {
+	background-color:#8FB236;
+	color: white;
+}
+
+div#menu {
+	float: left;
+	padding-left: 20px;
+	width: 200px;
+	letter-spacing: -1px;
+}
+
+#menu h1 {
+	color: #8FB236;
+	padding: 0px;
+	margin-top: 10px;
+	margin-bottom: 0px;
+	font-size: 15px;
+}
+
+#menu a {
+	display: block;
+	color: #8FB236;
+	text-transform: capitalize;
+	padding-left: 5px;
+	text-decoration: none;
+}
+
+#menu a:hover {
+	/*padding-left: 7px;*/
+	color: #d07514;
+	text-decoration: underline;
+}
+
+div#content {
+	float: right;
+	padding-right: 20px;
+	width: 520px;
+	border-left: 1px dashed silver;
+	padding-left: 10px;
+	min-height: 600px;
+}
+
+#content h1 {
+	font-size: 15px;
+	border-bottom: 1px solid silver;
+	margin-bottom: 5px;
+	padding: 0px;
+	letter-spacing: 2px;
+}
+
+#content a {
+	color: blue;
+	text-decoration: none;
+}
+
+#content td {
+	padding: 0px 10px;
+	text-decoration: none;
+}
+
+#content a:hover {
+	color: blue;
+	text-decoration: underline;
+}
+
+div#footer {
+	clear: both;
+	text-align: center;
+	font-size: 10px;
+	color: #666666;
+	padding-top: 15px;
+	letter-spacing: 2px;
+}
+
+#footer a {
+	color: black;
+	text-decoration: none;
+	letter-spacing: -1px;
+}
+
+.code {
+	border: 1px solid silver;
+	background-color: #F1F1F1;
+	font-family: Verdana, Arial, Helvetica, sans-serif;
+	color: #333333;
+	font-size: 11px;
+	padding: 2px;
+	margin: 2px;
+	line-height: 10px;
+	height: 200px;
+	overflow: scroll;
+}
+
+
+.quote {
+	border: 1px solid silver;
+	padding: 2px;
+	margin: 2px;
+}
