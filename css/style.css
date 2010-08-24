@@ -1,10 +1,3 @@
-/****************************************
-*	This is the style sheet of PPLOG	*
-*	Edit this as you wish.				*
-*	Designed by Federico Ramírez		*
-*	A.K.A fedekun						*
-****************************************/
-
 body {
 	font-family: Verdana, Arial, Helvetica, sans-serif;
 	font-size: 12px;
@@ -26,7 +19,8 @@ div#all {
 	background-repeat: no-repeat;
 	/*padding-top: 160px;*/
 	background-color: #E8E8E8;
-	border-top: 1px solid silver;
+	border: 1px solid silver;
+	/*border-right: 1px solid silver;*/
 }
 
 .space {
@@ -55,17 +49,22 @@ div#all {
 }
 
 *::-moz-selection {
-	background-color:#8FB236;
-	color: white;
+	background-color:#2773a5;
+	color: #ffffff;
 }
 
-div#menu {
+div#foot {
+        padding: 10px 0px 10px 0px;
+        border-top: 1px solid silver;
+}
+
+div#menu, div#foot {
 	/*padding-left: 20px;*/
 	/*letter-spacing: -1px;*/
 	/*min-height: 600px;*/
 }
 
-#menu h1 {
+#menu h1, #foot h1 {
 	/*color: #8FB236;*/
 	color:#2773a5;
 	padding: 0px;
@@ -74,7 +73,7 @@ div#menu {
 	font-size: 15px;
 }
 
-#menu a {
+#menu a, #foot a {
 	display: block;
 	/*color: #8FB236;*/
 	color:#2773a5;
@@ -83,7 +82,7 @@ div#menu {
 	text-decoration: none;
 }
 
-#menu a:hover {
+#menu a:hover, #foot a:hover {
 	/*padding-left: 7px;*/
 	/*color: #d07514;*/
 	color:red;
@@ -101,13 +100,16 @@ div#menu {
 }*/
 
 .ptext, .ptitle {
-       width: 300px;
+       width: 400px;
 }
 
-input.ptitle {font-size:1.5em;}
+input.ptitle { font-size:1.5em; padding: 4px 5px 4px 5px; border:1px solid #bbb;}
+input.ptitle:focus, input.ptext:focus { border:1px solid #2773a5; }
+input.ptext  { height: 22px; padding: 4px 5px 0px 5px; border:1px solid #bbb; }
 
 div#content {
         background-color:#ffffff;
+        /*border-left:1px solid silver;*/
 }
 
 #topbar h3, #menu h3 {
@@ -153,6 +155,51 @@ div#topbar {
 	text-decoration: underline;
 }
 
+input.s {
+	border:1px solid #bbb;
+	width: 135px;
+	height: 22px;
+	padding: 4px 5px 0px 5px;
+	/*border: 1px solid #bed881;*/
+	background: #fff;
+	margin-right: 2px;
+	color: #000000;
+	font-weight: normal;
+}
+
+input.s2 {
+	border:1px solid #bbb;
+	width: 160px;
+	height: 22px;
+	padding: 4px 5px 0px 5px;
+	/*border: 1px solid #bed881;*/
+	background: #fff;
+	margin-right: 2px;
+	color: #000000;
+	font-weight: normal;
+	margin-left:15px;
+}
+
+
+input.s:focus { border:1px solid #2773a5; }
+
+input.submit {
+	/*background: url(images/search-btn-bg.gif) no-repeat;*/
+	/*border: none;*/
+	background: #2773a5;
+	color: #fff;
+	width: 67px;
+	height: 26px;
+	font: bold 12px Arial, Helvetica, sans-serif;
+	border:1px solid silver;
+	/*color: #FFFFFF;*/
+	vertical-align: middle;
+}
+
+.adminPage .submit {
+       width: 200px;
+}
+
 div#content {
         padding:15px;
         /*width: 520px;*/
@@ -170,12 +217,12 @@ div#content {
         text-decoration:none;
 }
 
-#content h3 {
-	font-size: 18px;
+#content h2 {
+	/*font-size: 18px;*/
 	border-bottom: 1px solid silver;
 	margin-bottom: 5px;
 	padding: 0px;
-	letter-spacing: 2px;
+	letter-spacing: 1px;
 }
 
 #content a {
@@ -198,7 +245,7 @@ div#content {
 div#footer {
 	clear: both;
 	text-align: center;
-	font-size: 10px;
+	font-size: 12px;
 	color: #ffffff;
 	padding: 15px;
 	letter-spacing: 2px;
@@ -245,7 +292,8 @@ div#footer {
         background-color:#eee;
         margin:1em 1em 1em 1em;
         border:2px dotted #ddd;
-        padding:1em 2em;
+        /*padding:1em 2em;*/
+        padding:0.5em 2em;
 }
 ul.tagcloud a {color:#2773a5;}
 ul.tagcloud a:link {text-decoration:none}
@@ -264,12 +312,112 @@ ul.tagcloud li {
 }
 ul.tagcloud li:after {
 	content: ",";
+	font-size: 0.72em;
 }
 ul.tagcloud li:last-child:after {
 	content: "";
 }
 ul.tagcloud .count {
-	font-size: 0.875em;
-	line-height: 1.714em;
+	/*font-size: 0.875em;
+	line-height: 1.714em;*/
+	font-size: 0.72em;
+	line-height: 1.5em;
 	color: #888;
 }
+
+.LV_validation_message{
+    font-weight:bold;
+    margin:0 0 0 5px;
+}
+
+.LV_valid {
+    color:#00CC00;
+}
+
+.LV_invalid {
+    color:#CC0000;
+}
+
+.LV_valid_field,
+input.LV_valid_field:hover,
+input.LV_valid_field:active,
+textarea.LV_valid_field:hover,
+textarea.LV_valid_field:active {
+/*    border: 1px solid #00CC00;*/
+}
+
+.LV_invalid_field,
+input.LV_invalid_field:hover,
+input.LV_invalid_field:active,
+textarea.LV_invalid_field:hover,
+textarea.LV_invalid_field:active {
+/*    border: 1px solid #CC0000;*/
+}
+
+/* Following added from a readability article. Must clean up later */
+
+/*
+body {
+	font-size: 100%;
+	font-family: Georgia, serif;
+	color: #333;
+	}
+html>body, td, tbody td {
+	font-size: 16px;
+	}
+p {
+	line-height: 1.5em;
+	font-size: 1em;
+	}
+a {
+	font-weight: normal;
+	text-decoration: none;
+	}
+
+a:link {
+	color: #c00;
+	}
+a:visited {
+	color: #666;
+	}
+a:hover, a:active {
+	color: #333;
+	}
+.post h1 a {
+	color: #333;
+	}
+strong {
+	font-weight: bold;
+	}
+em {
+	font-style: italic;
+	}
+
+h1 {
+	font-size: 2em;
+	line-height: 1.5em;
+	}
+
+h2 {
+	font-size: 1.5em;
+	line-height: 2em;
+	}
+
+h3 {
+	line-height: 1.5em;
+	}
+h4 {
+	font-size: 1em; 
+	line-height: 1.125em; 
+	padding-bottom: 0.375em;
+	margin-top: 1.5em;
+	}
+h5 {
+	font-size: 0.875em;
+	line-height: 1.714em;
+	font-family: Georgia, serif;
+	color: #999;
+	font-variant: small-caps;
+	text-transform: lowercase;
+	}
+*/

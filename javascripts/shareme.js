@@ -14,7 +14,7 @@ items=[
 	["Reddit", "javascript:location.href='http://www.reddit.com/submit?url="+u1+"&title="+t1+"'", 0,bPath+"/reddit.gif"],
 	["Slashdot", "javascript:location.href='http://slashdot.org/bookmark.pl?url="+u1+"&title="+t1+"'", 0,bPath+"/slashdot.gif"],
 	["Squidoo", "javascript:location.href='http://www.squidoo.com/lensmaster/bookmark?"+u1+"'", 0,bPath+"/squidoo.gif"],
-	["Stumbleupon", "javascript:location.href='http://www.stumbleupon.com/submit?url="+u1+"&title="+t1+"'", "efc", bPath+"/stumble.gif"],
+	["Stumbleit", "javascript:location.href='http://www.stumbleupon.com/submit?url="+u1+"&title="+t1+"'", "efc", bPath+"/stumble.gif"],
 	["Technorati", "javascript:location.href='http://www.technorati.com/faves?add="+u1+"'", 0,bPath+"/technorati.gif"],
 	["Yahoo", "javascript:location.href='http://myweb2.search.yahoo.com/myresults/bookmarklet?u="+u1+"&t="+t1+"'", 0,bPath+"/yahoo.gif"],
 	["Blinklist", "javascript:location.href='http://blinklist.com/index.php?Action=Blink/addblink.php&Url="+u1+"&Title="+t1+"'", 0,bPath+"/blinklist.gif"],
@@ -46,7 +46,7 @@ function shareOver() {
     testing1 ="x1="+x1+" Xpage="+Xpage+" pageWidth ="+pageWidth() +" scrollX="+scrollX()+"<br>";
     testing1+="y1="+y1+" Ypage="+Ypage+" pageHeight="+pageHeight()+" scrollY="+scrollY();
     //document.getElementById("testing").innerHTML=testing1;
-    if (Ypage < y1) {y11=pos[1]-200;}
+    if (Ypage < y1) {y11=pos[1]-190;}
     else {y11=pos[1]+15;}
     if (Xpage < x1) {x11=pos[0]-190;}
     else {x11=pos[0]-0;}
@@ -83,33 +83,33 @@ function setMyOpacity(el, value){
 }
 document.write('<div id="testing"></div>');
 document.write('<div id="shareButton" onmouseover="shareOver();" onmouseout="shareOut();">');
-document.write('<a href="#" onmouseover="shareOver();" onmouseout="shareOut();"><img src="'+bPath+'/share.gif" alt="Share me!" /></a>');
+document.write('<a href="#" style="background-position: -9px -385px; width: 106px; height: 16px" onmouseover="shareOver();" onmouseout="shareOut();"></a>');
 document.write('<div id="shareDrop" >');
-document.write('<div class="share" style="width:90px;margin-right:-200px;height:180px;">')
-document.write('<a href="'+items[0][1]+'"><img src="'+items[0][3]+'" /> '+items[0][0]+'</a>');
-document.write('<a href="'+items[1][1]+'"><img src="'+items[1][3]+'" /> '+items[1][0]+'</a>');
-document.write('<a href="'+items[2][1]+'"><img src="'+items[2][3]+'" /> '+items[2][0]+'</a>');
-document.write('<a href="'+items[3][1]+'"><img src="'+items[3][3]+'" /> '+items[3][0]+'</a>');
-document.write('<a href="'+items[4][1]+'"><img src="'+items[4][3]+'" /> '+items[4][0]+'</a>');
-document.write('<a href="'+items[5][1]+'"><img src="'+items[5][3]+'" /> '+items[5][0]+'</a>');
-document.write('<a href="'+items[6][1]+'"><img src="'+items[6][3]+'" /> '+items[6][0]+'</a>');
-document.write('<a href="'+items[7][1]+'"><img src="'+items[7][3]+'" /> '+items[7][0]+'</a>');
-document.write('<a href="'+items[8][1]+'"><img src="'+items[8][3]+'" /> '+items[8][0]+'</a>');
+document.write('<div class="share" style="width:90px;margin-right:-200px;height:170px;">')
+document.write('<a style="background-position: -9px -77px;  width: 16px; height: 16px" href="'+items[0][1]+'"><span> '+items[0][0]+'</span></a>');
+document.write('<a style="background-position: -9px -281px; width: 16px; height: 16px" href="'+items[1][1]+'"><span> '+items[1][0]+'</span></a>');
+document.write('<a style="background-position: -9px -111px; width: 16px; height: 16px" href="'+items[2][1]+'"><span> '+items[2][0]+'</span></a>');
+document.write('<a style="background-position: -9px -247px; width: 16px; height: 16px" href="'+items[3][1]+'"><span> '+items[3][0]+'</span></a>');
+document.write('<a style="background-position: -9px -623px; width: 16px; height: 16px" href="'+items[4][1]+'"><span> '+items[4][0]+'</span></a>');
+document.write('<a style="background-position: -9px -315px; width: 16px; height: 16px" href="'+items[5][1]+'"><span> '+items[5][0]+'</span></a>');
+document.write('<a style="background-position: -9px -213px; width: 16px; height: 16px" href="'+items[6][1]+'"><span> '+items[6][0]+'</span></a>');
+document.write('<a style="background-position: -9px -9px;   width: 16px; height: 16px" href="'+items[7][1]+'"><span> '+items[7][0]+'</span></a>');
+document.write('<a style="background-position: -9px -349px; width: 18px; height: 18px" href="'+items[8][1]+'"><span style="height: 18px"> '+items[8][0]+'</span></a>');
 document.write('</div>');
 
-document.write('<div class="share" style="right:0px;top:10px;width:120px;position:absolute;height:180px;">');
-document.write('<a href="'+items[9][1]+'"><img src="'+items[9][3]+'" /> '+items[9][0]+'</a>');
-document.write('<a href="'+items[10][1]+'"><img src="'+items[10][3]+'" /> '+items[10][0]+'</a>');
-document.write('<a href="'+items[11][1]+'"><img src="'+items[11][3]+'" /> '+items[11][0]+'</a>');
-document.write('<a href="'+items[12][1]+'"><img src="'+items[12][3]+'" /> '+items[12][0]+'</a>');
-document.write('<a href="'+items[13][1]+'"><img src="'+items[13][3]+'" /> '+items[13][0]+'</a>');
-document.write('<a href="'+items[14][1]+'"><img src="'+items[14][3]+'" /> '+items[14][0]+'</a>');
-document.write('<a href="'+items[15][1]+'"><img src="'+items[15][3]+'" /> '+items[15][0]+'</a>');
-document.write('<a href="'+items[16][1]+'"><img src="'+items[16][3]+'" /> '+items[16][0]+'</a>');
-document.write('<a href="'+items[17][1]+'"><img src="'+items[17][3]+'" /> '+items[17][0]+'</a>');
+document.write('<div class="share" style="right:0px;top:10px;width:120px;position:absolute;height:170px;">');
+document.write('<a style="background-position: -9px -419px; width: 16px; height: 16px" href="'+items[9][1]+'"><span> '+items[9][0]+'</span></a>');
+document.write('<a style="background-position: -9px -487px; width: 16px; height: 16px" href="'+items[10][1]+'"><span> '+items[10][0]+'</span></a>');
+document.write('<a style="background-position: -9px -521px; width: 16px; height: 16px" href="'+items[11][1]+'"><span> '+items[11][0]+'</span></a>');
+document.write('<a style="background-position: -9px -589px; width: 16px; height: 16px" href="'+items[12][1]+'"><span> '+items[12][0]+'</span></a>');
+document.write('<a style="background-position: -9px -657px; width: 16px; height: 16px" href="'+items[13][1]+'"><span> '+items[13][0]+'</span></a>');
+document.write('<a style="background-position: -9px -43px;  width: 16px; height: 16px" href="'+items[14][1]+'"><span> '+items[14][0]+'</span></a>');
+document.write('<a style="background-position: -9px -179px; width: 16px; height: 16px" href="'+items[15][1]+'"><span> '+items[15][0]+'</span></a>');
+document.write('<a style="background-position: -9px -453px; width: 16px; height: 16px" href="'+items[16][1]+'"><span> '+items[16][0]+'</span></a>');
+document.write('<a style="background-position: -9px -145px; width: 16px; height: 16px" href="'+items[17][1]+'"><span> '+items[17][0]+'</span></a>');
 document.write('</div>');
 
-document.write('<div class="sharefoot"><a href="http://hardkap.net/pritmarkit" style="color:#fff">Powered by PritMarkit</a></div>');
+document.write('<div class="sharefoot"><a style="background-position: -500px -500px; color:#fff" href="http://hardkap.net/pritmarkit">Powered by PritMarkit</a></div>');
 document.write('</div>');
 document.write('<div id="shareshadow"></div>');
 document.write('</div>');

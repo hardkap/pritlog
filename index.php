@@ -19,9 +19,21 @@
 #	YAGNI: Only add things, when you actually 	                #
 #	need them, not because you think you will.	                #
 #							                #
-#	Version: 0.7                                                    #
+#	Version: 0.8                                                    #
 #######################################################################*/
 
+
+
+  require("includes/secure_session.php");
+  
+  if (substr_count($_SERVER['HTTP_ACCEPT_ENCODING'], 'gzip')) ob_start("ob_gzhandler"); else ob_start();
+
+  session_start();
+  $ss = new SecureSession();
+  $ss->check_browser = true;
+  $ss->check_ip_blocks = 2;
+  $ss->secure_word = 'SALT_aJyeiuLioRhjlP';
+  $ss->regenerate_id = true;
 
   $debugMode    = "off";    // Turn this on for debugging displays. But is not fully functional yet.
   $separator    = "#~#";    // Separator used between fields when the entry files are created.
@@ -30,24 +42,67 @@
   $authors      = array();
   $authorsPass  = array();
   $authorsEmail = array();
+  $authorsActCode = array();
+  $authorsActStatus = array();
   $tags         = array();
 
-  readConfig();
-  require("lang/".$config['blogLanguage'].".php");
-  readAuthors();
+  readConfig();                                            /* Read the config file and load it into the array */
+  require("lang/".$config['blogLanguage'].".php");         /* Load the language file */
 
-  $entries=getPosts();
-  $categories=loadCategories();
-  $lastEntry=explode($separator,$entries[0]);
-  $newPostNumber    =$lastEntry[3]+1;
+  $postdb               = getcwd()."/data/postdb.sqlite";
+  $config['postdb']     = $postdb;
+  $config['authorFile'] = getcwd(). "/data/authors.php";
+  readAuthors();
+  $firstTime = false;
+  if (!file_exists($postdb)) { $firstTime = true; }
+  if (function_exists('sqlite_open')) {
+       if ($config['db'] = sqlite_open($postdb, 0666, $sqliteerror)) {
+          if ( $firstTime ) {
+              @sqlite_query($config['db'], 'DROP TABLE posts');
+              @sqlite_query($config['db'], 'DROP TABLE comments');
+              @sqlite_query($config['db'], 'DROP TABLE stats');
+              @sqlite_query($config['db'], 'DROP TABLE active_guests');
+              @sqlite_query($config['db'], 'DROP TABLE active_users');
+              sqlite_query($config['db'], 'CREATE TABLE posts (title CHAR(100), content CHAR(4500), date DATETIME, postid PRIMARY KEY, category CHAR(20), type CHAR(5), stick CHAR(5), allowcomments CHAR(4), visits INTEGER, author CHAR(25));');
+              sqlite_query($config['db'], 'CREATE TABLE comments (commentid INTEGER PRIMARY KEY, postid CHAR(6), sequence INTEGER, author CHAR(25), title CHAR(100), content CHAR(4500), date DATETIME, ip CHAR(16), url CHAR(50), email CHAR(50));');
+              sqlite_query($config['db'], 'CREATE TABLE stats (statid INTEGER PRIMARY KEY, stattype CHAR(10), statcount INTEGER);');
+              sqlite_query($config['db'], 'CREATE TABLE active_guests (id INTEGER PRIMARY KEY, ip CHAR(16), logtime DATETIME);');
+              sqlite_query($config['db'], 'CREATE TABLE active_users (id INTEGER PRIMARY KEY, ip CHAR(16), logtime DATETIME);');
+              $stattype  = "total";
+              $statcount = 0;
+              sqlite_query($config['db'], "INSERT INTO stats (stattype, statcount) VALUES('$stattype', '$statcount');");
+          }
+       }
+  }
+  else { die(); }
+
+  loadCategories();
+  $result = sqlite_query($config['db'], 'select MAX(postid) as mymax from posts');
+  while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+       $lastEntry = $row['mymax'] + 1;
+  }
+  $newPostNumber    =$lastEntry;                      /* Assign a new post number if a new post will be created */
   $newFullPostNumber=str_pad($newPostNumber, 5, "0", STR_PAD_LEFT);
   $newPostFile      =$newFullPostNumber.$config['dbFilesExtension'];
-  $data = explode("/",$_SERVER['PATH_INFO']);
+
+  $op = 0;
+  $path = (isset($_SERVER['PATH_INFO'])) ? $_SERVER['PATH_INFO'] : @getenv('PATH_INFO');
+  if (trim($path, '/') != '' && $path != "/".$_SERVER['PHP_SELF']) { $op = 1; $path1 = $path; }
+  $path =  (isset($_SERVER['QUERY_STRING'])) ? $_SERVER['QUERY_STRING'] : @getenv('QUERY_STRING');
+  if (trim($path, '/') != '') { $op = 2;	$path1 = $path; }
+  $path = (isset($_SERVER['ORIG_PATH_INFO'])) ? $_SERVER['ORIG_PATH_INFO'] : @getenv('ORIG_PATH_INFO');
+  if (trim($path, '/') != '' && $path != "/".SELF) { $op = 3; $path1 = str_replace($_SERVER['SCRIPT_NAME'], '', $path); }
+  $path = (isset($_SERVER['REQUEST_URI'])) ? $_SERVER['REQUEST_URI'] : @getenv('REQUEST_URI');
+  if ($op == 0) { $op = 4; $path1 = $path . basename($_SERVER['SCRIPT_NAME']); }
+  //echo basename($_SERVER['SCRIPT_NAME']).' Option selected = '.$op.' Path = '.$path1.'<br>';
+  //var_dump($_SERVER);
+  $data = explode("/",$path1);
+
   $serverName='http://'.$_SERVER['SERVER_NAME'];
   $serverPort=($_SERVER['SERVER_PORT']=='80')?'':':'.$_SERVER['SERVER_PORT'];
   $scriptName=$_SERVER["SCRIPT_NAME"];
-  $blogPath=dirname($serverName.$serverPort.$scriptName);
-  if ($config['blogPath'] !== $blogPath) {
+  $blogPath=dirname($serverName.$serverPort.$scriptName);  /* Detect the absolute path to Pritlog */
+  if ($config['blogPath'] !== $blogPath) {                 /* Update the absolute path to Pritlog in the config file */
       $config['blogPath'] = $blogPath;
       writeConfig(false);
   }
@@ -55,43 +110,94 @@
   $baseScript=basename($scriptName);
   $i=0;
   $optionIndex=1;
-  foreach ($data as $value) {
-      if (strcmp($value,$baseScript) == 0) {
-        $optionIndex=$i+1;
+  if (is_array($data)) {
+      foreach ($data as $value) {
+          if (strcmp($value,$baseScript) == 0) {
+            $optionIndex=$i+1;
+          }
+          $i++;
       }
-      $i++;
   }
   $option = isset($data[$optionIndex])?$data[$optionIndex]:"mainPage";
+  $nicEditType = "default";
+  $nicEditUrl  = '<script src="'.$blogPath.'/javascripts/nicEdit.js" type="text/javascript"></script>';
   if (file_exists(getcwd().'/nicFile/nicEditorIcons.gif')) {
        $nicEditType = "nicFile";
        $nicEditUrl  = '<script src="'.$blogPath.'/nicFile/nicEdit.js" type="text/javascript"></script>';
-       if (!file_exists(getcwd().'/sessions')) { mkdir(getcwd().'/sessions',0755); }
-       session_save_path(getcwd(). '/sessions');
-       session_start();
-       unset($_SESSION['auth']);
   }
   elseif (file_exists(getcwd().'/nicUpload.php')) {
        $nicEditType = "nicUpload";
        $nicEditUrl  = '<script src="http://js.nicedit.com/nicEdit-latest.js" type="text/javascript"></script>';
-       //$nicEditUrl  = '<script src="'.$blogPath.'/nicEdit/nicEdit.js" type="text/javascript"></script>';
-       if (!file_exists(getcwd().'/sessions')) { mkdir(getcwd().'/sessions',0755); }
-       session_save_path(getcwd(). '/sessions');
-       session_start();
-       unset($_SESSION['auth']);
   }
   else {
        $nicEditType = "default";
-       $nicEditUrl  = '<script src="http://js.nicedit.com/nicEdit-latest.js" type="text/javascript"></script>';
-       //$nicEditUrl  = '<script src="'.$blogPath.'/nicEdit/nicEdit.js" type="text/javascript"></script>';
+       //$nicEditUrl  = '<script src="http://js.nicedit.com/nicEdit-latest.js" type="text/javascript"></script>';
+       $nicEditUrl  = '<script src="'.$blogPath.'/javascripts/nicEdit.js" type="text/javascript"></script>';
   }
-  $optionValue = $data[$optionIndex+1];
-  $optionValue2= $data[$optionIndex+2];
-  $optionValue3= $data[$optionIndex+3];
+  /* To get the query string from the pretty urls */
+  $optionValue = isset($data[$optionIndex+1])?$data[$optionIndex+1]:"";
+  $optionValue2= isset($data[$optionIndex+2])?$data[$optionIndex+2]:"";
+  $optionValue3= isset($data[$optionIndex+3])?$data[$optionIndex+3]:"";
   //echo $optionIndex."<br>";
   //echo $option."<br>";
   //echo $optionValue."<br>";
   //echo $optionValue2."<br>";
   //echo $optionValue3."<br>";
+
+  // In seconds. User will be logged out after this
+  $inactive = $config['timeoutDuration'];
+  // check to see if $_SESSION['timeout'] is set
+  $ip = $_SERVER['REMOTE_ADDR'];
+  $_SESSION['notice'] = "";
+  if( isset($_SESSION['timeout'])) {
+       $session_life  = time() - $_SESSION['timeout'];
+
+       if ($session_life > $inactive && isset($_SESSION['logged_in']) && $_SESSION['logged_in']) {
+          /* session_unset();
+           session_destroy(); 
+           header("Location: ".$blogPath); */
+           $_SESSION['notice']=$lang['loggedOut'];
+           $option="logoutPage";
+       }
+  }
+  $_SESSION['timeout'] = time();
+
+   $mypath  =isset($_SERVER['PATH_INFO'])?str_replace("/index.php","",$_SERVER['PATH_INFO']):"";
+   //$referrer=$blogPath.'/index.php'.$mypath;
+   $referrer=$serverName.$_SERVER['REQUEST_URI'];
+
+   if ($option == "mainPage") { $_SESSION['url']=$referrer; }
+   $accessArray=array('newEntry', 'newEntryForm', 'newEntrySubmit', 'deleteEntry', 'editEntry', 'editEntryForm', 'editEntrySubmit', 'deleteComment', 'myProfile', 'myProfileSubmit');
+   if (in_array($option,$accessArray)) {
+      if (!$ss->Check() || !isset($_SESSION['logged_in']) || !$_SESSION['logged_in']) {
+           $_SESSION['notice']="";
+           $_SESSION['url']=$referrer;
+           $_SESSION['access_type']="regular";
+           header('Location: '.$_SERVER["SCRIPT_NAME"].'/loginPage');
+           die;
+      }
+   }
+   $adminAccessArray=array('adminPage', 'adminPageBasic', 'adminPageBasicSubmit', 'adminPageAdvanced', 'adminPageAdvancedSubmit', 'adminPageAuthors', 'adminAuthorsAdd', 'adminAuthorsEdit');
+   if (in_array($option, $adminAccessArray)) {
+      if (!$ss->Check() || !isset($_SESSION['logged_in']) || !$_SESSION['logged_in'] || !$_SESSION['isAdmin']) {
+           $_SESSION['notice']="";
+           $_SESSION['url']=$referrer;
+           $_SESSION['access_type']="admin";
+           header('Location: '.$_SERVER["SCRIPT_NAME"].'/loginPage');
+           die;
+      }
+   }
+
+   if ($option == 'loginPageSubmit') {
+       loginPageSubmit();
+       die;
+   }
+
+   if ($option == 'logoutPage') {
+       logout();
+       //die;
+   }
+
 
 if($option == 'RSS')
 {
@@ -109,13 +215,14 @@ else
 <meta name="Description" content="<?php echo $config['metaDescription']; ?>"/>
 <title>
 <?php
-if (trim($optionValue2) == "") { $postTitle=""; }
+if (trim($optionValue2) == "") { $postTitle=""; $postTitleSave="";}
 else {
   $postTitle    =str_replace("  "," ",str_replace("-"," ",$optionValue2))." &laquo; ";
   $postTitleSave=str_replace("  "," ",str_replace("-"," ",$optionValue2))." | ";
 }
 
 echo $postTitle.$config['blogTitle'];
+
 ?>
 </title>
 <link rel="alternate" type="application/rss+xml" title="Recent Posts" href="<?php echo $_SERVER["SCRIPT_NAME"].'/RSS/'.$optionValue ?>" />
@@ -126,10 +233,14 @@ echo $postTitle.$config['blogTitle'];
 <!--[if IE]><link rel="stylesheet" href="<?php echo $blogPath.'/css/ie.css' ?>" type="text/css" media="screen, projection"><![endif]-->
 
 <link href="<?php echo $blogPath.'/css/style.css' ?>" rel=stylesheet type=text/css>
+<?php
+  echo '<script type="text/javascript">var blogPath="'.$blogPath.'";</script>';
+?>
+<script src="<?php echo $blogPath.'/javascripts/livevalidation.js' ?>" type="text/javascript"></script>
 
 </head>
 
-<body>
+<body id="noticebd">
 
 <div class="container">
 
@@ -150,59 +261,47 @@ echo $postTitle.$config['blogTitle'];
 
 <div id="all" class="span-24">
 
-<div id="topbar" class="span-5">
 
 <!-- Left Sidebar -->
 
 <?php
 
-if (strlen($config['about']) > 10) {
-
+if (trim($_SESSION['notice']) !== "") {
 ?>
 
-<div  class="span-5  last">
-<h3><?php echo $lang['pageBasicConfigAbout']; ?></h3>
-<?php echo $config['about']; ?>
-</div>
-
-<?php
-}
+<script src="<?php echo $blogPath.'/javascripts/addremove.js' ?>" type="text/javascript"></script>
+<script type="text/javascript">
+Event.add(window, 'load', function() {
+  var i = 0;
+  var el = document.createElement('p');
+  el.innerHTML = "<strong><?php echo $_SESSION['notice'] ?></strong>";
+  el.setAttribute("id","notice");
+  el.setAttribute("class","error");
+  Dom.add(el, 'noticehd');
+  var t=setTimeout("Dom.remove('notice');",3300);
+  /*
+  Event.add('add-element', 'click', function() {
+    var el = document.createElement('p');
+    el.innerHTML = 'Remove This Element (' + ++i + ')';
+    Dom.add(el, 'h3');
+    Event.add(el, 'click', function(e) {
+      Dom.remove(this);
+    });
+  }); */
+});
+</script>
+<?php 
+unset($_SESSION['notice']);
+} 
 ?>
 
-<div  class="span-5  last">
-<h3><?php echo $lang['sidebarHeadMainMenu']; ?></h3>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/mainPage>'.$lang['sidebarLinkHome']; ?></a>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/newEntry>'.$lang['sidebarLinkNewEntry']; ?></a>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/viewArchive>'.$lang['sidebarLinkArchive']; ?></a>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/RSS>'.$lang['sidebarLinkRSSFeeds']; ?></a>
-<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/adminPage>'.$lang['sidebarLinkAdmin']; ?></a>
-</div>
 
-<div  class="span-5  last">
-<h3><?php echo $lang['sidebarHeadCategories']; ?></h3>
-<?php sidebarCategories(); ?>
-</div>
-
-<div class="span-5  last">
-<h3><?php echo $lang['sidebarHeadPages']; ?></h3>
-<?php sidebarPageEntries() ?>
-</div>
-
-<div  class="span-5  last">
-<h3><?php echo $lang['sidebarHeadLinks']; ?></h3>
-<?php sidebarLinks(); ?>
-</div>
-
-<div  class="span-5  last">
-<h3><?php echo $lang['sidebarHeadStats']; ?></h3>
-<?php sidebarStats() ?>
-</div>
-
-</div>
 
 <!-- Main content - that has the posts begins here -->
 
-<div id="content" class="span-12">
+<div id="content" class="span-16">
+
+<div id="noticehd"></div>
 <?php
 
 }
@@ -216,51 +315,111 @@ if($option !== 'RSS') {
 
 <!-- Right sidebar -->
 
-<div class="span-5">
+<div class="span-6">
 
-<div id="menu" class="span-5">
+<div id="menu" class="span-6">
 
-<div class="span-5  last">
-<h3><?php echo $lang['sidebarHeadShare']; ?></h3>
+<div class="span-6  last">
+<br>
 <style>
 #shareButton {font:12px Verdana, Helvetica, Arial; height: 30px;width:100px;}
 #shareDrop {position:absolute; padding:10px; display: none; z-index: 100; top:-900px; left:0px; width: 200px;float:left;background: #E9E9E9;border:1px solid black;}
 #shareButton img, #shareDrop img {border:0} #shareDrop a {color:#008DC2; padding:0px 5px;display:block;text-decoration:none;} #shareDrop a:hover {background-color: #999999; color: #fff; text-decoration:none;}
 #shareshadow{position: absolute;left: 0; top: 0; z-index: 99; background: black; visibility: hidden;}
-div.sharefoot {position: absolute; top: 182px; height:15px; width: 200px; text-align: center; background-color: #999999; color: #fff;}
+div.sharefoot {position: absolute; top: 172px; height:15px; width: 200px; text-align: center; background-color: #999999; color: #fff;}
 div.sharefoot a{display:inline; color:#fff; background-color:#999999; } div.sharefoot a:hover{text-decoration:none; background: #00adef; color: #fff}
 </style>
 <script type="text/javascript">
 <?php
 echo 'var bPath="'.$blogPath.'/images/bookmarks";';
-echo 'var u1   ="'.urlencode($blogPath).'";';
+//echo 'var u1   ="'.urlencode($blogPath).'";';
+echo 'var u1   =encodeURIComponent(document.location.href);';
 echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 ?>
 </script>
-<script type="text/javascript" src="<?php echo $blogPath.'/javascripts/shareme.js' ?>"></script>
+
+<style>
+
+div #shareButton a { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>") no-repeat; }
+div .share a span { cursor:pointer; display:block; margin-left:15px; color:#008DC2; padding:0px 5px; height:16px; width: 60px; text-decoration:none;}
+div .share a span:hover {background-color: #999999; color: #fff; text-decoration:none;}
+
+div .shareit { background: url("<?php echo $blogPath.'/images/shareme.gif'; ?>") no-repeat;}
+
+</style>
+
+<?php echo '<script type="text/javascript" src="'.$blogPath.'/javascripts/shareme.js"></script>'; ?>
+
+
 </div>
 
-<div class="span-5  last">
-<h3><?php echo $lang['sidebarHeadSearch']; ?></h3>
-    <form name="form1" method="post" action=<?php echo $_SERVER['SCRIPT_NAME']; ?>/searchPosts>
-    <input type="text" name="searchkey">
+<div class="span-6  last">
+    <br/>
+    <form name="form1" method="post" id="searchform" action=<?php echo $_SERVER['SCRIPT_NAME']; ?>/searchPosts>
+    <input type="text" class="s" name="searchkey">
     <input type="hidden" name="do" value="search">
-    <input type="submit" name="Submit" value="Search"><br />
+    <input type="submit" class="submit" name="Submit" value="Search"><br />
     </form>
 </div>
 
-<div  class="span-5  last">
-<h3><?php echo $lang['sidebarHeadPopularEntries']; ?></h3>
-    <?php sidebarPopular();  ?>
-</div>
-
-<div  class="span-5  last">
+<div  class="span-6 last">
 <h3><?php echo $lang['sidebarHeadLatestEntries']; ?></h3>
     <?php sidebarListEntries(); ?>
 </div>
 
+<div  class="span-6  last">
+<h3><?php echo $lang['sidebarHeadMainMenu']; ?></h3>
+<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/mainPage>'.$lang['sidebarLinkHome']; ?></a>
+<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/viewArchive>'.$lang['sidebarLinkArchive']; ?></a>
+<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/RSS>'.$lang['sidebarLinkRSSFeeds']; ?></a>
+<?php if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false)) { ?>
+<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/adminPage>'.$lang['sidebarLinkAdmin']; ?></a>
+<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/newEntry>'.$lang['sidebarLinkNewEntry']; ?></a>
+<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/logoutPage>'.$lang['sidebarLinkLogout']; ?></a>
+<?php } else { ?>
+<?php if (isset($_SESSION['logged_in']) && $_SESSION['logged_in']) { ?>
+<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/newEntry>'.$lang['sidebarLinkNewEntry']; ?></a>
+<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/myProfile>'.$lang['pageMyProfile']; ?></a>
+<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/logoutPage>'.$lang['sidebarLinkLogout']; ?></a>
+<?php } else { ?>
+<a href=<?php echo $_SERVER["SCRIPT_NAME"].'/loginPage>'.$lang['sidebarLinkLogin']; ?></a>
+<?php } ?>
+<?php } ?>
+</div>
 
-<div  class="span-5  last">
+<div  class="span-6  last">
+<h3><?php echo $lang['sidebarHeadCategories']; ?></h3>
+<?php sidebarCategories(); ?>
+</div>
+
+<div class="span-6  last">
+<h3><?php echo $lang['sidebarHeadPages']; ?></h3>
+<?php sidebarPageEntries() ?>
+</div>
+
+<div  class="span-6  last">
+<h3><?php echo $lang['sidebarHeadLinks']; ?></h3>
+<?php sidebarLinks(); ?>
+</div>
+
+<div  class="span-6  last">
+<h3><?php echo $lang['sidebarHeadStats']; ?></h3>
+<?php sidebarStats() ?>
+</div>
+
+
+</div>
+
+</div>
+
+<div id="foot" class="span-24">
+
+<div  class="span-7  prepend-1 append-1">
+<h3><?php echo $lang['sidebarHeadPopularEntries']; ?></h3>
+    <?php sidebarPopular();  ?>
+</div>
+
+<div  class="span-7 append-1">
 <h3><?php echo $lang['sidebarHeadLatestComments']; ?></h3>
 <?php
       sidebarListComments();
@@ -268,14 +427,21 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 ?>
 </div>
 
+<?php if (strlen($config['about']) > 10) { ?>
+<div  class="span-6">
+<h3><?php echo $lang['pageBasicConfigAbout']; ?></h3>
+<?php echo $config['about']; ?>
 </div>
+<?php } ?>
 
 </div>
 
 </div>
+
+
 
 <?php /* PLEASE DONT REMOVE THIS COPYRIGHT WITHOUT PERMISSION FROM THE AUTHOR */ ?>
-<?php echo '<div id="footer">'.$lang['footerCopyright'].' '.$config['blogTitle'].' '.date('Y').' - '.$lang['footerRightsReserved'].' - Powered by <a href="http://hardkap.net/pritlog/">Pritlog</a></div>'; ?>
+<?php sqlite_close($config['db']); echo '<div id="footer">'.$lang['footerCopyright'].' '.$config['blogTitle'].' '.date('Y').' - '.$lang['footerRightsReserved'].' - Powered by <a href="http://hardkap.net/pritlog/">Pritlog</a></div>'; ?>
 
 </div>
 
@@ -296,7 +462,7 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
       switch ($option) {
       case "newEntry":
           if ($debugMode=="on") {echo "Calling newEntryPass()";}
-          newEntryPass();
+          newEntryForm();
           break;
       case "newEntryForm":
           if ($debugMode=="on") {echo "Calling newEntryForm()";}
@@ -310,13 +476,7 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
           listPosts();
           break;
       case "adminPage":
-          if ($debugMode=="on") {echo "adminPage  ".$_POST['process']."<br>";}
-          if ($_POST['process']!=="adminPage") {
-              adminPass();
-          }
-          else {
-              adminPage();
-          }
+          adminPage();
           break;
       case "adminPageBasic":
           if ($debugMode=="on") {echo "adminPageBasic  ".$_POST['process']."<br>";}
@@ -349,6 +509,7 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 
       case "deleteEntry":
           if ($debugMode=="on") {echo "deleteEntry  ".$_POST['process']."<br>";}
+          //deleteEntrySubmit();
           if ($_POST['process']!=="deleteEntrySubmit") {
               deleteEntryForm();
           }
@@ -358,7 +519,7 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
           break;
       case "editEntry":
           if ($debugMode=="on") {echo "editEntry  ".$_POST['process']."<br>";}
-          editEntryPass();
+          editEntryForm();
           break;
       case "editEntryForm";
           editEntryForm();
@@ -390,50 +551,547 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
           break;
       case "deleteComment":
           if ($debugMode=="on") {echo "deleteEntry  ".$_POST['process']."<br>";}
-          if ($_POST['process']!=="deleteCommentSubmit") {
+          $process=isset($_POST['process'])?$_POST['process']:"";
+          if ($process !=="deleteCommentSubmit") {
               deleteCommentForm();
           }
           else {
               deleteCommentSubmit();
           }
           break;
+      case "loginPage":
+           loginPage();
+           break;
+      case "logoutPage":
+           logoutPage();
+           break;
+      case "registerPage":
+           registerPage();
+           break;
+      case "registerPageSubmit":
+           registerPageSubmit();
+           break;
+      case "forgotPass":
+           forgotPass();
+           break;
+      case "forgotPassSubmit":
+           forgotPassSubmit();
+           break;
+      case "activation":
+           activation();
+           break;
+      case "myProfile":
+           myProfile();
+           break;
+      case "myProfileSubmit":
+           myProfileSubmit();
+           break;
       }
   }
 
-  function adminPass() {
+  function logout() {
+      global $blogPath, $lang;
+      unset($_SESSION['logged_in']);
+      unset($_SESSION['username']);
+      unset($_SESSION['isAdmin']);
+      unset($_SESSION['access_type']);
+      unset($_SESSION['loginError']);
+      unset($_SESSION['ss_fprint']);
+      header('Location: '.$_SESSION['url']);
+      die();
+      //unset($_SESSION['url']);
+  }
+
+  function logoutPage() {
+      global $blogPath, $lang;
+      echo "<h3>".$lang['titleLogoutPage']."</h3>";
+      echo $lang['loggedOut'].'<br>';
+  }
+
+  function loginPage() {
       global $debugMode, $optionValue, $config, $lang;
-      echo "<h3>".$lang['titleAdminPage']."</h3>";
-      echo "<form name=\"form1\" method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/adminPage>";
-      echo "<table><td>Pass</td>";
-      echo "<td><input name=\"pass\" type=\"password\" id=\"pass\">";
-      echo "<input name=\"process\" type=\"hidden\" id=\"process\" value=\"adminPage\">";
-      echo "</tr><tr><td>&nbsp;</td><td><input type=\"submit\" name=\"Submit\" value=\"Submit\"></td>";
+      echo "<h3>".$lang['titleLoginPage']."</h3>";
+      echo "<form name=\"form1\" method=\"post\" action=\"".$_SERVER['SCRIPT_NAME']."/loginPageSubmit\">";
+      echo "<table>";
+      echo "<tr><td>".$lang['pageAuthorsNew']."</td>";
+      echo "<td><input class=\"s\" name=\"author\" type=\"text\" id=\"author\">&nbsp;&nbsp;('admin' for master user)</td></tr>";
+      echo '<script>';
+      echo 'var author = new LiveValidation( "author", {onlyOnSubmit: true } );';
+      echo 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+      echo '</script>';
+      echo "<tr><td>".$lang['pageDeletePass']."</td>";
+      echo "<td><input class=\"s\" name=\"pass\" type=\"password\" id=\"pass\"></td></tr>";
+      echo '<script>';
+      echo 'var pass = new LiveValidation( "pass", {onlyOnSubmit: true } );';
+      echo 'pass.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+      echo '</script>';
+      echo '</tr><tr><td>&nbsp;</td><td><input type="submit" class="submit" name="Submit" value="'.$lang['pageBasicConfigSubmit'].'"></td>';
       echo "</tr></table></form>";
+      echo '[<a href="'.$_SERVER['SCRIPT_NAME'].'/forgotPass">'.$lang['titleForgotPass'].'?</a>]';
+      if ($config['allowRegistration'] == 1) {
+          echo '<br>Not registered?&nbsp;<a href="'.$_SERVER['SCRIPT_NAME'].'/registerPage">'.$lang['titleRegisterPageSubmit'].'!</a><br>';
+      }
+      if (isset($_SESSION["loginError"])) {
+           echo '<br>'.$_SESSION["loginError"].'<br>';
+           unset($_SESSION["loginError"]);
+      }
+  }
+
+  function loginPageSubmit() {
+      global $debugMode, $optionValue, $config, $lang, $baseScript, $authorsPass, $ss, $authorsActStatus;
+      $loginError=false;
+      $authorsActStatus['admin'] = 1;
+      //echo 'yes - '.$_SESSION['url'].' - '.$_POST['author'].' - '.$_POST['pass'].' - '.$authorsPass[$_POST['author']].' - '.$authorsActStatus[$_POST['author']]; die();
+      if ((md5($config['randomString'].$_POST['pass']) === $authorsPass[$_POST['author']]) && ($authorsActStatus[$_POST['author']] == 1)) {
+         $ss->Open();
+         $_SESSION['logged_in'] = true;
+         $_SESSION['username']  = $_POST['author'];
+         if ($_POST['author'] == "admin") {
+            $_SESSION['isAdmin'] = true;
+            $_SESSION['access_type'] = "admin";
+         }
+         else {
+           if ($_SESSION['access_type'] == "admin" || $authorsActStatus[$_POST['author']] == 0) {
+               $_SESSION["loginError"] = $lang['errorUserPassIncorrect'];
+               $loginError=true;
+           }
+           $_SESSION['access_type'] = "regular";
+           $_SESSION["loginError"]  = $lang['errorNotAuthorized'];
+         }
+         header('Location: '.$_SESSION['url']);
+      }
+      else {
+         $_SESSION["loginError"] = $lang['errorUserPassIncorrect'];
+         header('Location: '.$baseScript.'/loginPage');
+      }
+  }
+
+  function myProfile() {
+      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail;
+      echo "<h3>".$lang['pageMyProfile']."</h3>";
+      if ((isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) && !(isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false)) {
+          echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/myProfileSubmit>";
+          echo "<fieldset>";
+          echo '<legend>'.$lang['pageMyProfile'].'</legend>';
+          echo '<p><label for="origpass">'.$lang['pageMyProfileCurrentPass'].'</label><br>';
+          echo '<input type="password" class="ptext" name="origpass" id="origpass" value=""></p>';
+          echo '<script>';
+          echo 'var origpass = new LiveValidation( "origpass", {onlyOnSubmit: true } );';
+          echo 'origpass.add( Validate.Presence, { failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          echo '</script>';
+          echo '<p><label for="newpass1">'.$lang['pageBasicConfigNewpass1'].'</label><br>';
+          echo '<input type="password" class="ptext" name="newpass1" id="newpass1" value=""></p>';
+          echo '<script>';
+          echo 'var pass1 = new LiveValidation( "newpass1", {onlyOnSubmit: true } );';
+          echo 'pass1.add( Validate.Length, { minimum: 5 , failureMessage: "'.$lang['errorPassLength'].'" } );';
+          echo '</script>';
+          echo '<p><label for="newpass2">'.$lang['pageBasicConfigNewpass2'].'</label><br>';
+          echo '<input type="password" class="ptext" name="newpass2" id="newpass2" value=""></p>';
+          echo '<script>';
+          echo 'var pass2 = new LiveValidation( "newpass2", {onlyOnSubmit: true } );';
+          echo 'pass2.add( Validate.Confirmation,{ match: "newpass1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
+          echo '</script>';
+          echo '<p><label for="authorEmail">'.$lang['pageAuthorsNewEmail'].'</label><br>';
+          echo '<input type="text" class="ptext" name="authorEmail" id="authorEmail" value="'.$authorsEmail[$_SESSION['username']].'"></p>';
+          echo '<script>';
+          echo 'var email = new LiveValidation( "authorEmail", {onlyOnSubmit: true } );';
+          echo 'email.add( Validate.Presence, { failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          echo 'email.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
+          echo '</script>';
+          echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
+          echo '<p><input type="submit" value="'.$lang['pageAdvancedConfigSubmit'].'"></p>';
+          echo '</fieldset>';
+          echo '</form>';
+      }
+      else { echo $lang['errorInvalidRequest'].'<br>'; }
+  }
+
+  function myProfileSubmit() {
+      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $separator, $authorsPass, $authorsActCode, $authorsActStatus;
+      $authorFileName=$config['authorFile'];
+      echo "<h3>".$lang['pageMyProfile']."</h3>";
+      $do = 1;
+      if ((isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) && !(isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false)) {
+          $authorEmail=$_POST['authorEmail'];
+          $addAuthor  =$_SESSION['username'];
+          if (trim($authorEmail) == "") {
+               echo $lang['errorAllFields'].'<br>';
+               $do = 0;
+          }
+          if (!eregi("^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", trim($authorEmail))) {
+               echo $lang['errorInvalidAdminEmail'].'<br>';
+               $do = 0;
+          }
+          if ($_POST['newpass1'] != $_POST['newpass2']) {
+               echo $lang['errorNewPasswordsMatch']."<br>";
+               $do = 0;
+          }
+          if (strtolower(trim($addAuthor)) == "admin") {
+               echo $lang['errorForbiddenAuthor'].'<br>';
+               $do = 0;
+          }
+          if (isset($_POST['newpass1']) && trim($_POST['newpass1']) != "" && strlen($_POST['newpass1']) < 5) {
+              echo $lang['errorPassLength'].'<br>';
+              $do = 0;
+          }
+          if (md5($config['randomString'].$_POST['origpass']) !== $authorsPass[$addAuthor]) {
+              echo $lang['errorPasswordIncorrect'].'<br>';
+              $do = 0;
+          }
+          if ($do == 1) {
+              $fp = fopen($authorFileName, "w");
+              fwrite($fp,'<?php /*');
+              fwrite($fp,"\n");
+              foreach ($authors as $value) {
+                   if (strcmp($value,$addAuthor) == 0) {
+                        $authorsPassText      = $_POST['newpass1'];
+                        if (trim($_POST['newpass1']) != "") { $authorsPass[$value]  = md5($config['randomString'].$authorsPassText); }
+                        $authorsEmail[$value] = $authorEmail;
+                   }
+                   $authorLine=$value.$separator.$authorsPass[$value].$separator.$authorsEmail[$value].$separator.$authorsActCode[$value].$separator.$authorsActStatus[$value]."\n";
+                   fwrite($fp,$authorLine);
+              }
+              fwrite($fp,'*/ ?>');
+              fclose($fp);
+              echo '<br>'.$lang['msgConfigSaved'].'.';
+              echo '<br>'.$lang['msgConfigLoginAgain'].'.';
+          }
+      }
+      else { echo $lang['errorInvalidRequest'].'<br>'; }
+  }
+
+  function registerPage() {
+      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail;
+      echo "<h3>".$lang['titleRegisterPage']."</h3>";
+      if (!isset($_SESSION['logged_in']) && !(isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) && ($config['allowRegistration'] == 1)) {
+          echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/registerPageSubmit>";
+          echo "<fieldset>";
+          echo '<legend>'.$lang['titleRegisterPage'].'</legend>';
+          echo '<p><label for="addAuthor">'.$lang['pageAuthorsNew'].'</label><br>';
+          echo '<input type="text" class="ptext" name="addAuthor" id="addAuthor" value=""></p>';
+          $authorsList="";
+          foreach ($authors as $value) {
+              $authorsList.='"'.$value.'" , ';
+          }
+          echo '<script>';
+          echo 'var author = new LiveValidation( "addAuthor", {onlyOnSubmit: true } );';
+          echo 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          echo 'author.add( Validate.Exclusion, { within: [ '.$authorsList.' ] , failureMessage: "'.$lang['errorDuplicateAuthor'].'"  } );';
+          echo '</script>';
+          echo '<p><label for="newpass1">'.$lang['pageBasicConfigNewpass1'].'</label><br>';
+          echo '<input type="password" class="ptext" name="newpass1" id="newpass1" value=""></p>';
+          echo '<script>';
+          echo 'var pass1 = new LiveValidation( "newpass1", {onlyOnSubmit: true } );';
+          echo 'pass1.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          echo 'pass1.add( Validate.Length, { minimum: 5 , failureMessage: "'.$lang['errorPassLength'].'" } );';
+          echo '</script>';
+          echo '<p><label for="newpass2">'.$lang['pageBasicConfigNewpass2'].'</label><br>';
+          echo '<input type="password" class="ptext" name="newpass2" id="newpass2" value=""></p>';
+          echo '<script>';
+          echo 'var pass2 = new LiveValidation( "newpass2", {onlyOnSubmit: true } );';
+          echo 'pass2.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          echo 'pass2.add( Validate.Confirmation,{ match: "newpass1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
+          echo '</script>';
+          echo '<p><label for="authorEmail">'.$lang['pageAuthorsNewEmail'].'</label><br>';
+          echo '<input type="text" class="ptext" name="authorEmail" id="authorEmail" value=""></p>';
+          echo '<script>';
+          echo 'var email = new LiveValidation( "authorEmail", {onlyOnSubmit: true } );';
+          echo 'email.add( Validate.Presence, { failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          echo 'email.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
+          echo '</script>';
+          if($config['commentsSecurityCode'] == 1)
+  	  {
+	       $code = '';
+	       if($config['onlyNumbersOnCAPTCHA'] == 1)
+	       {
+		   $code = substr(rand(0,999999),1,$config['CAPTCHALength']);
+               }
+	       else
+	       {
+	  	   //$code = strtoupper(substr(crypt(rand(0,999999), $config['randomString']),1,$config['CAPTCHALength']));
+	  	   $code = genRandomString($config['CAPTCHALength']);
+	       }
+	       echo '<p><label for="code">'.$lang['pageCommentsCode'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$code.')</font><br>';
+	       echo '<input name="code" class="s" type="text" id="code"></p>';
+               echo '<input name="originalCode" value="'.$code.'" type="hidden" id="originalCode">';
+          }
+          echo '<p><input type="submit" class="submit" value="'.$lang['titleRegisterPageSubmit'].'"></p>';
+          echo '</fieldset>';
+          echo '</form>';
+      }
+      else { echo $lang['errorInvalidRequest'].'<br>'; }
+  }
+
+  function registerPageSubmit() {
+      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $separator, $authorsPass, $blogPath, $authorsActCode, $authorsActStatus;
+      $authorFileName=$config['authorFile'];
+      echo "<h3>".$lang['titleRegisterPage']."</h3>";
+      $do = 1;
+      if (!isset($_SESSION['logged_in']) && !$_SESSION['logged_in'] && ($config['allowRegistration'] == 1)) {
+          $authorEmail=$_POST['authorEmail'];
+          $addAuthor=$_POST['addAuthor'];
+          if (isset($authorsPass[$addAuthor])) {
+               echo $lang['errorDuplicateAuthor'].'<br>';
+               $do = 0;
+          }
+          if (trim($addAuthor) == "" || trim($authorEmail) == "") {
+               echo $lang['errorAllFields'].'<br>';
+               $do = 0;
+          }
+          if (!eregi("^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", trim($authorEmail))) {
+               echo $lang['errorInvalidAdminEmail'].'<br>';
+               $do = 0;
+          }
+          if ($_POST['newpass1'] != $_POST['newpass2']) {
+               echo $lang['errorNewPasswordsMatch']."<br>";
+               $do = 0;
+          }
+          if (strtolower(trim($addAuthor)) == "admin") {
+               echo $lang['errorForbiddenAuthor'].'<br>';
+               $do = 0;
+          }
+          if (strlen($_POST['newpass1']) < 5) {
+              echo $lang['errorPassLength'].'<br>';
+              $do = 0;
+          }
+          if($config['commentsSecurityCode'] == 1)
+	  {
+	      $code         = isset($_POST['code'])?$_POST['code']:"";
+ 	      $originalCode = isset($_POST['originalCode'])?$_POST['originalCode']:"";
+	      if ($code !== $originalCode)
+	      {
+	   	  echo $lang['errorSecurityCode'].'<br>';
+		  $do = 0;
+              }
+	  }
+          if ($do == 1) {
+              $fp = fopen($authorFileName, "w");
+              fwrite($fp,'<?php /*');
+              fwrite($fp,"\n");
+              foreach ($authors as $value) {
+                   $authorLine=$value.$separator.$authorsPass[$value].$separator.$authorsEmail[$value].$separator.$authorsActCode[$value].$separator.$authorsActStatus[$value]."\n";
+                   fwrite($fp,$authorLine);
+              }
+              $addAuthor=$_POST['addAuthor'];
+              $addPass  =md5($config['randomString'].$_POST['newpass1']);
+              $addEmail =$_POST['authorEmail'];
+              $activ_code = rand(50001,99999);
+              $active = "0";
+              $authorLine=$addAuthor.$separator.$addPass.$separator.$addEmail.$separator.$activ_code.$separator.$active."\n";
+              //echo $authorLine.'<br>';
+              $activeLink=$blogPath.'/index.php/activation/'.$addAuthor.'/'.$activ_code;
+              $subject = "PRITLOG: ".$lang['titleRegisterPage'];
+               $message = $addAuthor.",\n\n"
+                      .$lang['msgMail10']."...\n\n"
+                      .$lang['pageAuthorsNewEmail'].": ".$addEmail."\n"
+                      .$lang['pageAuthorsNew'].": ".$addAuthor."\n"
+                      .$lang['pageNewPassword'].": ".$_POST['newpass1']."\n\n"
+                      .$lang['titleRegisterActLink']."\n".$activeLink."\n\n"
+                      .$lang['titleRegisterAutoMsg']."\n\n";
+             // To send HTML mail, the Content-type header must be set
+             $headers  = 'MIME-Version: 1.0' . "\r\n";
+             $headers .= 'Content-type: text/html; charset=iso-8859-1' . "\r\n";
+             // Additional headers
+             //$headers .= 'To: '.$addEmail. "\r\n";
+             //$headers .= 'From: Pritlog <'.$config['sendMailWithNewCommentMail'].'>' . "\r\n";
+             $headers = 'From: Pritlog <'.$config['sendMailWithNewCommentMail'].'>' . "\r\n";
+             //echo $authorLine.'<br>';
+	     if (mail($addEmail,
+                 $subject,
+                 $message,
+                 $headers)) {
+                   fwrite($fp,$authorLine);
+                   echo '<br>'.$lang['titleRegisterThank'].'.';
+             }
+             else {
+                 echo '<br>'.$lang['msgMail9'].'.<br>';
+             }
+             fwrite($fp,'*/ ?>');
+             fclose($fp);
+             if ($config['sendRegistMail'] == 1) {
+	         $subject = "PRITLOG: ".$lang['titleRegisterPage'];
+    	         $message = $lang['msgMail11']."\n\n"
+                 .$lang['pageAuthorsNew'].": ".$addAuthor."\n"
+                 .$lang['pageAuthorsNewEmail'].": ".$addEmail."\n"
+                 .$lang['msgMail5'].": ".date("d M Y h:i A")."\n\n"
+                 .$lang['msgMail6']."\n\n";
+                 // To send HTML mail, the Content-type header must be set
+                 //$headers  = 'MIME-Version: 1.0' . "\r\n";
+                 //$headers .= 'Content-type: text/html; charset=iso-8859-1' . "\r\n";
+                 // Additional headers
+                 //$headers .= 'To: '.$config['sendMailWithNewCommentMail']. "\r\n";
+                 $headers = 'From: Pritlog <'.$config['sendMailWithNewCommentMail'].'>' . "\r\n";
+		 mail($config['sendMailWithNewCommentMail'],
+                      $subject,
+                      $message,
+                      $headers);
+             }
+          }
+          else {
+              echo $lang['errorPleaseGoBack'];
+          }
+
+       }
+       else { echo $lang['errorInvalidRequest'].'<br>'; }
+  }
+
+  function forgotPass() {
+      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail;
+      echo "<h3>".$lang['titleForgotPass']."</h3>";
+      if (!isset($_SESSION['logged_in']) && !(isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false)) {
+          echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/forgotPassSubmit>";
+          echo "<fieldset>";
+          echo '<legend>'.$lang['titleForgotPass'].'</legend>';
+          echo '<p><label for="addAuthor">'.$lang['pageAuthorsNew'].'</label><br>';
+          echo '<input type="text" class="ptext" name="addAuthor" id="addAuthor" value=""></p>';
+          $authorsList="";
+          foreach ($authors as $value) {
+              $authorsList.='"'.$value.'" , ';
+          }
+          echo '<script>';
+          echo 'var author = new LiveValidation( "addAuthor", {onlyOnSubmit: true } );';
+          echo 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          echo 'author.add( Validate.Inclusion, { within: [ '.$authorsList.' ] , failureMessage: "'.$lang['errorUserNotFound'].'"  } );';
+          echo '</script>';
+          echo '<p><input type="submit" class="submit" value="'.$lang['pageBasicConfigSubmit'].'"></p>';
+          echo '</fieldset>';
+          echo '</form>';
+      }
+      else { echo $lang['errorInvalidRequest'].'<br>'; }
+  }
+
+  function createRandomPassword() {
+    $chars = "abcdefghijkmnopqrstuvwxyz023456789";
+    srand((double)microtime()*1000000);
+    $i = 0;
+    $pass = '' ;
+    while ($i <= 7) {
+        $num = rand() % 33;
+        $tmp = substr($chars, $num, 1);
+        $pass = $pass . $tmp;
+        $i++;
+    }
+    return $pass;
+  }
+
+  function forgotPassSubmit() {
+      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $separator, $authorsPass, $blogPath, $authorsActCode, $authorsActStatus;
+      $authorFileName=$config['authorFile'];
+      echo "<h3>".$lang['titleForgotPass']."</h3>";
+      $do = 1;
+      if (!isset($_SESSION['logged_in']) && !in_array('"'.$_POST['addAuthor'].'"', $authors)) {
+          $addAuthor=$_POST['addAuthor'];
+          $addEmail =$authorsEmail[$addAuthor];
+          if (trim($addAuthor) == "") {
+               echo $lang['errorAllFields'].'<br>';
+               $do = 0;
+          }
+          if (strtolower(trim($addAuthor)) == "admin") {
+               echo $lang['errorForbiddenAuthor'].'<br>';
+               $do = 0;
+          }
+          if ($do == 1) {
+              $fp = fopen($authorFileName, "w");
+              fwrite($fp,'<?php /*');
+              fwrite($fp,"\n");
+              foreach ($authors as $value) {
+                   $authorsDelete = false;
+                   if (strcmp($value,$addAuthor) == 0) {
+                        $authorsPassText      = createRandomPassword();
+                        $authorsPass[$value]  = md5($config['randomString'].$authorsPassText);
+                   }
+                   $authorLine=$value.$separator.$authorsPass[$value].$separator.$authorsEmail[$value].$separator.$authorsActCode[$value].$separator.$authorsActStatus[$value]."\n";
+                   fwrite($fp,$authorLine);
+              }
+              fwrite($fp,'*/ ?>');
+              fclose($fp);
+              $subject = "PRITLOG: ".$lang['titleForgotPassSub'];
+	      $message = $addAuthor.",\n\n"
+                      .$lang['msgMail10']."...\n\n"
+                      .$lang['pageAuthorsNewEmail'].": ".$addEmail."\n"
+                      .$lang['pageAuthorsNew'].": ".$addAuthor."\n"
+                      .$lang['pageNewPassword'].": ".$authorsPassText."\n\n"
+                      .$lang['titleRegisterAutoMsg']."\n\n";
+             // To send HTML mail, the Content-type header must be set
+             $headers  = 'MIME-Version: 1.0' . "\r\n";
+             $headers .= 'Content-type: text/html; charset=iso-8859-1' . "\r\n";
+             // Additional headers
+             //$headers .= 'To: '.$addEmail. "\r\n";
+             $headers = 'From: Pritlog <'.$config['sendMailWithNewCommentMail'].'>' . "\r\n";
+             if (mail($addEmail,
+                 $subject,
+                 $message,
+                 $headers)) {
+                   echo '<br>'.$lang['titleForgotPassMsg'];
+             }
+             else {
+                 echo '<br>'.$lang['msgMail9'].'.<br>';
+             }
+          }
+          else {
+              echo $lang['errorPleaseGoBack'];
+          }
+       }
+       else {
+          echo $lang['errorInvalidRequest']."<br>";
+       }
+  }
+
+
+  function activation() {
+      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $separator, $authorsPass, $serverName, $authorsActCode, $authorsActStatus;
+      global $optionValue, $optionValue2;
+      $authorFileName=$config['authorFile'];
+      $author  = trim($optionValue);
+      $actCode = trim($optionValue2);
+      echo "<h3>".$lang['titleRegisterPage']."</h3>";
+      $do = 1;
+      if (!isset($_SESSION['logged_in']) && !$_SESSION['logged_in'] && ($config['allowRegistration'] == 1)) {
+          if ($authorsActCode[$author] == $actCode) {
+              if ($authorsActStatus[$author] == 0) {
+                  $authorsActStatus[$author] = 1;
+                  $fp = fopen($authorFileName, "w");
+                  fwrite($fp,'<?php /*');
+                  fwrite($fp,"\n");
+                  foreach ($authors as $value) {
+                       $authorLine=$value.$separator.$authorsPass[$value].$separator.$authorsEmail[$value].$separator.$authorsActCode[$value].$separator.$authorsActStatus[$value]."\n";
+                       fwrite($fp,$authorLine);
+                  }
+                  fwrite($fp,'*/ ?>');
+                  fclose($fp);
+                  echo $lang['titleRegisterActive'].'<br>';
+              }
+              else { echo $lang['titleRegisterAlready'].'<br>'; }
+          }
+          else { echo $lang['errorInvalidRequest'].'<br>'; }
+
+      }
+      else { echo $lang['errorInvalidRequest'].'<br>'; }
   }
 
   function adminPage() {
       global $debugMode, $optionValue, $config, $lang;
       echo "<h3>".$lang['titleAdminPage']."</h3>";
 
-      if (md5($config['randomString'].$_POST['pass'])===$config['Password']) {
-          echo '<p><form method="post" action="'.$_SERVER['SCRIPT_NAME'].'/adminPageBasic">';
-          echo '<input type="submit" value="'.$lang['pageBasicConfig'].'">';
+      if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
+          echo '<p><form method="post" class="adminPage" action="'.$_SERVER['SCRIPT_NAME'].'/adminPageBasic">';
+          echo '<input type="submit" class="submit" value="'.$lang['pageBasicConfig'].'">';
           echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
           echo '</form><br>';
-          echo '<form method="post" action="'.$_SERVER['SCRIPT_NAME'].'/adminPageAdvanced">';
-          echo '<input type="submit" value="'.$lang['pageAdvancedConfig'].'">';
+          echo '<form method="post" class="adminPage" action="'.$_SERVER['SCRIPT_NAME'].'/adminPageAdvanced">';
+          echo '<input type="submit" class="submit" value="'.$lang['pageAdvancedConfig'].'">';
           echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
           echo '</form><br>';
-          echo '<form method="post" action="'.$_SERVER['SCRIPT_NAME'].'/adminPageAuthors">';
-          echo '<input type="submit" value="'.$lang['pageAuthorsManage'].'">';
+          echo '<form method="post" class="adminPage" action="'.$_SERVER['SCRIPT_NAME'].'/adminPageAuthors">';
+          echo '<input type="submit" class="submit" value="'.$lang['pageAuthorsManage'].'">';
           echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
           echo '</form></p>';
           echo '<br><br><h3>Pritlog Version</h3>';
-          //echo 'You are using a beta release of Pritlog<br>Thank you for testing!<br>';
+          //echo 'You are using Pritlog 0.8 Beta 1<br>Thank you for testing!<br>';
           echo '<script type="text/javascript">';
-          echo 'var clientVersion=0.7;';
+          echo 'var clientVersion=0.8;';
           echo '</script>';
-          echo '<script src="http://hardkap.net/pritlog/checkversion.7.js" type="text/javascript"></script>';
+          echo '<script src="http://hardkap.net/pritlog/checkversion.8.js" type="text/javascript"></script>';
        }
        else {
           echo $lang['errorPasswordIncorrect'].' .. <br>';
@@ -443,23 +1101,39 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
   function adminPageBasic() {
       global $debugMode, $optionValue, $config, $lang;
       echo "<h3>".$lang['titleAdminPage']."</h3>";
-      if ($_POST['pass']===$config['Password']) {
+      if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
           echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/adminPageBasicSubmit>";
           echo "<fieldset>";
           echo '<legend>'.$lang['pageBasicConfig'].'</legend>';
           echo '<p><label for="title">'.$lang['pageBasicConfigTitle'].'</label><br>';
           echo '<input type="text" class="ptitle" name="title" id="title" value="'.$config['blogTitle'].'"></p>';
+          echo '<script>';
+          echo 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
+          echo 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          echo '</script>';
           echo '<p><label for="newpass1">'.$lang['pageBasicConfigNewpass1'].'</label><br>';
           echo '<input type="password" class="ptext" name="newpass1" id="newpass1" value=""></p>';
+          echo '<script>';
+          echo 'var pass1 = new LiveValidation( "newpass1", {onlyOnSubmit: true } );';
+          echo '</script>';
           echo '<p><label for="newpass2">'.$lang['pageBasicConfigNewpass2'].'</label><br>';
           echo '<input type="password" class="ptext" name="newpass2" id="newpass2" value=""></p>';
+          echo '<script>';
+          echo 'var pass2 = new LiveValidation( "newpass2", {onlyOnSubmit: true } );';
+          echo 'pass2.add( Validate.Confirmation,{ match: "newpass1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
+          echo '</script>';
           echo '<p><label for="adminEmail">'.$lang['pageBasicConfigAdminEmail'].'</label><br>';
           echo '<input type="text" class="ptext" name="adminEmail" id="adminEmail" value="'.$config['sendMailWithNewCommentMail'].'"></p>';
-          echo '<p><label for="posts">'.$lang['pageBasicConfigAbout'].'</label><br>';
+          echo '<script>';
+          echo 'var email = new LiveValidation( "adminEmail", {onlyOnSubmit: true } );';
+          echo 'email.add( Validate.Presence, { failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          echo 'email.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
+          echo '</script>';
+          echo '<br><label for="posts">'.$lang['pageBasicConfigAbout'].'</label><br>';
           nicEditStuff();
-          echo '<textarea name="posts" id="posts">'.$config['about'].'</textarea></p>';  /* this is actually about. not posts. Dont be mislead */
+          echo '<textarea name="posts" id="posts">'.$config['about'].'</textarea><br><br>';  /* this is actually about. not posts. Dont be mislead */
           echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
-          echo '<p><input type="submit" value="'.$lang['pageBasicConfigSubmit'].'"></p>';
+          echo '<p><input type="submit" class="submit" value="'.$lang['pageBasicConfigSubmit'].'"></p>';
           echo '</fieldset>';
           echo '</form>';
        }
@@ -474,7 +1148,7 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
        echo "<h3>".$lang['titleAdminPage']."</h3>";
 
       $do=1;
-      if ($_POST['pass']===$config['Password']) {
+      if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
           if (trim($_POST['title']) == "" || trim($_POST['adminEmail']) == "" || trim($_POST['posts']) == "") {
               echo $lang['errorCannotBeSpaces'].'<br>';
               echo '<li>'.$lang['pageBasicConfigTitle'].'</li>';
@@ -515,14 +1189,10 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
       echo "<h3>".$lang['titleAdminPage']."</h3>";
 
 
-      if ($_POST['pass']===$config['Password']) {
+      if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
           echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/adminPageAdvancedSubmit>";
           echo "<fieldset>";
           echo '<legend>'.$lang['pageAdvancedConfig'].'</legend>';
-          echo '<p><label for="postdir">'.$lang['pageAdvancedConfigPostsDir'].'</label><br>';
-          echo '<input type="text" class="ptext" name="postdir" id="postdir" value="'.$config['postDirOrig'].'"></p>';
-          echo '<p><label for="commentdir">'.$lang['pageAdvancedConfigCommentsDir'].'</label><br>';
-          echo '<input type="text" class="ptext" name="commentdir" id="commentdir" value="'.$config['commentDirOrig'].'"></p>';
           echo '<p><label for="metaDesc">'.$lang['pageAdvancedConfigMetaDesc'].'</label><br>';
           echo '<input type="text" class="ptext" name="metaDesc" id="metaDesc" value="'.$config['metaDescription'].'"></p>';
           echo '<p><label for="metaKeywords">'.$lang['pageAdvancedConfigMetaKey'].'</label><br>';
@@ -540,6 +1210,9 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
           echo '<input type="text" class="ptext" name="entriesPerPage" id="entriesPerPage" value="'.$config['entriesPerPage'].'"></p>';
           echo '<p><label for="menuEntriesLimit">'.$lang['pageAdvancedConfigMenuEntries'].'</label><br>';
           echo '<input type="text" class="ptext" name="menuEntriesLimit" id="menuEntriesLimit" value="'.$config['menuEntriesLimit'].'"></p>';
+          echo '<p><label for="timeoutDuration">'.$lang['timeoutDuration'].'</label><br>';
+          echo '<input type="text" class="ptext" name="timeoutDuration" id="timeoutDuration" value="'.$config['timeoutDuration'].'"></p>';
+
 
           echo '<p><label for="blogLanguage">'.$lang['pageAdvancedConfigLanguage'].'</label><br>';
           echo '<select name="blogLanguage" id="blogLanguage">';
@@ -555,16 +1228,6 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
                           echo '<option value="'.$language.'" '.$selected.' >'.$language;
                       }
                   }
-                  /*
-                  rsort($file_array_unsorted);
-                  foreach ($file_array_unsorted as $value) {
-                      $filename=$config['postDir'].$value;
-                      if ((file_exists($filename)) && ($filename !== $config['postDir'].".") && ($filename !== $config['postDir']."..")) {
-                        $fp = fopen($filename, "rb");
-                        array_push($file_array_sorted,fread($fp, filesize($filename)));
-                        fclose($fp);
-                      }
-                  } */
                   closedir($handle);
               }
           }
@@ -585,38 +1248,52 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
           else {
               $checking='';
           }
-          echo '<input type="checkbox" name="sendMailComments" value="1" '.$checking.'">'.$lang['pageAdvancedConfigSendMail'].'</a><br>';
+          echo '<input type="checkbox" name="sendMailComments" value="1" '.$checking.'>'.$lang['pageAdvancedConfigSendMail'].'</a><br>';
           if ($config['commentsSecurityCode'] == 1) {
               $checking='checked="checked"';
           }
           else {
               $checking='';
           }
-          echo '<input type="checkbox" name="commentsSecurityCode" value="1" '.$checking.'">'.$lang['pageAdvancedConfigSecCode'].'</a><br>';
+          echo '<input type="checkbox" name="commentsSecurityCode" value="1" '.$checking.'>'.$lang['pageAdvancedConfigSecCode'].'</a><br>';
           if ($config['authorEditPost'] == 1) {
               $checking='checked="checked"';
           }
           else {
               $checking='';
           }
-          echo '<input type="checkbox" name="authorEditPost" value="1" '.$checking.'">'.$lang['pageAdvancedConfigAuthorEdit'].'</a><br>';
+          echo '<input type="checkbox" name="authorEditPost" value="1" '.$checking.'>'.$lang['pageAdvancedConfigAuthorEdit'].'</a><br>';
           if ($config['authorDeleteComment'] == 1) {
               $checking='checked="checked"';
           }
           else {
               $checking='';
           }
-          echo '<input type="checkbox" name="authorDeleteComment" value="1" '.$checking.'">'.$lang['pageAdvancedConfigAuthorComment'].'</a><br>';
+          echo '<input type="checkbox" name="authorDeleteComment" value="1" '.$checking.'>'.$lang['pageAdvancedConfigAuthorComment'].'</a><br>';
           if ($config['showCategoryCloud'] == 1) {
               $checking='checked="checked"';
           }
           else {
               $checking='';
           }
-          echo '<input type="checkbox" name="showCategoryCloud" value="1" '.$checking.'">'.$lang['pageAdvancedConfigCatCloud'].'</a></p>';
+          echo '<input type="checkbox" name="showCategoryCloud" value="1" '.$checking.'>'.$lang['pageAdvancedConfigCatCloud'].'</a><br>';
+          if ($config['allowRegistration'] == 1) {
+              $checking='checked="checked"';
+          }
+          else {
+              $checking='';
+          }
+          echo '<input type="checkbox" name="allowRegistration" value="1" '.$checking.'>'.$lang['pageAdvancedConfigRegister'].'</a><br>';
+          if ($config['sendRegistMail'] == 1) {
+              $checking='checked="checked"';
+          }
+          else {
+              $checking='';
+          }
+          echo '<input type="checkbox" name="sendRegistMail" value="1" '.$checking.'>'.$lang['pageAdvancedConfigRegistMail'].'</a></p>';
           echo '<input name="process" type="hidden" id="process" value="adminPageAdvancedSubmit">';
           echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
-          echo '<p><input type="submit" value="'.$lang['pageAdvancedConfigSubmit'].'"></p>';
+          echo '<br><br><p><input type="submit" class="submit" value="'.$lang['pageAdvancedConfigSubmit'].'"></p>';
           echo '</fieldset>';
           echo '</form>';
        }
@@ -632,15 +1309,7 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
        echo "<h3>".$lang['titleAdminPage']."</h3>";
 
        $do=1;
-      if ($_POST['pass']===$config['Password']) {
-          if (isset($_POST['postdir']) && trim($_POST['postdir']) != "") {
-               $config['postDirOrig'] = $_POST['postdir'];
-               $config['postDir']     = getcwd().'/'.$_POST['postdir'].'/';
-          }
-          if (isset($_POST['commentdir']) && trim($_POST['commentdir']) != "") {
-               $config['commentdirOrig'] = $_POST['commentDir'];
-               $config['commentdir']     = getcwd().'/'.$_POST['commentDir'].'/';
-          }
+      if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
           if (isset($_POST['metaDesc']) && trim($_POST['metaDesc']) != "") {
                $config['metaDescription'] = $_POST['metaDesc'];
           }
@@ -665,6 +1334,9 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
           if (isset($_POST['menuEntriesLimit']) && trim($_POST['menuEntriesLimit']) != "") {
                $config['menuEntriesLimit'] = $_POST['menuEntriesLimit'];
           }
+          if (isset($_POST['timeoutDuration']) && trim($_POST['timeoutDuration']) != "") {
+               $config['timeoutDuration'] = $_POST['timeoutDuration'];
+          }
 
           if ($_POST['sendMailComments'] == 1) { $config['sendMailWithNewComment'] = 1; }
           else { $config['sendMailWithNewComment'] = 0; }
@@ -680,6 +1352,12 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 
           if ($_POST['showCategoryCloud'] == 1) { $config['showCategoryCloud'] = 1; }
           else { $config['showCategoryCloud'] = 0; }
+
+          if ($_POST['allowRegistration'] == 1) { $config['allowRegistration'] = 1; }
+          else { $config['allowRegistration'] = 0; }
+
+          if ($_POST['sendRegistMail'] == 1) { $config['sendRegistMail'] = 1; }
+          else { $config['sendRegistMail'] = 0; }
 
           if (isset($_POST['menuLinks'])) {
                $config['menuLinks']=$config['menuLinksOrig']=str_replace("\r\n",";",$_POST['menuLinks']);
@@ -699,24 +1377,50 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
   function adminPageAuthors() {
       global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail;
       echo "<h3>".$lang['titleAdminPage']."</h3>";
-      if ($_POST['pass']===$config['Password']) {
-          echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/adminAuthorsAdd>";
+      if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
+          echo "<form method=\"post\" class=\"adminPage\" action=".$_SERVER['SCRIPT_NAME']."/adminAuthorsAdd>";
           echo "<fieldset>";
           echo '<legend>'.$lang['pageAuthorsAdd'].'</legend>';
           echo '<p><label for="addAuthor">'.$lang['pageAuthorsNew'].'</label><br>';
           echo '<input type="text" class="ptext" name="addAuthor" id="addAuthor" value=""></p>';
+          $authorsList="";
+          foreach ($authors as $value) {
+              $authorsList.='"'.$value.'" , ';
+          }
+          $authorsList.='"admin"';
+          echo '<script>';
+          echo 'var author = new LiveValidation( "addAuthor", {onlyOnSubmit: true } );';
+          echo 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          echo 'author.add( Validate.Exclusion, { within: [ '.$authorsList.' ] , failureMessage: "'.$lang['errorDuplicateAuthor'].'"  } );';
+          echo '</script>';
           echo '<p><label for="newpass1">'.$lang['pageBasicConfigNewpass1'].'</label><br>';
           echo '<input type="password" class="ptext" name="newpass1" id="newpass1" value=""></p>';
+          echo '<script>';
+          echo 'var pass1 = new LiveValidation( "newpass1", {onlyOnSubmit: true } );';
+          echo 'pass1.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          echo 'pass1.add( Validate.Length, { minimum: 5 , failureMessage: "'.$lang['errorPassLength'].'" } );';
+          echo '</script>';
           echo '<p><label for="newpass2">'.$lang['pageBasicConfigNewpass2'].'</label><br>';
           echo '<input type="password" class="ptext" name="newpass2" id="newpass2" value=""></p>';
+          echo '<script>';
+          echo 'var pass2 = new LiveValidation( "newpass2", {onlyOnSubmit: true } );';
+          echo 'pass2.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          echo 'pass2.add( Validate.Confirmation,{ match: "newpass1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
+          echo '</script>';
           echo '<p><label for="authorEmail">'.$lang['pageAuthorsNewEmail'].'</label><br>';
           echo '<input type="text" class="ptext" name="authorEmail" id="authorEmail" value=""></p>';
+          echo '<script>';
+          echo 'var email = new LiveValidation( "authorEmail", {onlyOnSubmit: true } );';
+          echo 'email.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+          echo 'email.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
+          echo '</script>';
           echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
-          echo '<p><input type="submit" value="'.$lang['pageAuthorsAdd'].'"></p>';
+          echo '<p><input type="submit" class="submit" value="'.$lang['pageAuthorsAdd'].'"></p>';
           echo '</fieldset>';
           echo '</form>';
 
           if (is_array($authors)) {
+              $i = 0;
               foreach ($authors as $value) {
                   echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/adminAuthorsEdit>";
                   echo "<fieldset>";
@@ -725,10 +1429,19 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
                   echo '<tr><td><strong>Author: </strong>'.$value.'<br><br></td>';
                   echo '<td><label for="authorEmail">'.$lang['pageAuthorsNewEmail'].'</label><br>';
                   echo '<input type="text" name="authorEmail" id="authorEmail" value="'.$authorsEmail[$value].'"></td></tr>';
-                  echo '<tr><td><label for="newpass1">'.$lang['pageBasicConfigNewpass1'].'</label><br>';
-                  echo '<input type="password" name="newpass1" id="newpass1" value=""></td>';
-                  echo '<td><label for="newpass2">'.$lang['pageBasicConfigNewpass2'].'</label><br>';
-                  echo '<input type="password" name="newpass2" id="newpass2" value=""></td></tr>';
+                  echo '<tr><td><label for="newpass'.$i.'1">'.$lang['pageBasicConfigNewpass1'].'</label><br>';
+                  echo '<input type="password" name="newpass'.$i.'1" id="newpass'.$i.'1" value=""></td>';
+                  echo '<script>';
+                  echo 'var pass'.$i.'1 = new LiveValidation( "newpass'.$i.'1", {onlyOnSubmit: true } );';
+                  //echo 'pass'.$i.'1.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+                  echo 'pass'.$i.'1.add( Validate.Length, { minimum: 5 , failureMessage: "'.$lang['errorPassLength'].'" } );';
+                  echo '</script>';
+                  echo '<td><label for="newpass'.$i.'2">'.$lang['pageBasicConfigNewpass2'].'</label><br>';
+                  echo '<input type="password" name="newpass'.$i.'2" id="newpass'.$i.'2" value=""></td></tr>';
+                  echo '<script>';
+                  echo 'var pass'.$i.'2 = new LiveValidation( "newpass'.$i.'2", {onlyOnSubmit: true } );';
+                  echo 'pass'.$i.'2.add( Validate.Confirmation,{ match: "newpass'.$i.'1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
+                  echo '</script>';
                   echo '</table>';
                   echo '<input type="submit" value="'.$lang['postFtEdit'].'">&nbsp;&nbsp;';
                   echo '<input type="checkbox" name="deleteAuthor" value="1">'.$lang['pageAuthorsDelete'];
@@ -736,6 +1449,7 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
                   echo '<input name="pass" type="hidden" id="pass" value="'.$config['Password'].'">';
                   echo '</fieldset>';
                   echo '</form>';
+                  $i++;
               }
           }
        }
@@ -746,17 +1460,18 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 
 
   function adminAuthorsAdd() {
-      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $separator, $authorsPass;
-      $authorFileName=getcwd(). "/authors.php";
+      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $separator, $authorsPass, $authorsActCode, $authorsActStatus;
+      $authorFileName=$config['authorFile'];
       echo "<h3>".$lang['titleAdminPage']."</h3>";
       $do = 1;
-      if ($_POST['pass']===$config['Password']) {
+      if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
           $addAuthor=$_POST['addAuthor'];
+          $authorEmail=$_POST['authorEmail'];
           if (isset($authorsPass[$addAuthor])) {
                echo $lang['errorDuplicateAuthor'].'<br>';
                $do = 0;
           }
-          if (trim($addAuthor) == "") {
+          if (trim($addAuthor) == "" || trim($authorEmail) == "") {
                echo $lang['errorAllFields'].'<br>';
                $do = 0;
           }
@@ -777,13 +1492,13 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
               fwrite($fp,'<?php /*');
               fwrite($fp,"\n");
               foreach ($authors as $value) {
-                   $authorLine=$value.$separator.$authorsPass[$value].$separator.$authorsEmail[$value]."\n";
+                   $authorLine=$value.$separator.$authorsPass[$value].$separator.$authorsEmail[$value].$separator.$authorsActCode[$value].$separator.$authorsActStatus[$value]."\n";
                    fwrite($fp,$authorLine);
               }
               $addAuthor=$_POST['addAuthor'];
               $addPass  =md5($config['randomString'].$_POST['newpass1']);
               $addEmail =$_POST['authorEmail'];
-              $authorLine=$addAuthor.$separator.$addPass.$separator.$addEmail."\n";
+              $authorLine=$addAuthor.$separator.$addPass.$separator.$addEmail.$separator."11111".$separator."1"."\n";
               fwrite($fp,$authorLine);
               fwrite($fp,'*/ ?>');
 
@@ -802,13 +1517,14 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 
 
   function adminAuthorsEdit() {
-      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $authorsPass, $separator;
-      $authorFileName=getcwd(). "/authors.php";
+      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail, $authorsPass, $separator, $authorsActCode, $authorsActStatus;
+      $authorFileName=$config['authorFile'];
       echo "<h3>".$lang['titleAdminPage']."</h3>";
       $do = 1;
-      if ($_POST['pass']===$config['Password']) {
+      $deleteAuthor = (isset($_POST['deleteAuthor']))?$_POST['deleteAuthor']:0;
+      if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
           $editAuthor=$_POST['author'];
-          if ($_POST['deleteAuthor'] != 1) {
+          if ($deleteAuthor != 1) {
               if ($_POST['newpass1'] != $_POST['newpass2']) {
                    echo $lang['errorNewPasswordsMatch']."<br>";
                    $do = 0;
@@ -827,12 +1543,12 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
                    if (strcmp($value,$editAuthor) == 0) {
                         $authorsPass[$value]  = md5($config['randomString'].$_POST['newpass1']);
                         $authorsEmail[$value] = $_POST['authorEmail'];
-                        if ($_POST['deleteAuthor'] == 1) {
+                        if ($deleteAuthor == 1) {
                             $authorsDelete = true;
                         }
-
                    }
-                   $authorLine=$value.$separator.$authorsPass[$value].$separator.$authorsEmail[$value]."\n";
+                   $authorLine=$value.$separator.$authorsPass[$value].$separator.$authorsEmail[$value].$separator.$authorsActCode[$value].$separator.$authorsActStatus[$value]."\n";
+                   //echo $authorLine.'<br>';
                    if (!$authorsDelete) {
                       fwrite($fp,$authorLine);
                    }
@@ -853,9 +1569,9 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 
   function readAuthors() {
     /* Read Author information from file. */
-    global $authors, $separator, $authorsPass, $authorsEmail, $config;
+    global $authors, $separator, $authorsPass, $authorsEmail, $config, $authorsActCode, $authorsActStatus;
 
-    $tempAuthors = file( getcwd()."/".'authors.php' );
+    $tempAuthors = file( $config['authorFile'] );
     $i=0;
     foreach ($tempAuthors as $value) {
         if (!strstr($value,'<?php') && !strstr($value,'?>') && (trim($value) != "" )) {
@@ -864,11 +1580,15 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
              $authors[$i]=$authorLine[0];
              $authorsPass[$authors[$i]]=$authorLine[1];
              $authorsEmail[$authors[$i]]=$authorLine[2];
-             //echo $authors[$i].'  '.$authorPass[$authors[$i]].'  '.$authorEmail[$authors[$i]].'<br>';
+             $authorsActCode[$authors[$i]]=(trim($authorLine[3]) == "")?11111:$authorLine[3];
+             $authorsActStatus[$authors[$i]]=(trim($authorLine[4]) == "")?0:$authorLine[4];
+             //echo $authorLine[0].' - '.$authorsActCode[$authors[$i]].'<br>';
+             //echo $authors[$i].'  '.$authorsPass[$authors[$i]].'  '.$authorsEmail[$authors[$i]].'<br>';
              $i++;
         }
     }
     $authorsPass['admin'] = $config['Password'];
+    //echo $config['Password'].'<br>';
  }
 
 
@@ -876,7 +1596,7 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
     /* Read config information from file. */
     global $config;
 
-    $contents = file( getcwd()."/".'config_admin.php' );
+    $contents = file( getcwd()."/data/".'config_admin.php' );
     $contents[0]=trim(str_replace("<?php /*","",$contents[0]));
     $contents[0]=trim(str_replace("*/ ?>","",$contents[0]));
     if ( $contents[0] ) {
@@ -910,7 +1630,10 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
                   'menuLinks',
                   'blogLanguage',
                   'blogPath',
-                  'showCategoryCloud');
+                  'showCategoryCloud',
+                  'allowRegistration',
+                  'sendRegistMail',
+                  'timeoutDuration');
 
       for ( $i = 0; $i < count( $tempConfigs ); $i++ ) {
         $key = $configKeys[ $i ];
@@ -959,11 +1682,17 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
         if ( !isset( $config[ 'blogLanguage' ] ) )               { $config[ 'blogLanguage' ]               = 'english-us'; }
         if ( !isset( $config[ 'blogPath' ] ) )                   { $config[ 'blogPath' ]                   = 'http://localhost'; }
         if ( !isset( $config[ 'showCategoryCloud' ] ) )          { $config[ 'showCategoryCloud' ]          = 1; }
+        if ( !isset( $config[ 'allowRegistration' ] ) )          { $config[ 'allowRegistration' ]          = 0; }
+        if ( !isset( $config[ 'sendRegistMail' ] ) )             { $config[ 'sendRegistMail' ]             = 1; }
+        if ( !isset( $config[ 'timeoutDuration' ] ) )            { $config[ 'timeoutDuration' ]            = 900; }
+        $config['menuLinksOrig']=$config['menuLinks'];
+        $config['menuLinksArray']=explode(';',$config['menuLinks']);
+
   }
 
   function writeConfig($message=true) {
         global $config, $lang;
-        $configFile=getcwd()."/".'config_admin.php';
+        $configFile=getcwd()."/data/".'config_admin.php';
         $configContent='<?php /* ';
         if (file_exists($configFile)) {
             $configContent=$configContent.
@@ -996,7 +1725,10 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
                           $config['menuLinks'].'|'.
                           $config['blogLanguage'].'|'.
                           $config['blogPath'].'|'.
-                          $config['showCategoryCloud'];
+                          $config['showCategoryCloud'].'|'.
+                          $config['allowRegistration'].'|'.
+                          $config['sendRegistMail'].'|'.
+                          $config['timeoutDuration'];
             $configContent=$configContent.' */ ?>';
             $fp=fopen($configFile,"w");
             fwrite($fp,$configContent);
@@ -1013,38 +1745,46 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 	echo header('Content-type: text/xml').'<?xml version="1.0" encoding="ISO-8859-1"?><rss version="2.0">';
 	echo '<channel><title>'.$config['blogTitle'].'</title><description>'.$config['metaDescription'].'</description>';
 	echo '<link>http://'.$_SERVER['HTTP_HOST'].substr($_SERVER['REQUEST_URI'],0,strlen($_SERVER['REQUEST_URI'])-7).'</link>';
+       
+        $result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE type = 'post';");
+        while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+            $totalEntries = $row['view'];
+        }
 
 	if($config['entriesOnRSS'] == 0)
 	{
-		$limit = count($entries);
+		$limit = $totalEntries;
 	}
 	else
 	{
 		$limit = $config['entriesOnRSS'];
 	}
 
-	for($i = 0; $i < $limit; $i++)
-	{
-		$entry      = explode($separator, $entries[$i]);
-		$rssTitle   =$entry[0];
-                $rssTitleModified=titleModify($rssTitle);
-
-                $rssContent =explode("*readmore*",$entry[1]);
-                $rssEntry   =$entry[3];
-                $rssCategory=$entry[4];
-                if ($optionValue === $rssCategory || trim($optionValue) == "") {
-                   echo '<item><link>'.$base.htmlentities('viewEntry/'.$rssEntry."/".$rssTitleModified).'</link>';
+        $limit = ($limit > 200) ? 200 : $limit;
+        $result = sqlite_query($config['db'], "select * from posts ORDER BY postid DESC LIMIT $limit;");
+        while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+            $rssTitle      = $row['title'];
+            $rssTitleModified=titleModify($rssTitle);
+            $rssContent    = explode("*readmore*",$row['content']);
+            $date1         = $row['date'];
+            $rssEntry      = $row['postid'];
+            $rssCategory   = $row['category'];
+            $postType      = $row['type'];
+            $allowComments = $row['allowcomments'];
+            $visits        = $row['visits'];
+            if (trim($visits) == "") { $visits=0; }
+            if ($optionValue === $rssCategory || trim($optionValue) == "") {
+                   echo '<item><link>'.$base.htmlspecialchars('viewEntry/'.$rssEntry."/".$rssTitleModified).'</link>';
     		   echo '<title>'.$rssTitle.'</title><category>'.$rssCategory.'</category>';
-    		   echo '<description>'.htmlentities($rssContent[0]).'</description></item>';
-                }
-	}
+    		   echo '<description>'.htmlspecialchars($rssContent[0]).'</description></item>';
+            }
+        }
 
 	echo '</channel></rss>';
   }
 
   function titleModify($myTitle)
   {
-          //$myTitle=str_replace('"','',str_replace("'","",$myTitle));
           $myTitle=str_replace('"','',str_replace("'","",html_entity_decode($myTitle,ENT_QUOTES)));
           $myTitleMod1=preg_replace("/[^a-z\d\'\"]/i", "-", substr($myTitle,0,strlen($myTitle)-1));
 	  $myTitleMod2=preg_replace("/[^a-z\d]/i", "", substr($myTitle,strlen($myTitle)-1,1));
@@ -1052,27 +1792,35 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
           return $myTitleModified;
   }
 
-  function getPosts() {
-      global $config;
-      if (file_exists($config['postDir'])) {
-          if ($handle = opendir($config['postDir'])) {
-              $file_array_unsorted = array();
-              $file_array_sorted   = array();
-              while (false !== ($file = readdir($handle))) {
-                  array_push($file_array_unsorted,$file);
-              }
-              rsort($file_array_unsorted);
-              foreach ($file_array_unsorted as $value) {
-                  $filename=$config['postDir'].$value;
-                  if ((file_exists($filename)) && ($filename !== $config['postDir'].".") && ($filename !== $config['postDir']."..")) {
-                    $fp = fopen($filename, "rb");
-                    array_push($file_array_sorted,fread($fp, filesize($filename)));
-                    fclose($fp);
-                  }
-              }
-              closedir($handle);
-          }
+  function getPosts($start, $end, $requestCategory = "") {
+      global $config, $postdb, $separator;
+
+       $file_array_sorted   = array();
+       //echo $start.' '.$end.'<br>';
+       //echo $requestCategory.'<Br>';
+       if (trim($requestCategory) == "") {
+           $result = sqlite_query($config['db'], "select * from posts WHERE type = 'post' ORDER BY stick desc, postid desc LIMIT $start, $end;");
+       }
+       else {
+           $result = sqlite_query($config['db'], "select * from posts WHERE type = 'post' AND category = '$requestCategory' ORDER BY stick desc, postid desc LIMIT $start, $end;");
+       }
+       //sqlite_seek($result,11);
+       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $title         = $row['title'];
+          $content       = $row['content'];
+          $date          = $row['date'];
+          $fileName      = $row['postid'];
+          $category      = $row['category'];
+          $postType      = $row['type'];
+          $allowComments = $row['allowcomments'];
+          $visits        = $row['visits'];
+          if (trim($visits) == "") { $visits=1; }
+          //echo $title.'<br>';
+          $author=(trim($row['author'])=="")?'admin':$row['author'];
+          $line=$title.$separator.$content.$separator.$date.$separator.$fileName.$separator.$category.$separator.$postType.$separator.$allowComments.$separator.$visits.$separator.$author;
+          array_push($file_array_sorted, $line);
       }
+      //return $result;
       return $file_array_sorted;
   }
 
@@ -1081,41 +1829,73 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
       global $config, $separator, $lang;
       $ip=$_SERVER['REMOTE_ADDR'];
       $currentTime=time();
+      //$currentDateTime=date("d M Y H:i");
+      $currentDateTime=date("Y-m-d H:i:s");
       $statsContent=$ip.$separator.$currentTime."\n";
       $statsFile=$config['commentDir']."online".$config['dbFilesExtension'].".dat";
       $logThis=0;
       $statsDontLog=explode(',',$config['statsDontLog']);
+      $stattype = "total";
       foreach ($statsDontLog as $value) {
           if ($ip == $value ) {
               $logThis=1;
           }
       }
+      $result = sqlite_query($config['db'], "SELECT * FROM stats WHERE stattype = '$stattype';");
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $statcount = $row['statcount'] + 1;
+      }
+
       if ($logThis != 1) {
-          if (file_exists($config['commentDir'])) {
-              $fp=fopen($statsFile,"a");
-              fwrite($fp,$statsContent);
-              fclose($fp);
-          }
+          sqlite_query($config['db'], "UPDATE stats SET statcount = '$statcount' WHERE stattype = '$stattype';");
       }
-      if (file_exists($statsFile)) {$statsRead=file($statsFile);}
-      $hits=0;
-      $online=0;
-      $already=array();
-      if (is_array($statsRead)) {
-          foreach ($statsRead as $value) {
-              $log=explode($separator,$value);
-              $logIP=$log[0];
-              $logTime=$log[1];
-              $timeOnline=$currentTime-$logTime;
-              if ($timeOnline < $config['usersOnlineTimeout']) {
-                   if (array_search($logIP,$already)===FALSE) {$online++;}
-                   array_push($already,$logIP);
-              }
-              $hits++;
-          }
+      if (!(isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false)) {
+         @sqlite_query($config['db'], "DELETE FROM active_guests WHERE ip = '$ip';");
+         @sqlite_query($config['db'], "DELETE FROM active_users WHERE ip = '$ip';");
+         //echo 'Logging Guest: '.$currentDateTime.' '.$ip.'<br>';
+         sqlite_query($config['db'], "INSERT INTO active_guests (ip, logtime) VALUES('$ip', '$currentDateTime');");
       }
-      echo $lang['sidebarStatsUsersOnline'].': '.$online.'<br>';
-      echo $lang['sidebarStatsHits'].': '.$hits.'<br>';
+      /* Update users last active timestamp */
+      else{
+         @sqlite_query($config['db'], "DELETE FROM active_guests WHERE ip = '$ip';");
+         @sqlite_query($config['db'], "DELETE FROM active_users WHERE ip = '$ip';");
+         sqlite_query($config['db'], "INSERT INTO active_users (ip, logtime) VALUES('$ip','$currentDateTime');");
+      }
+      $guests = 0;
+      $users  = 0;
+      $result = sqlite_query($config['db'], "SELECT * FROM active_guests;");
+      $date1 = date("Y-m-d H:i");
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $logID   = $row['id'];
+          $logIP   = $row['ip'];
+          $logTime = strtotime($row['logtime']);
+          $timeOnline=$currentTime-$logTime;
+          //echo $logIP.' '.$currentTime.' '.$logTime.' '.$timeOnline.' '.$config['usersOnlineTimeout'].'<br>';
+          //echo $row['date1'].'<br>';
+
+          if ($timeOnline > $config['usersOnlineTimeout']) {
+               sqlite_query($config['db'], "DELETE FROM active_guests WHERE id = '$logID';");
+          }
+          else { $guests++; }
+      }
+      $result = sqlite_query($config['db'], "SELECT * FROM active_users;");
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $logID   = $row['id'];
+          $logIP   = $row['ip'];
+          $logTime = strtotime($row['logtime']);
+          $timeOnline=$currentTime-$logTime;
+          //echo $logIP.'  '.$timeOnline.'2<br>';
+
+          if ($timeOnline > $config['usersOnlineTimeout']) {
+               sqlite_query($config['db'], "DELETE FROM active_users WHERE id = '$logID';");
+          }
+          else { $users++; }
+      }
+      $online = $users + $guests;
+      //echo $lang['sidebarStatsUsersOnline'].': '.$online.'<br>';
+      echo $users  . ' '.$lang['sidebarStatsMembersOnline'].'<br>';
+      echo $guests . ' '.$lang['sidebarStatsGuestsOnline'].'<br>';
+      echo $lang['sidebarStatsHits'].': '.$statcount.'<br>';
   }
 
 
@@ -1124,52 +1904,20 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
       global $userFileName, $optionValue3, $lang;
       $config_Teaser=0;
       $filterEntries=array();
-      $totalEntries=0;
-      $totalPosts=0;
-      if (is_array($entries)) {
-          foreach ($entries as $value)
-          {
-               $entry   =explode($separator,$value);
-               $title   =$entry[0];
-               $content =$entry[1];
-               $date1   =$entry[2];
-               $fileName=$entry[3];
-               $category=$entry[4];
-               $postType=$entry[5];
-               if ($requestCategory == "") {
-                   if ($postType!="page") {
-                        array_push($filterEntries,$value);
-                        $totalEntries++;
-                        $totalPosts++;
-                   }
-               }
-               else {
-                   if ($category == $requestCategory) {
-                        array_push($filterEntries,$value);
-                        $totalEntries++;
-                   }
-               }
+
+      if (trim($requestCategory) == "") {
+          $result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE type = 'post';");
+          while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+              $totalEntries = $row['view'];
+              if ($row['view'] == 0) {
+                 echo '<br><br>'.$lang['msgNoPosts'].' <a href="'.$_SERVER['SCRIPT_NAME'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
+              }
           }
       }
-
-      if ($totalEntries == 0) {
-          $justCommentsDir=str_replace("/","",(substr($config['commentDir'],strlen(getcwd()),strlen($config['commentDir']))));
-          $justPostsDir=str_replace("/","",(substr($config['postDir'],strlen(getcwd()),strlen($config['postDir']))));
-          $errorMessage="<br><span style=\"color: rgb(204, 0, 51);\">Unable to create posts and comments directories<br>Please create them manually. <br>";
-          $errorMessage=$errorMessage.$lang['errorDirectoryNames'].': <br>- '.$justPostsDir.'<br>- '.$justCommentsDir.'<br>';
-          $errorMessage=$errorMessage.'<br>'.$lang['errorPermissions'].'.<br></span>';
-
-
-          if (is_writable(getcwd())) {
-              if (!file_exists($config['commentDir']) || !file_exists($config['postDir'])) {  /* Looks like first time running */
-                  mkdir($config['commentDir'],0755) or die($errorMessage);
-                  mkdir($config['postDir'],0755) or die($errorMessage);
-              }
-
-              echo '<br><br>'.$lang['msgNoPosts'].' <a href="'.$_SERVER['SCRIPT_NAME'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
-          }
-          else {
-              exit($errorMessage);
+      else {
+          $result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE type = 'post' AND category = '$requestCategory';");
+          while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+              $totalEntries = $row['view'];
           }
       }
 
@@ -1187,13 +1935,16 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 
       $i = $arrayStart;
       if ($arrayEnd > $totalEntries) {$arrayEnd = $totalEntries;}
+      //echo 'a '.$i.' '.$arrayStart.' '.$arrayEnd.'<br>';
+      $filterEntries = getPosts($arrayStart, $config['entriesPerPage'], $requestCategory);
 
+      $j = 0;
       while($i<=$arrayEnd)
       {
-           $entry  =explode($separator,$filterEntries[$i]);
+           $entry  =explode($separator,$filterEntries[$j++]);
            $title  =$entry[0];
            $titleModified=titleModify($title);
-           $date1   =$entry[2];
+           $date1   =date("d M Y H:i",strtotime($entry[2]));
            $fileName=$entry[3];
            $category=$entry[4];
            $postType=$entry[5];
@@ -1202,21 +1953,24 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
            if (trim($visits) == "") { $visits=0; }
            if (strstr($entry[1],"*readmore*")) { $readmore='<br><br><a href="'.$_SERVER["SCRIPT_NAME"].'/viewEntry/'.$fileName."/".$titleModified.'">'.$lang['pageViewFullPost'].' &raquo;</a>'; }
            else { $readmore=""; }
-           $content =explode("*readmore*",$entry[1]); 
+           $content =explode("*readmore*",$entry[1]);
 
-           echo "<h3><a class=\"postTitle\" href=".$_SERVER["SCRIPT_NAME"]."/viewEntry/".$fileName."/".$titleModified.">".$title."</a></h3>";
+           echo "<h2><a class=\"postTitle\" href=".$_SERVER["SCRIPT_NAME"]."/viewEntry/".$fileName."/".$titleModified.">".$title."</a></h2>";
            echo $content[0].$readmore;
            $categoryText=str_replace("."," ",$category);
-           echo "<br><center><i>".$lang['pageAuthorsNew'].": ".$author."&nbsp;-&nbsp; ".$lang['postFtPosted'].": ".$date1."<br>".$lang['postFtCategory'].": <a href=".$_SERVER['SCRIPT_NAME']."/viewCategory/".$category.">".$categoryText."</a>&nbsp;-&nbsp; ".$lang['postFtVisits'].": ".$visits."</i><br>";
+           echo "<br><center><i>".$lang['pageAuthorsNew1'].": ".$author."&nbsp;-&nbsp; ".$lang['postFtPosted'].": ".$date1."<br>".$lang['postFtCategory'].": <a href=".$_SERVER['SCRIPT_NAME']."/viewCategory/".urlencode($category).">".$categoryText."</a>&nbsp;-&nbsp; ".$lang['postFtVisits'].": ".$visits;
            $commentFile=$config['commentDir'].$fileName.$config['dbFilesExtension'];
-           if (file_exists($commentFile)) {
-               $commentLines=file($commentFile);
-               $commentText=count($commentLines)." ".$lang['postFtComments'];
+           $result = sqlite_query($config['db'], "select count(*) AS view from comments WHERE postid='$fileName';");
+           $commentCount = sqlite_fetch_array($result);
+           if ($commentCount['view'] > 0) {
+               $commentText=$lang['postFtComments'].": ".$commentCount['view'];
            }
            else {$commentText=$lang['postFtNoComments'];}
-           echo "<a href=".$_SERVER["SCRIPT_NAME"]."/viewEntry/".$fileName."/".$titleModified."#Comments>".$commentText."</a>";
-           echo "&nbsp;-&nbsp;<a href=".$_SERVER['SCRIPT_NAME']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
-           echo "&nbsp;-&nbsp;<a href=".$_SERVER['SCRIPT_NAME']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a></center><br/>";
+           echo "&nbsp;-&nbsp; <a href=".$_SERVER["SCRIPT_NAME"]."/viewEntry/".$fileName."/".$titleModified."#Comments>".$commentText."</a></i><br></center>";
+           if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
+               echo "<center><a href=".$_SERVER['SCRIPT_NAME']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
+               echo "&nbsp;-&nbsp;<a href=".$_SERVER['SCRIPT_NAME']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a></center><br/>";
+           }
            echo "<br/><br/>";
            $i++;
       }
@@ -1242,9 +1996,9 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
                         {
                                 $categoryText='/mainPage/allCategories';
                         }
-                        else 
+                        else
                         {
-                                $categoryText='/viewCategory/'.$requestCategory;
+                                $categoryText='/viewCategory/'.urlencode($requestCategory);
                         }
 
                         if($i == (($page-1)+$config['maxPagesDisplayed']) && (($page-1)+$config['maxPagesDisplayed']) < $totalPages)
@@ -1274,121 +2028,85 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
   function sidebarListEntries() {
       global $separator, $entries, $config;
       $i=0;
-      if (is_array($entries)) {
-          foreach ($entries as $value) {
-              if ($i < $config['menuEntriesLimit']) {
-                  $entry  =explode($separator,$value);
-                  $title  =$entry[0];
-                  $titleModified=titleModify($title);
-                  $content=$entry[1];
-                  $date1  =$entry[2];
-                  $fileName=$entry[3];
-                  $postType=$entry[5];
-                  if ($postType!="page") {
+      $limit = $config['menuEntriesLimit'];
+      $result = sqlite_query($config['db'], "select * from posts ORDER BY postid DESC LIMIT $limit;");
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+            $title         = $row['title'];
+            $titleModified = titleModify($title);
+            $fileName      = $row['postid'];
+            $postType      = $row['type'];
+            if ($postType!="page") {
                      echo "<a href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$fileName."/".$titleModified.">".$title."</a>";
                      $i++;
-                  }
-              }
-          }
+            }
       }
-
   }
 
   function sidebarPopular() {
       global $separator, $entries, $config;
       $i=1;
       $multiArray= Array();
-      if (is_array($entries)) {
-          foreach ($entries as $value) {
-               $entry  =explode($separator,$value);
-               $title  =$entry[0];
-               $titleModified=titleModify($title);
-               $content=$entry[1];
-               $date1  =$entry[2];
-               $fileName=$entry[3];
-               $postType=$entry[5];
-               $visits  =$entry[7];
-               if (trim($visits) == "") { $visits=0; }
-               if ($postType!="page") {
-                  $multiArray[$i] = $visits.$separator.$fileName.$separator.$titleModified.$separator.$title;
-                  $i++;
-               }
-           }
-           $i=0;
-           rsort($multiArray, SORT_NUMERIC);
-           foreach ($multiArray as $value) {
-               if ($i < $config['menuEntriesLimit']) {
-                   $popularEntry=explode($separator,$value);
-                   echo '<a href="'.$_SERVER['SCRIPT_NAME'].'/viewEntry/'.$popularEntry[1].'/'.$popularEntry[2].'">'.$popularEntry[3].'</a>';
-                   $i++;
-               }
-           }
-       }
+      $limit = $config['menuEntriesLimit'];
+      $result = sqlite_query($config['db'], "select * from posts WHERE type = 'post' ORDER BY visits DESC LIMIT $limit;");
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $title         = $row['title'];
+          $titleModified = titleModify($title);
+          $content       = (str_replace("*readmore*","",$row['content']));
+          $date1         = $row['date'];
+          $fileName      = $row['postid'];
+          $category      = $row['category'];
+          $postType      = $row['type'];
+          $allowComments = $row['allowcomments'];
+          $visits        = $row['visits'];
+          if (trim($visits) == "") { $visits=0; }
+          echo '<a href="'.$_SERVER['SCRIPT_NAME'].'/viewEntry/'.$fileName.'/'.$titleModified.'">'.$title.'</a>';
+      }
   }
 
 
   function getTitleFromFilename($fileName1) {
-      global $entries, $separator;
-      $limit = count($entries);
-      for($i = 0; $i < $limit; $i++)
-      {
-      	     $entry      = explode($separator, $entries[$i]);
-	     $fileTitle  =$entry[0];
-             $fileEntry  =$entry[3];
-             $titleText  = titleModify($fileTitle);
-             if ($fileEntry == $fileName1) { return $titleText; }
+      global $entries, $separator, $config;
+      $limit  = count($entries);
+      $result = sqlite_query($config['db'], "select * from posts WHERE postid = '$fileName1';");
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+	  $fileTitle  = $row['title'];
+          $titleText  = titleModify($fileTitle);
+          return $titleText;
       }
   }
 
   function sidebarListComments() {
       global $separator, $entries, $config;
       $latestCommentsFile=$config['commentDir']."latest".$config['dbFilesExtension'];
-      if (file_exists($latestCommentsFile)) {
-          $allComments=file($latestCommentsFile);
-          $allCommentsReversed=array_reverse($allComments);
-          $i=0;
-          foreach ($allCommentsReversed as $value) {
-              if ($i < $config['menuEntriesLimit']) {
-                  $entry  =explode($separator,$value);
-                  $commentFileName=$entry[0];
-                  $postTitle=getTitleFromFilename($commentFileName);
-                  $commentTitle   =$entry[1];
-                  $commentNum     =$entry[2];
-                  echo "<a href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$commentFileName."/".$postTitle."#".$commentNum.">".$commentTitle."</a>";
-                  $i++;
-              }
-          }
+      $limit = $config['menuEntriesLimit'];
+      $result = sqlite_query($config['db'], "select * from comments ORDER BY date DESC LIMIT $limit;");
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $commentFileName = $row['postid'];
+          $commentNum      = $row['sequence'];
+          $commentTitle    = $row['title'];
+          $postTitle=getTitleFromFilename($commentFileName);
+          echo "<a href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$commentFileName."/".$postTitle."#".$commentNum.">".$commentTitle."</a>";
       }
   }
 
   function sidebarPageEntries() {
       global $separator, $entries, $config;
       $i=0;
-      if (is_array($entries)) {
-          foreach ($entries as $value) {
-              if ($i < $config['menuEntriesLimit']) {
-                  $entry  =explode($separator,$value);
-                  $title  =$entry[0];
-                  $titleModified=titleModify($title);
-                  $content=$entry[1];
-                  $date1  =$entry[2];
-                  $fileName=$entry[3];
-                  $postType=$entry[5];
-                  if ($postType=="page") {
-                     echo "<a href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$fileName."/".$titleModified.">".$title."</a>";
-                     $i++;
-                  }
-              }
-          }
+      $limit = $config['menuEntriesLimit'];
+      $result = sqlite_query($config['db'], "select * from posts WHERE type = 'page' ORDER BY date DESC LIMIT $limit;");
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+            $title         = $row['title'];
+            $titleModified = titleModify($title);
+            $fileName         = $row['postid'];
+            $postType         = $row['type'];
+            echo "<a href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$fileName."/".$titleModified.">".$title."</a>";
+            $i++;
       }
-
   }
 
   function printTagCloudAgain($tags) {
         // $tags is the array
-
         //arsort($tags);
-
         //shuffle($tags);
 
         $max_size = 42; // max font size in pixels
@@ -1416,8 +2134,8 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
         foreach ($tags as $key => $value) {
             $size = $min_size + (($value - $min_qty) * $step);
             $rand_colors = array_rand($colors);
-            echo '<li><a href="'.$_SERVER['SCRIPT_NAME'].'/viewCategory/'.str_replace(" ",".",$key).'" class="tag" style="font-size:'.$size.'px; color:'.$colors[$rand_colors].'" onmouseout="this.style.color=\''.$colors[$rand_colors].'\'" onmouseover="this.style.color=\'#fff\'" title="'.$value.' things tagged with '.$key.'">'.$key.'</a>';
-            echo ' <span class="count">('.$value.')</span></li>';
+            echo '<li><a href="'.$_SERVER['SCRIPT_NAME'].'/viewCategory/'.urlencode(str_replace(" ",".",$key)).'" class="tag" style="font-size:'.$size.'px; color:'.$colors[$rand_colors].'" onmouseout="this.style.color=\''.$colors[$rand_colors].'\'" onmouseover="this.style.color=\'#fff\'" title="'.$value.' things tagged with '.$key.'">'.$key.'</a>';
+            echo '<span class="count"> ('.$value.')</span></li>';
         }
         echo '</ul>';
   }
@@ -1426,40 +2144,29 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
   function loadCategories() {
       global $separator, $entries, $config, $tags;
       $category_array_unsorted=array();
-      if (is_array($entries)) {
-          foreach ($entries as $value) {
-             $entry  =explode($separator,$value);
-             $category=$entry[4];
-             array_push($category_array_unsorted,$category);
-          }
-          $category_array_unique = array_unique($category_array_unsorted);
-          foreach ($category_array_unique as $value) {
-             $categoryText=str_replace("."," ",$value);
-             $tags[$categoryText]=0;
-             foreach ($category_array_unsorted as $subvalue) {
-                  if (str_replace("."," ",$subvalue) == $categoryText) {
-                       $tags[$categoryText]++;
-                  }
-             }
+      $result = sqlite_query($config['db'], 'select DISTINCT category from posts;');
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $category = $row['category'];
+          $categoryText=str_replace("."," ",$category);
+          $result1 = sqlite_query($config['db'], "select count(category) AS view from posts WHERE category = '$category';");
+          while ($row1 = sqlite_fetch_array($result1, SQLITE_ASSOC)) {
+              $catcount = $row1['view'];
+              $tags[$categoryText] = $catcount;
           }
       }
-      return $category_array_unique;
   }
 
   function sidebarCategories() {
       global $separator, $entries, $config, $tags, $categories;
-      if (is_array($categories)) {
-          foreach ($categories as $value) {
-             $categoryText=str_replace("."," ",$value);
-             echo "<a href=".$_SERVER['SCRIPT_NAME']."/viewCategory/".$value.">".$categoryText."</a>";
-          }
+      $result = sqlite_query($config['db'], 'select DISTINCT category from posts ORDER BY category;');
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $categoryText=str_replace("."," ",$row['category']);
+          echo "<a href=".$_SERVER['SCRIPT_NAME']."/viewCategory/".urlencode($row['category']).">".$categoryText."</a>";
       }
   }
 
   function sidebarLinks() {
       global $config;
-      $config['menuLinksOrig']=$config['menuLinks'];
-      $config['menuLinksArray']=explode(';',$config['menuLinks']);
       foreach ($config['menuLinksArray'] as $value) {
           $fullLink=explode(",",$value);
           echo '<a href="'.$fullLink[0].'">'.$fullLink[1].'</a>';
@@ -1471,45 +2178,34 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
       $latestCommentsFile=$config['commentDir']."latest".$config['dbFilesExtension'];
       $userFileName=$config['commentDir']."users".$config['dbFilesExtension'].".dat";
       echo '<h3>'.$lang['pageAllComments'].'</h3>';
-      if ($handle = opendir($config['commentDir'])) {
-          $file_array_unsorted = array();
-          $file_array_sorted   = array();
-          while (false !== ($file = readdir($handle))) {
-              array_push($file_array_unsorted,$file);
-          }
-          $file_array_sorted=array_reverse($file_array_unsorted);
-          $commentCount=count($file_array_sorted)-4;
+      $result = sqlite_query($config['db'], 'select count(commentid) AS view from comments');
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $commentCount  = $row['view'];
           if ($commentCount > 0) {
               echo '<table><tr><th>'.$lang['pageAllCommentsTitle'].'</th><th>'.$lang['pageAllCommentsDate'].'</th><th>'.$lang['pageAllCommentsBy'].'</th></tr>';
           }
           else {
               echo $lang['pageAllCommentsNo'].'!<br>';
           }
-
-          $statsFile=$config['commentDir']."online".$config['dbFilesExtension'].".dat";
-          foreach ($file_array_sorted as $value) {
-              $filename=$config['commentDir'].$value;
-              if ((file_exists($filename)) && ($filename !== $config['commentDir'].".") && ($filename !== $config['commentDir']."..") && ($filename !== $latestCommentsFile) && ($filename !== $userFileName) && ($filename !== $statsFile)){
-                $fileContents = file($filename);
-                foreach ($fileContents as $commentContents) {
-                    $commentSplit=explode($separator,$commentContents);
-                    $commentTitle=$commentSplit[0];
-                    $commentAuthor=$commentSplit[1];
-                    $commentDate=explode(" ",$commentSplit[3]);
-                    $commentDateFormatted=$commentDate[0]." ".$commentDate[1]." ".$commentDate[2];
-                    $commentFile=$commentSplit[4];
-                    $titleModified=getTitleFromFilename($commentFile);
-                    echo "<tr><td><a style='font-style:normal' href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$commentFile."/".$titleModified."#Comments>".$commentTitle."</a></td>";
-                    echo "<td>".$commentDateFormatted."</td><td>".$commentAuthor."</td></tr>";
-                }
-              }
+          $result = sqlite_query($config['db'], 'select * from comments ORDER BY date DESC');
+          while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+              $postid        = $row['postid'];
+              $sequence      = $row['sequence'];
+              $author        = $row['author'];
+              $title         = $row['title'];
+              $content       = $row['content'];
+              $date          = $row['date'];
+              $ip            = $row['ip'];
+              $url           = $row['url'];
+              $email         = $row['email'];
+              $titleModified=getTitleFromFilename($postid);
+              echo "<tr><td><a style='font-style:normal' href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$postid."/".$titleModified."#Comments>".$title."</a></td>";
+              echo "<td>".$date."</td><td>".$author."</td></tr>";
           }
           echo "</table>";
-          closedir($handle);
       }
-      return $file_array_sorted;
   }
-  
+
   function nicEditStuff() {
       global $nicEditType, $blogPath, $nicEditUrl;
       switch ($nicEditType) {
@@ -1528,7 +2224,7 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
             break;
         case "default":
             echo $nicEditUrl;
-            $nicPanel="          new nicEditor({fullPanel : true}).panelInstance('posts');";
+            $nicPanel="          new nicEditor({fullPanel : true, iconsPath : '".$blogPath."/images/nicEditorIcons.gif'}).panelInstance('posts');";
             break;
       }
       echo '<script type="text/javascript">';
@@ -1538,58 +2234,51 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
       echo "</script>";
   }
 
-  function newEntryPass() {
-      global $debugMode, $optionValue, $lang;
-      $fileName = $optionValue;
-      echo '<h3>'.$lang['pageNew'].'...</h3>';
-      echo "<form name=\"form1\" method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/newEntryForm>";
-      echo "<table>";
-      echo "<tr><td>".$lang['pageAuthorsNew']."</td>";
-      echo "<td><input name=\"author\" type=\"text\" id=\"author\">&nbsp;&nbsp;('admin' for master user)</td></tr>";
-      echo "<tr><td>".$lang['pageDeletePass']."</td>";
-      echo "<td><input name=\"pass\" type=\"password\" id=\"pass\"></td></tr>";
-      echo '</tr><tr><td>&nbsp;</td><td><input type="submit" name="Submit" value="'.$lang['pageBasicConfigSubmit'].'"></td>';
-      echo "</tr></table></form>";
-  }
-
 
   function newEntryForm() {
-      global $separator, $newPostFile, $newFullPostNumber, $debugMode, $config, $blogPath, $lang, $authors, $authorsPass;
+      global $separator, $newPostFile, $newFullPostNumber, $debugMode, $config, $blogPath, $lang, $authors, $authorsPass, $ss;
       $newPostFileName=$config['postDir'].$newPostFile;
       echo '<h3>'.$lang['pageNew'].'...</h3>';
       if ($debugMode=="on") {
          echo $_SERVER['PHP_SELF']."<br>";
          echo "Post will be written to ".$newPostFileName."  ".$newFullPostNumber;
       }
-      $thisAuthor = $_POST['author'];
-      $thisPass   = $_POST['pass'];
+      $thisAuthor = $_SESSION['username'];
       $do = 1;
-      if (trim($thisAuthor) == "" || trim($thisPass) =="") {
+      if (trim($thisAuthor) == "") {
            $lang['errorAllFields'].'<br>';
            $do = 0;
       }
       if ($do == 1) {
           if (is_array($authors)) {
               if (isset($authorsPass[$thisAuthor])) {
-                   if ($authorsPass[$thisAuthor] === md5($config['randomString'].$thisPass)) {
+                   if ($_SESSION['logged_in']) {
                         nicEditStuff();
                         echo "<form method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/newEntrySubmit>";
                         echo "<fieldset>";
                         echo '<legend>'.$lang['pageNewForm'].'</legend>';
                         echo '<p><label for="title">'.$lang['pageNewTitle'].'</label><br>';
                         echo '<input type="text" class="ptitle" name="title" id="title" value=""></p>';
+                        echo '<script>';
+                        echo 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
+                        echo 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+                        echo '</script>';
                         echo '<br><label for="posts">'.$lang['pageNewContent'].'</label><br>('.$lang['pageNewReadmore'].')<br>';
                         echo '<textarea name="posts" cols="'.$config['textAreaCols'].'" rows="'.$config['textAreaRows'].'"';
-                        echo ' style="height: 400px; width: 400px;" id="posts"></textarea><br><br>';
+                        echo ' style="height: 400px; width: 550px;" id="posts"></textarea><br><br>';
                         echo '<p><label for="category">'.$lang['pageNewCategory'].'</label><br>';
                         echo '<input type="text" class="ptext" id="category" name="category" value=""></p>';
+                        echo '<script>';
+                        echo 'var category = new LiveValidation( "category", {onlyOnSubmit: true } );';
+                        echo 'category.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+                        echo '</script>';
                         echo '<p><label>'.$lang['pageNewOptions'].'</label><br>';
                         echo '<input type="checkbox" name="allowComments" value="yes" checked="checked">'.$lang['pageNewAllowComments'].'<br>';
-                        echo '<input type="checkbox" name="isPage" value="1">'.$lang['pageNewIsPage'].' <a href="javascript:alert(\''.$lang['pageNewIsPageDesc'].'\')">(?)</a></p>';
+                        echo '<input type="checkbox" name="isPage" value="1">'.$lang['pageNewIsPage'].' <a href="javascript:alert(\''.$lang['pageNewIsPageDesc'].'\')">(?)</a><br>';
+                        echo '<input type="checkbox" name="isSticky" value="yes">'.$lang['pageNewIsSticky'].'</p>';
                         echo '<input name="process" type="hidden" id="process" value="newEntry">';
-                        echo '<input name="pass" type="hidden" id="pass" value="'.$authorsPass[$thisAuthor].'">';
                         echo '<input name="author" type="hidden" id="author" value="'.$thisAuthor.'">';
-                        echo '<p><input type="submit" value="'.$lang['pageNewSubmit'].'"></p>';
+                        echo '<p><input type="submit" class="submit" style="width:100px;" value="'.$lang['pageNewSubmit'].'"></p>';
                         echo '</fieldset>';
                         echo '</form>';
                    }
@@ -1611,13 +2300,13 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
   function newEntrySubmit() {
       global $separator, $newPostFile, $newFullPostNumber, $debugMode, $config, $lang, $authors, $authorsPass;
       $newPostFileName=$config['postDir'].$newPostFile;
-      $postTitle=str_replace("\\","",$_POST["title"]);
-      $postContent=$_POST["posts"];
-      $postDate=date("d M Y h:i");
-      $isPage=$_POST["isPage"];
+      $postTitle=sqlite_escape_string(str_replace("\\","",$_POST["title"]));
+      $postContent=sqlite_escape_string(str_replace("\\","",$_POST["posts"]));
+      $postDate=date("Y-m-d H:i:s");
+      $isPage=isset($_POST["isPage"])?$_POST["isPage"]:0;
+      $stick=isset($_POST["isSticky"])?$_POST["isSticky"]:"no";
       $allowComments=isset($_POST["allowComments"])?$_POST["allowComments"]:"no";
       $thisAuthor = $_POST['author'];
-      $thisPass=$_POST['pass'];
       $visits=0;
       $postCategory=strtolower($_POST["category"]);
       echo "<h3>".$lang['pageNew']."...</h3>";
@@ -1629,13 +2318,14 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 		   $do = 0;
       }
 
-      $checkExistingTitle=getfileNameFromTitle($postTitle);
-      if ($checkExistingTitle != 0) {
-           echo $lang['errorDuplicatePost'].'.<br>';
-           $do = 0;
+      $result = sqlite_query($config['db'], "select * from posts WHERE title = '$postTitle';");
+      $dupMsg = "";
+      if (sqlite_num_rows($result) > 0) {
+           $dupMsg = $dupMsg.$lang['errorDuplicatePost'].'.<br>';
+           $do = 1;
       }
       if ($do == 1) {
-          if ($authorsPass[$thisAuthor] === $thisPass) {
+          if ($authorsPass[$thisAuthor] === $authorsPass[$_SESSION['username']] && (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false)) {
               $postCategory=str_replace(" ",".",$postCategory);
               if ($debugMode=="on") {echo "Writing to ".$newPostFileName;}
               $errorMessage='<br><span style="color: rgb(204, 0, 51);">'.$lang['errornewPostFile'].'<br>';
@@ -1646,11 +2336,10 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
               else {
                   $postType="post";
               }
+              $postContent=str_replace("\\","",$postContent);
               $content=$postTitle.$separator.str_replace("\\","",$postContent).$separator.$postDate.$separator.$newFullPostNumber.$separator.$postCategory.$separator.$postType.$separator.$allowComments.$separator.$visits.$separator.$thisAuthor;
-              $fp = fopen($newPostFileName,"w") or die($errorMessage);
-              fwrite($fp, $content) or die($errorMessage);
-              fclose($fp);
-              echo $lang['msgNewPost'];
+              sqlite_query($config['db'], "INSERT INTO posts (postid, title, content, date, category, type, stick, allowcomments, visits, author) VALUES('$newFullPostNumber', '$postTitle', '$postContent', '$postDate', '$postCategory', '$postType', '$stick', '$allowComments','$visits', '$thisAuthor');");
+              echo $dupMsg.$lang['msgNewPost'];
           }
           else {
               echo $lang['errorPasswordIncorrect'].'<br>';
@@ -1667,15 +2356,11 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
       $fileName = $optionValue;
       echo "<h3>".$lang['pageDelete']."...</h3>";
       echo "<form name=\"form1\" method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/deleteEntry>";
-      echo "<table>";
-      echo "<tr><td>".$lang['pageAuthorsNew']."</td>";
-      echo "<td><input name=\"author\" type=\"text\" id=\"author\">&nbsp;&nbsp;('admin' for master user)</td></tr>";
-      echo "<tr><td>".$lang['pageDeletePass']."</td>";
-      echo "<td><input name=\"pass\" type=\"password\" id=\"pass\"></td></tr>";
+      echo $lang['msgSure'].'<br><br>';
       echo '<input name="process" type="hidden" id="process" value="deleteEntrySubmit">';
-      echo '<input name="fileName" type="hidden" id="fileName" value="'.$fileName.'"></td>';
-      echo '</tr><tr><td>&nbsp;</td><td><input type="submit" name="Submit" value="'.$lang['pageBasicConfigSubmit'].'"></td>';
-      echo "</tr></table></form>";
+      echo '<input name="fileName" type="hidden" id="fileName" value="'.$fileName.'">';
+      echo '<input type="submit" name="Submit" value="'.$lang['pageBasicConfigSubmit'].'">';
+      echo "</form>";
   }
 
   function deleteEntrySubmit() {
@@ -1683,97 +2368,49 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
        if ($debugMode=="on") {echo "Inside deleteEntrySubmit ..<br>";}
        $entryName= $_POST['fileName'];
        $fileName = $config['postDir'].$entryName.$config['dbFilesExtension'];
-       $fp = fopen($fileName, "rb");
-       $fullpost=explode($separator,fread($fp, filesize($fileName)));
-       fclose($fp);
-       $author=$fullpost[8];
+       $result = sqlite_query($config['db'], "select * from posts WHERE postid = '$entryName';");
+       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+           //echo $row['postid'].'<br>';
+           $author=$row['author'];
+           $category=$row['category'];
+       }
        echo "<h3>".$lang['pageDelete']."...</h3>";
        $errorMessage='<br><span style="color: rgb(204, 0, 51);">'.$lang['errorDeleteEntry'].'<br>';
        $errorMessage=$errorMessage.$lang['errorReportBug'].'<br>';
-       $thisAuthor = $_POST['author'];
-       $thisPass = md5($config['randomString'].$_POST['pass']);
-       if ((($config['authorEditPost'] == 1) && ($thisPass === $authorsPass[$thisAuthor])) ||
-           (($config['authorEditPost'] == 0) && ($thisAuthor == 'admin' || $thisAuthor == $author) && ($thisPass === $authorsPass[$thisAuthor]))) {
-          if (file_exists($fileName)) {unlink($fileName);}
-          if (deleteEntryComment($entryName)) {
-             echo $lang['msgDeleteSuccess'].'...<br/>';
-          }
-          else { exit($errorMessage); }
+       $thisAuthor = $_SESSION['username'];
+       if ((($config['authorEditPost'] == 1) && ($_SESSION['logged_in'])) ||
+           (($config['authorEditPost'] == 0) && ($thisAuthor == 'admin' || $thisAuthor == $author) && $_SESSION['logged_in'])) {
+          @sqlite_query($config['db'], "DELETE FROM posts WHERE postid = '$entryName';");
+          @sqlite_query($config['db'], "DELETE FROM comments WHERE postid = '$entryName';");
+          echo $lang['msgDeleteSuccess'].'...<br/>';
        }
        else {
           echo $lang['errorNotAuthorized'].' .. <br>';
        }
   }
 
-  function deleteEntryComment($entryName) {
-       global $config,$separator, $lang;
-       $commentFullName=$config['commentDir'].$entryName.$config['dbFilesExtension'];
-       $thisCommentFileName=$entryName;
-       if (file_exists($commentFullName)) {unlink($commentFullName);}
-       $latestFileName=$config['commentDir']."/latest".$config['dbFilesExtension'];
-       if (file_exists($latestFileName)) {
-             $latestLines= file($latestFileName);
-             $errorMessage='<br><span style="color: rgb(204, 0, 51);">'.$lang['errorLatestFile'].'<br>';
-             $errorMessage=$errorMessage.$lang['errorReportBug'].'<br>';
-             $fp=fopen($latestFileName, "w") or die($errorMessage);
-             $i=0;
-             foreach ($latestLines as $value) {
-                 $latestSplit=explode($separator,$value);
-                 $commentFileName=trim($latestSplit[0]);
-                 if (trim($value) != "") {
-                     if (($commentFileName == $thisCommentFileName)){
-                         //echo "Deleted Indeed!<br>";
-                     }
-                     else {
-                         fwrite($fp,$value);
-                     }
-                  }
-                  $i++;
-             }
-             fclose($fp);
-         }
-         if (file_exists($commentFullName)) {return false;}
-         else {return true;}
-  }
-
-  function editEntryPass() {
-      global $debugMode, $optionValue, $lang;
-      global $optionValue, $blogPath, $lang;
-      $fileName = $optionValue;
-      echo '<h3>'.$lang['pageEdit'].'...</h3>';
-      echo "<form name=\"form1\" method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/editEntryForm>";
-      echo "<table>";
-      echo "<tr><td>".$lang['pageAuthorsNew']."</td>";
-      echo "<td><input name=\"author\" type=\"text\" id=\"author\">&nbsp;&nbsp;('admin' for master user)</td></tr>";
-      echo "<tr><td>".$lang['pageDeletePass']."</td>";
-      echo "<td><input name=\"pass\" type=\"password\" id=\"pass\"></td></tr>";
-      echo '<input type="hidden" name="fileName" id="fileName" value="'.$fileName.'">';
-      echo '<tr><td>&nbsp;</td><td><input type="submit" name="Submit" value="'.$lang['pageBasicConfigSubmit'].'"></td>';
-      echo "</tr></table></form>";
-  }
-
-
   function editEntryForm() {
       global $separator, $newPostFile, $newFullPostNumber, $debugMode, $config, $authors, $authorsPass;
       global $optionValue, $blogPath, $lang;
-      $fileName = $_POST['fileName'];
+      $fileName = $optionValue;
       $editFileName=$config['postDir'].$fileName.$config['dbFilesExtension'];
       echo "<h3>".$lang['pageEdit']."...</h3>";
       if ($debugMode=="on") {echo "Editing .. ".$editFileName."<br>";}
-      $thisAuthor = $_POST['author'];
-      $thisPass = md5($config['randomString'].$_POST['pass']);
-
-      if (file_exists($editFileName)) {
-        $fp = fopen($editFileName, "rb");
-        $fullpost=explode($separator,fread($fp, filesize($editFileName)));
-        fclose($fp);
-        $title=$fullpost[0];
-        $content=$fullpost[1];
-        $category=$fullpost[4];
-        $postType=$fullpost[5];
-        $allowComments=$fullpost[6];
-        $visits=$fullpost[7];
-        $author=$fullpost[8];
+      $thisAuthor = $_SESSION['username'];
+      //$thisPass = md5($config['randomString'].$_POST['pass']);
+      $result = sqlite_query($config['db'], "select * from posts WHERE postid = '$fileName';");
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $title         = $row['title'];
+          $titleModified = titleModify($title);
+          $content       = $row['content'];
+          $date1         = $row['date'];
+          $fileName      = $row['postid'];
+          $category      = $row['category'];
+          $postType      = $row['type'];
+          $allowComments = $row['allowcomments'];
+          $visits        = $row['visits'];
+          $stick         = $row['stick'];
+          $author=(trim($row['author'])=="")?'admin':$row['author'];
         if ($postType == "page") {
             $checking='checked="checked"';
         }
@@ -1786,8 +2423,14 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
         else {
             $checkAllowComments='';
         }
-        if ((($config['authorEditPost'] == 1) && ($thisPass === $authorsPass[$thisAuthor])) ||
-            (($config['authorEditPost'] == 0) && ($thisAuthor == 'admin' || $thisAuthor == $author) && ($thisPass === $authorsPass[$thisAuthor]))) {
+        if ($stick == "yes") {
+            $checkStick='checked="checked"';
+        }
+        else {
+            $checkStick='';
+        }
+        if ((($config['authorEditPost'] == 1) && ($_SESSION['logged_in'])) ||
+            (($config['authorEditPost'] == 0) && ($_SESSION['isAdmin'] || $thisAuthor == $author) && ($_SESSION['logged_in']))) {
             if ($thisAuthor == 'admin' && $thisAuthor != $author && trim($author) != "") {
                 $thisAuthor = $author;
                 $thisPass   = $authorsPass[$thisAuthor];
@@ -1799,17 +2442,26 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
             echo '<legend>'.$lang['pageEditForm'].'</legend>';
             echo '<p><label for="title">'.$lang['pageNewTitle'].'</label><br>';
             echo '<input type="text" class="ptitle" name="title" id="title" value="'.$title.'"></p>';
+            echo '<script>';
+            echo 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
+            echo 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+            echo '</script>';
             echo '<br><label for="posts">'.$lang['pageNewContent'].'</label><br>('.$lang['pageNewReadmore'].')<br>';
             echo '<textarea name="posts" cols="'.$config['textAreaCols'].'" rows="'.$config['textAreaRows'].'"';
-            echo ' style="height: 400px; width: 400px;" id="posts">';
+            echo ' style="height: 400px; width: 550px;" id="posts">';
             echo $content;
             echo '</textarea><br><br>';
             echo '<p><label for="category">'.$lang['pageNewCategory'].'</label><br>';
             $category=str_replace("."," ",$category);
             echo '<input type="text" class="ptext" id="category" name="category" value="'.$category.'"></p>';
+            echo '<script>';
+            echo 'var category = new LiveValidation( "category", {onlyOnSubmit: true } );';
+            echo 'category.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+            echo '</script>';
             echo '<p><label>'.$lang['pageNewOptions'].'</label><br>';
             echo '<input type="checkbox" name="allowComments" value="yes" '.$checkAllowComments.'>'.$lang['pageNewAllowComments'].'<br>';
-            echo '<input type="checkbox" name="isPage" value="1" '.$checking.'>'.$lang['pageNewIsPage'].' <a href="javascript:alert(\''.$lang['pageNewIsPageDesc'].'\')">(?)</a></p>';
+            echo '<input type="checkbox" name="isPage" value="1" '.$checking.'>'.$lang['pageNewIsPage'].' <a href="javascript:alert(\''.$lang['pageNewIsPageDesc'].'\')">(?)</a><br>';
+            echo '<input type="checkbox" name="isSticky" value="yes" '.$checkStick.'>'.$lang['pageNewIsSticky'].'</p>';
             echo '<input name="fileName" type="hidden" id="fileName" value="'.$fileName.'">';
             echo '<input name="visits" type="hidden" id="visits" value="'.$visits.'">';
             echo '<input name="process" type="hidden" id="process" value="editEntrySubmit">';
@@ -1824,7 +2476,7 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
        }
 
       }
-      else {echo $lang['errorFileNA'].'...<br>';}
+      //else {echo $lang['errorFileNA'].'...<br>';}
   }
 
   function editEntrySubmit() {
@@ -1834,10 +2486,11 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
       echo "<h3>".$lang['pageEdit']."...</h3>";
       $entryName= $_POST['fileName'];
       $fileName = $config['postDir'].$entryName.$config['dbFilesExtension'];
-      $postTitle=str_replace("\\","",$_POST["title"]);
-      $postContent=$_POST["posts"];
-      $postDate=date("d M Y h:i");
-      $isPage=isset($_POST["isPage"])?$_POST["isPage"]:$_GET["isPage"];
+      $postTitle=sqlite_escape_string(str_replace("\\","",$_POST["title"]));
+      $postContent=sqlite_escape_string(str_replace("\\","",$_POST["posts"]));
+      $postDate=date("Y-m-d H:i:s");
+      $isPage=isset($_POST["isPage"])?$_POST["isPage"]:0;
+      $stick=isset($_POST["isSticky"])?$_POST["isSticky"]:"no";
       $allowComments=isset($_POST["allowComments"])?$_POST["allowComments"]:"no";
       $visits=isset($_POST["visits"])?$_POST["visits"]:0;
       $postCategory=strtolower($_POST["category"]);
@@ -1851,7 +2504,6 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 	   $do = 0;
       }
 
-      $checkExistingTitle=getfileNameFromTitle($postTitle);
       if ($do == 1) {
           if ($isPage == 1) {
               $postType="page";
@@ -1862,13 +2514,10 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
           if ($debugMode=="on") {echo "Writing to ".$fileName;}
           $errorMessage='<br><span style="color: rgb(204, 0, 51);">'.$lang['errornewPostFile'].'<br>';
           $errorMessage=$errorMessage.'<br>'.$lang['errorReportBug'].'<br>';
-          if (!file_exists($fileName)) { die($errorMessage); }
-          if ($thisPass === $authorsPass[$thisAuthor]) {
+          if ($_SESSION['logged_in']) {
               $postCategory=str_replace(" ",".",$postCategory);
               $content=$postTitle.$separator.str_replace("\\","",$postContent).$separator.$postDate.$separator.$entryName.$separator.$postCategory.$separator.$postType.$separator.$allowComments.$separator.$visits.$separator.$thisAuthor;
-              $fp = fopen($fileName,"w") or die($errorMessage);
-              fwrite($fp, $content) or die($errorMessage);
-              fclose($fp);
+              sqlite_query($config['db'], "UPDATE posts SET title='$postTitle', content='$postContent', category='$postCategory', type='$postType', stick='$stick', allowcomments='$allowComments', visits='$visits', author='$thisAuthor' WHERE postid='$entryName';");
               echo $lang['msgEditSuccess'].' .. <br>';
           }
           else {
@@ -1879,19 +2528,16 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
            echo $lang['errorPleaseGoBack'];
       }
   }
+  
+  function genRandomString($length = 10) {
+    $characters = '0123456789abcdefghijklmnopqrstuvwxyz';
+    $string = '';
 
-  function getfileNameFromTitle($fileName1) {
-      global $entries, $separator;
-      $limit = count($entries);
-      for($i = 0; $i < $limit; $i++)
-      {
-      	     $entry      = explode($separator, $entries[$i]);
-	     $fileTitle  =$entry[0];
-             $fileEntry  =$entry[3];
-             $titleText  = str_replace("-"," ",$fileName1);
-             if (strcmp($titleText,$fileTitle) == 0) { return $fileEntry; }
-      }
-      return 0;
+    for ($p = 0; $p < $length; $p++) {
+        $string .= $characters[mt_rand(0, strlen($characters))];
+    }
+
+    return $string;
   }
 
   function viewEntry() {
@@ -1902,46 +2548,43 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
       $cool=true;
       if ($debugMode=="on") {echo "Editing .. ".$viewFileName."<br>";}
       if (strstr($fileName,'%') || strstr($fileName,'.')) {
-        $cool=false;
-        echo '<br>'.$lang['errorInvalidURL'].'<br>';
+          $cool=false;
+          echo '<br>'.$lang['errorInvalidRequest'].'<br>';
       }
-      if (file_exists($viewFileName) && $cool) {
-          $fp = fopen($viewFileName, "rb");
-          $entry   =explode($separator,fread($fp, filesize($viewFileName)));
-          fclose($fp);
-          $title   =$entry[0];
-          $titleModified=titleModify($title);
-          $contentOrig=$entry[1];
-          $content =(str_replace("*readmore*","",$entry[1]));
-          $date1   =$entry[2];
-          $fileName=$entry[3];
-          $category=$entry[4];
-          $postType=$entry[5];
-          $allowComments=$entry[6];
-          $visits  =$entry[7];
-          $author  =(trim($entry[8])== "")?'admin':$entry[8];
+      $result = sqlite_query($config['db'], "select * from posts WHERE postid = '$fileName';");
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $title         = $row['title'];
+          $titleModified = titleModify($title);
+          $content       = (str_replace("*readmore*","",$row['content']));
+          $date1         = date("d M Y H:i",strtotime($row['date']));
+          $fileName      = $row['postid'];
+          $category      = $row['category'];
+          $postType      = $row['type'];
+          $allowComments = $row['allowcomments'];
+          $visits        = $row['visits'];
           if (trim($visits) == "") { $visits=1; }
           else { $visits++; }
-          $fileContent=$title.$separator.str_replace("\\","",$contentOrig).$separator.$date1.$separator.$fileName.$separator.$category.$separator.$postType.$separator.$allowComments.$separator.$visits.$separator.$author;
-          $fp = fopen($viewFileName,"w");
-          fwrite($fp, $fileContent);
-          fclose($fp);
-          
+          $author=(trim($row['author'])=="")?'admin':$row['author'];
+          sqlite_query($config['db'], "UPDATE posts SET visits = '$visits' WHERE postid = '$fileName';");
           $categoryText=str_replace("."," ",$category);
 
-          echo "<h3>".$title."</h3>";
+          echo "<h2>".$title."</h2>";
           echo $content;
-          echo '<br><center><i>'.$lang['pageAuthorsNew'].': '.$author.'&nbsp;-&nbsp; '.$lang['postFtPosted'].': '.$date1.'<br>'.$lang['postFtCategory'].': <a href='.$_SERVER['SCRIPT_NAME'].'/viewCategory/'.$category.'>'.$categoryText.'</a>&nbsp;-&nbsp; '.$lang['postFtVisits'].': '.$visits.'</i><br>';
+          echo '<br><center><i>'.$lang['pageAuthorsNew1'].': '.$author.'&nbsp;-&nbsp; '.$lang['postFtPosted'].': '.$date1.'<br>'.$lang['postFtCategory'].': <a href='.$_SERVER['SCRIPT_NAME'].'/viewCategory/'.urlencode($category).'>'.$categoryText.'</a>&nbsp;-&nbsp; '.$lang['postFtVisits'].': '.$visits;
           $commentFile=$config['commentDir'].$fileName.$config['dbFilesExtension'];
-          if (file_exists($commentFile)) {
-              $commentLines=file($commentFile);
-              $commentText=count($commentLines)." ".$lang['postFtComments'];
+          $result = sqlite_query($config['db'], "select count(*) AS view from comments WHERE postid='$fileName';");
+          $commentCount = sqlite_fetch_array($result);
+          if ($commentCount['view'] > 0) {
+              $commentText=$lang['postFtComments'].": ".$commentCount['view'];
           }
           else {$commentText=$lang['postFtNoComments'];}
 
-          echo "<a href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$fileName."/".$titleModified."#Comments>".$commentText."</a>";
-          echo "&nbsp;-&nbsp;<a href=".$_SERVER['SCRIPT_NAME']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
-          echo "&nbsp;-&nbsp;<a href=".$_SERVER['SCRIPT_NAME']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a><br/><br/></center>";
+          echo "&nbsp;-&nbsp; <a href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$fileName."/".$titleModified."#Comments>".$commentText."</a></i><br></center>";
+          if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
+              echo "<center><a href=".$_SERVER['SCRIPT_NAME']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
+              echo "&nbsp;-&nbsp;<a href=".$_SERVER['SCRIPT_NAME']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a></center>";
+          }
+          echo "<br><br>";
 
 
           $commentFullName=$config['commentDir'].$fileName.$config['dbFilesExtension'];
@@ -1950,26 +2593,31 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 
           if($allowComments == "yes")
           {
-                if (file_exists($commentFullName)) {
-                    $fp = fopen($commentFullName, "rb");
-                    $allcomments=explode("\n",fread($fp, filesize($commentFullName)));
-                    fclose($fp);
-                    foreach ($allcomments as $value) {
-                         if (trim($value) != "") {
-                             $comment = explode($separator,$value);
-                             $title   = $comment[0];
-                             $author  = $comment[1];
-                             $content = $comment[2];
-                             $date    = $comment[3];
-                             echo '<a name="'.$comment[5].'">'.$lang['postFtPosted'].' <b>'.$date.'</b> '.$lang['pageViewCommentsby'].' <b>'.$author.'</b><br /><i>'.$title.'</i><br /></a>';
-                             echo $content;
-                             echo '<br><a href="'.$_SERVER['SCRIPT_NAME'].'/deleteComment/'.$fileName.'/'.$i.'">'.$lang['postFtDelete'].'</a><br><br><br>';
-                             $i++;
-                         }
+                $result = sqlite_query($config['db'], "select * from comments WHERE postid = '$fileName';");
+                while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+                    $postid        = $row['postid'];
+                    $sequence      = $row['sequence'];
+                    $author        = $row['author'];
+                    $title         = $row['title'];
+                    $content       = $row['content'];
+                    $date          = $row['date'];
+                    $ip            = $row['ip'];
+                    $url           = $row['url'];
+                    $email         = $row['email'];
+                    $authorLink    = (trim($url) == "")?$author:'<a href="'.$url.'">'.$author.'</a>';
+                    echo '<a name="'.$sequence.'">'.$lang['pageCommentsBy'].'</a>&nbsp;<strong>'.$authorLink.'</strong>&nbsp;'.$lang['pageViewCommentsOn'].'&nbsp;<b>'.$date.'</b><br>';
+                    echo $content;
+                    echo '<br>';
+                    if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
+                        echo '<a href="'.$_SERVER['SCRIPT_NAME'].'/deleteComment/'.$fileName.'/'.$sequence.'">'.$lang['postFtDelete'].'</a>';
+                        if (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false) {
+                            echo '&nbsp;&nbsp;-&nbsp;&nbsp;'.$ip;
+                        }
                     }
-        	}
-                else {echo $lang['pageViewCommentsNo']."<br>";}
-
+                    echo '<br><br>';
+                    $i++;
+                }
+                if ($i == 0) {echo $lang['pageViewCommentsNo']."<br>";}
                 echo $nicEditUrl;
                 echo '<br /><br /><h3>'.$lang['pageComments'].'</h3>';
 	 	echo '<script type="text/javascript">';
@@ -1981,13 +2629,27 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
                 echo "<form name=\"submitform\" method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/sendComment>";
                 echo "<fieldset>";
                 echo '<legend>'.$lang['pageCommentsForm'].'</legend>';
-                echo '<p><label for="commentTitle">'.$lang['pageCommentsTitle'].'</label><br>';
-                echo '<input type="text" class="ptext" name="commentTitle" id="commentTitle" value=""></p>';
-                echo '<p><label for="author">'.$lang['pageCommentsAuthor'].'</label><br>';
+                echo '<p><label for="author">'.$lang['pageCommentsAuthor'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$lang['pageCommentsRequired'].')</font><br>';
                 echo '<input type="text" class="ptext" id="author" name="author" value=""></p>';
-                echo '<br><label for="comment">'.$lang['pageCommentsContent'].'</label><br>';
+                echo '<script>';
+                echo 'var author = new LiveValidation( "author", {onlyOnSubmit: true } );';
+                echo 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+                echo '</script>';
+                echo '<p><label for="commentEmail">'.$lang['pageAuthorsNewEmail'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$lang['pageCommentsOptionalEmail'].')</font><br>';
+                echo '<input type="text" class="ptext" name="commentEmail" id="commentEmail" value=""></p>';
+                echo '<script>';
+                echo 'var commentEmail = new LiveValidation( "commentEmail", {onlyOnSubmit: true } );';
+                echo 'commentEmail.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
+                echo '</script>';
+                echo '<p><label for="commentUrl">'.$lang['pageCommentsUrl'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$lang['pageCommentsOptionalUrl'].')</font><br>';
+                echo '<input type="text" class="ptext" name="commentUrl" id="commentUrl" value=""></p>';
+                echo '<script>';
+                echo 'var commentUrl = new LiveValidation( "commentUrl", {onlyOnSubmit: true } );';
+                echo 'commentUrl.add( Validate.Format, { pattern: /(http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/i,  failureMessage: "'.$lang['errorInvalidUrl'].'" } );';
+                echo '</script>';
+                echo '<label for="comment">'.$lang['pageCommentsContent'].'</label><br>';
                 echo '<textarea name="comment" cols="'.$config['textAreaCols'].'" rows="'.$config['textAreaRows'].'"';
-                echo ' id="comment"></textarea><br><br>';
+                echo ' style="height: 200px; width: 400px;" id="comment"></textarea><br>';
 		if($config['commentsSecurityCode'] == 1)
 		{
 			$code = '';
@@ -1997,18 +2659,16 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 			}
 			else
 			{
-				$code = strtoupper(substr(crypt(rand(0,999999), $config['randomString']),1,$config['CAPTCHALength']));
+				//$code = strtoupper(substr(crypt(rand(0,999999), $config['randomString']),1,$config['CAPTCHALength']));
+				$code = genRandomString($config['CAPTCHALength']);
 			}
 			echo '<p><label for="code">'.$lang['pageCommentsCode'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$code.')</font><br>';
-			echo '<input name="code" type="text" id="code"></p>';
+			echo '<input name="code" class="s" type="text" id="code"></p>';
                         echo '<input name="originalCode" value="'.$code.'" type="hidden" id="originalCode">';
 		}
-                /* Commenter password - removed for version 0.7
-                echo '<p><label for="pass">'.$lang['pageDeletePass'].'</label><br><font face="Verdana, Arial, Helvetica, sans-serif" size="2">First time? - remember the password you enter here<br>Otherwise - use the same password you used before</br></font><br>';
-                echo '<input type="password" class="ptext" id="pass" name="pass" value=""></p>';
-                */
+
                 echo '<input name="sendComment" value="'.$fileName.'" type="hidden" id="sendComment">';
-                echo '<p><input type="submit" value="'.$lang['pageCommentsSubmit'].'">&nbsp;&nbsp;<input type="reset" value="'.$lang['pageCommentsReset'].'"></p>';
+                echo '<p><input type="submit" class="submit" style="width:100px" value="'.$lang['pageCommentsSubmit'].'">&nbsp;&nbsp;<input type="reset" class="submit" value="'.$lang['pageCommentsReset'].'"></p>';
                 echo '</fieldset>';
                 echo '</form>';
           }
@@ -2020,29 +2680,22 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 	# Send Comment Process
         global $separator, $config, $lang;
 	echo "<h3>".$lang['pageViewComments']."</h3>";
-        $commentFileName= isset($_POST['sendComment'])?$_POST['sendComment']:$_GET['sendComment'];
-	$commentTitle   = isset($_POST['commentTitle'])?$_POST['commentTitle']:$_GET['commentTitle'];
-	$author  = isset($_POST['author'])?$_POST['author']:$_GET['author'];
-	$comment = isset($_POST['comment'])?$_POST['comment']:$_GET['comment'];
-	$pass    = isset($_POST['pass'])?$_POST['pass']:$_GET['pass'];
-	$date    = getdate($config_gmt);
-	$code    = $_POST['code'];
-	$originalCode = $_POST['originalCode'];
-	$do = 1;
-	$triedAsAdmin = 0;
+        $commentFileName = isset($_POST['sendComment'])?$_POST['sendComment']:$_GET['sendComment'];
+	$author          = isset($_POST['author'])?$_POST['author']:"";
+	$commentTitle    = $lang['pageCommentsBy'].' '.$author;
+	$comment         = isset($_POST['comment'])?$_POST['comment']:"";
+	$url             = isset($_POST['commentUrl'])?$_POST['commentUrl']:"";
+	$email           = isset($_POST['commentEmail'])?$_POST['commentEmail']:"";
+	$code            = $_POST['code'];
+	$originalCode    = $_POST['originalCode'];
+	$do              = 1;
+	$triedAsAdmin    = 0;
 
 	if(trim($commentTitle) == '' || trim($author) == '' || trim($comment) == '')
 	{
 		echo $lang['errorAllFields'].'<br>';
 		$do = 0;
 	}
-        /* Again commenter password commented for version 0.7
-        if (strlen($pass) < 5)
-        {
-                echo $lang['errorPassLength'].'<br>';
-                $do = 0;
-        }
-        */
 
 	if($config['commentsSecurityCode'] == 1)
 	{
@@ -2067,36 +2720,6 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 		}
 	}
 
-	# Start of author checking, for identity security
-	/* Below code commented for version 0.7
-        $userFileName=$config['commentDir']."users".$config['dbFilesExtension'].".dat";
-	$newUser = 1;
-	if (file_exists($userFileName)) {
-            $users=file($userFileName);
-  	    $data = '';
-  	    if ($do == 1) {
-                foreach($users as $value)
-                {
-        		$userLine=explode($separator,$value);
-        		if ($userLine[0] == $author) {
-                            $newUser=0;
-                            if (crypt($pass,trim($userLine[1])) !== trim($userLine[1])) {echo $lang['errorPasswordIncorrect'];$do=0;}
-                            else {$do=1;}
-                        }
-                }
-	    }
-	}
-
-	if ($newUser == 1 && $do ==1)
-	{
-                $fp = fopen($userFileName, "a");
-		$userContent=$author.$separator.crypt($pass)."\n";
-		fwrite($fp,$userContent);
-		fclose($fp);
-		echo $lang['msgNewUser'].'<br>';
-	}
-	*/
-
 	if($do == 1)
 	{
 		if(strlen($comment) > $config['commentsMaxLength'])
@@ -2106,62 +2729,42 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
                 else
 		{
                      $commentFullName=$config['commentDir'].$commentFileName.$config['dbFilesExtension'];
- 		     if (file_exists($commentFullName)) {$commentLines=file($commentFullName);}
- 		     if (trim($commentLines[0])=="") {
+                     $result = sqlite_query($config['db'], "select count(sequence) AS view from comments WHERE postid='$commentFileName';");
+                     $commentCount = sqlite_fetch_array($result);
+                     $result = sqlite_query($config['db'], "select * from comments WHERE postid = '$commentFileName' ORDER BY sequence DESC LIMIT 1;");
+                     while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+                         $maxseq = $row['sequence'];
+                     }
+ 		     if ($commentCount['view'] == 0) {
                          $thisCommentSeq=1;
                      }
-                     else {
- 		         $thisCommentSeq=count($commentLines)+1;
-                     }
-                     $comment=str_replace("\n","",$comment);
-                     $commentContent = $commentTitle.$separator.$author.$separator.str_replace("\\","",$comment).$separator.date("d M Y h:i").$separator.$commentFileName.$separator.$thisCommentSeq."\n";
- 		     #  Add comment
- 		     $errorMessage='<br><span style="color: rgb(204, 0, 51);">'.$lang['errorCommentFile'].'<br>';
- 		     $errorMessage=$errorMessage."<br>If this problem continues, please report as a bug to the author of PRITLOG<br>";
- 		     $fp = fopen($commentFullName, "a") or die($errorMessage);
-		     fwrite($fp,$commentContent) or die($errorMessage);
-		     fclose($fp);
+                     else { $thisCommentSeq = $maxseq + 1; }
+                     $comment = sqlite_escape_string(str_replace("\\","",str_replace("\n","",$comment)));
+                     $date    = date("Y-m-d H:i:s");
+                     //echo $date;
+                     //die();
+                     $ip      = $_SERVER["REMOTE_ADDR"];
+                     sqlite_query($config['db'], "INSERT INTO comments (postid, sequence, title, author, content, date, ip, url, email) VALUES('$commentFileName', '$thisCommentSeq', '$commentTitle', '$author', '$comment', '$date', '$ip', '$url', '$email');");
 
-                     # Add coment number to a file with latest comments
-                     $errorMessage='<br><span style="color: rgb(204, 0, 51);">Error opening or writing to commentFileName '.$commentFileName.'. <br>Please check the folder permissions<br>';
-                     $errorMessage=$errorMessage.'<br>'.$lang['errorReportBug'].'<br>';
-		     $fp=fopen($config['commentDir']."/latest".$config['dbFilesExtension'],"a") or die($errorMessage);
-                     fwrite($fp,$commentFileName.$separator.$commentTitle.$separator.$thisCommentSeq."\n") or die($errorMessage);
-		     fclose($fp);
                      echo $lang['msgCommentAdded'].' '.$author.'!<br />';
 
                      # If Comment Send Mail is active
 		     if($config['sendMailWithNewComment'] == 1)
                      {
 		 	 $subject = "PRITLOG: ".$lang['msgMail7'];
-		 	 $message = "
-                                  <html>
-                                  <head>
-                                  <title>".$subject."</title>
-                                  </head>
-                                  <body>".
-                                  '<p>'.$lang['msgMail1'].' '.$author.' '.$lang['msgMail2'].'</p>'.
-                                  '<p>'.$lang['msgMail3'].': '.$commentTitle.'<br>'.$lang['msgMail4'].': '.str_replace("\\","",$comment).'<br>'.
-                                  $lang['msgMail5'].': '.date("d M Y h:i").'</p><p>'.$lang['msgMail6'].'</p>'.
-                                  "</body>
-                                  </html>
-                                  ";
+		 	 $message = $lang['msgMail1']." ".$author." ".$lang['msgMail2']."\n\n"
+                                  .$lang['msgMail3'].": ".$commentTitle."\n"
+                                  .$lang['msgMail4'].": ".str_replace("\\","",$comment)."\n"
+                                  .$lang['msgMail5'].": ".date("d M Y h:i A")."\n\n"
+                                  .$lang['msgMail6']."\n\n";
 
                          // To send HTML mail, the Content-type header must be set
                          $headers  = 'MIME-Version: 1.0' . "\r\n";
                          $headers .= 'Content-type: text/html; charset=iso-8859-1' . "\r\n";
                          // Additional headers
                          $headers .= 'To: '.$config['sendMailWithNewCommentMail']. "\r\n";
-                         $headers .= 'From: Pritlog <'.$config['sendMailWithNewCommentMail'].'>' . "\r\n";
-		 	 if (mail($config['sendMailWithNewCommentMail'],
-                         $subject,
-                         $message,
-                         $headers)) {
-                               echo '<br>'.$lang['msgMail8'].'.';
-                         }
-                         else {
-                             echo '<br>'.$lang['msgMail9'].'.<br>';
-                         }
+                         $headers = 'From: Pritlog <'.$config['sendMailWithNewCommentMail'].'>' . "\r\n";
+		 	 @mail($config['sendMailWithNewCommentMail'], $subject, $message, $headers);
   		     }
 		}
 	}
@@ -2176,85 +2779,32 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
       $commentNum = $optionValue2;
       echo "<h3>".$lang['pageCommentDel']."...</h3>";
       echo "<form name=\"form1\" method=\"post\" action=".$_SERVER['SCRIPT_NAME']."/deleteComment>";
-      echo "<table>";
-      echo "<tr><td>".$lang['pageAuthorsNew']."</td>";
-      echo "<td><input name=\"author\" type=\"text\" id=\"author\">&nbsp;&nbsp;('admin' for master user)</td></tr>";
-      echo "<tr><td>".$lang['pageDeletePass']."</td>";
-      echo "<td><input name=\"pass\" type=\"password\" id=\"pass\"></td></tr>";
+      echo $lang['msgSure'].'<br><br>';
       echo '<input name="process" type="hidden" id="process" value="deleteCommentSubmit">';
-      echo '<input name="fileName" type="hidden" id="fileName" value="'.$fileName.'"></td>';
-      echo '</tr><tr><td>&nbsp;</td><td><input type="submit" name="Submit" value="'.$lang['pageBasicConfigSubmit'].'"></td>';
-      echo "</tr></table></form>";
+      echo '<input name="fileName" type="hidden" id="fileName" value="'.$fileName.'">';
+      echo '<input name="commentNum" type="hidden" id="commentNum" value="'.$commentNum.'">';
+      echo '<input type="submit" name="Submit" value="'.$lang['pageBasicConfigSubmit'].'">';
+      echo "</form>";
   }
 
   function deleteCommentSubmit() {
        global $separator, $newPostFile, $newFullPostNumber, $config, $debugMode, $lang, $authors, $authorsPass;
        global $fileName;
        if ($debugMode=="on") {echo "Inside deleteCommentSubmit ..<br>";}
-       $fileName = $_POST['fileName'];
+       $fileName   = $_POST['fileName'];
+       $commentNum = $_POST['commentNum'];
        $postFile = $config['postDir'].$fileName.$config['dbFilesExtension'];
-       $fp = fopen($postFile, "rb");
-       $fullpost=explode($separator,fread($fp, filesize($postFile)));
-       fclose($fp);
-       $author=$fullpost[8];
-       $thisAuthor = $_POST['author'];
-       $thisPass   = md5($config['randomString'].$_POST['pass']);
+       $result = sqlite_query($config['db'], "select * from posts WHERE postid = '$fileName';");
+       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+           $author = $row['author'];
+       }
+       $thisAuthor = $_SESSION['username'];
        echo "<h3>".$lang['pageCommentDel']."...</h3>";
        $commentNum=$_POST['commentNum'];
-       if ((($config['authorDeleteComment'] == 1) && ($thisPass === $authorsPass[$thisAuthor])) ||
-           (($config['authorDeleteComment'] == 0) && ($thisAuthor == 'admin' || $thisAuthor == $author) && ($thisPass === $authorsPass[$thisAuthor]))) {
-            $commentFullName=$config['commentDir'].$fileName.$config['dbFilesExtension'];
-            $i=0;
-            $j=0;
-            if (file_exists($commentFullName)) {
-            $allcomments=file($commentFullName);
-            $errorMessage='<br><span style="color: rgb(204, 0, 51);">'.$lang['errorCommentFile'].'<br>';
-            $errorMessage=$errorMessage.'<br>'.$lang['errorReportBug'].'<br>';
-            $fp=fopen($commentFullName, "w");
-            foreach ($allcomments as $value) {
-                if (trim($value) != "") {
-                    if ($commentNum != $i) {
-                        if (fwrite($fp,$value)===FALSE) {
-                             echo $lang['errorCommentFile']."<br>";
-                        }
-                        else { $j++;}
-                    }
-                    else {
-                        $commentSplit=explode($separator,$value);
-                        $thisCommentFileName=$commentSplit[4];
-                        $thisCommentSeq=$commentSplit[5];
-                        echo $lang['msgCommentDeleted']." ...<br>";
-                    }
-                }
-                $i++;
-             }
-             fclose($fp);
-             $i=$i-2;
-             if ($j == 0) {unlink($commentFullName);}
-             $latestFileName=$config['commentDir']."/latest".$config['dbFilesExtension'];
-             if (file_exists($latestFileName)) {
-                   $latestLines= file($latestFileName);
-                   $errorMessage='<br><span style="color: rgb(204, 0, 51);">'.$lang['errorLatestFile'].'<br>';
-                   $errorMessage=$errorMessage.$lang['errorReportBug'].'<br>';
-                   $fp=fopen($latestFileName, "w") or die($errorMessage);
-                   $i=0;
-                   foreach ($latestLines as $value) {
-                        $latestSplit=explode($separator,$value);
-                        $commentFileName=trim($latestSplit[0]);
-                        $commentSeq     =trim($latestSplit[2]);
-                        if (trim($value) != "") {
-                           if (($commentFileName == $thisCommentFileName) && ($commentSeq == trim($thisCommentSeq))){
-                               //echo "Deleted Indeed!<br>";
-                           }
-                           else {
-                               fwrite($fp,$value);
-                           }
-                        }
-                        $i++;
-                   }
-                   fclose($fp);
-               }
-    	  }
+       if ((($config['authorDeleteComment'] == 1) && ($_SESSION['logged_in'])) ||
+           (($config['authorDeleteComment'] == 0) && ($thisAuthor == 'admin' || $thisAuthor == $author) && ($_SESSION['logged_in']))) {
+            sqlite_query($config['db'], "delete from comments WHERE postid = '$fileName' and sequence = '$commentNum';");
+            echo $lang['msgCommentDeleted']." ...<br>";
        }
        else {
           echo $lang['errorNotAuthorized'].' .. <br>';
@@ -2268,45 +2818,42 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
       echo "<h3>".$lang['pageArchive']."</h3>";
       $archiveArray   = array();
       $archiveArrayUnique = array();
-      foreach ($entries as $value) {
-          $entry  =explode($separator,$value);
-          $title  =$entry[0];
-          $titleModified=str_replace(" ","-",$title);
-          $content=$entry[1];
-          $date1  =explode(",",$entry[2]);
-          $date2  =explode(" ",$date1[0]);
-          $monthYear=$date2[2]." ".$date2[1];
+      $archiveArrayFormat = array();
+      $result = sqlite_query($config['db'], "select * from posts ORDER BY date;");
+      if (sqlite_num_rows($result) == 0) {
+          echo '<br><br>'.$lang['msgNoPosts'].' <a href="'.$_SERVER['SCRIPT_NAME'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
+      }
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $title         = $row['title'];
+          $titleModified = titleModify($rssTitle);
+          $date          = $row['date'];
+          $monthYear     = date("Y-m",strtotime($date));
           array_push($archiveArray,$monthYear);
-          $fileName=$entry[3];
-          $postType=$entry[5];
+          $archiveArrayFormat[$monthYear] = date("M Y",strtotime($date));
+          //echo $date.'<br>';
       }
       $archiveArrayUnique=array_unique($archiveArray);
       foreach ($archiveArrayUnique as $archiveMonthYear) {
-          echo "<a style='font-style:normal' href=".$_SERVER['SCRIPT_NAME']."/viewArchiveMonth/".str_replace(" ","-",$archiveMonthYear).">".$archiveMonthYear."</a><br>";
+          echo "<a style='font-style:normal' href=".$_SERVER['SCRIPT_NAME']."/viewArchiveMonth/".str_replace(" ","-",$archiveMonthYear).">".$archiveArrayFormat[$archiveMonthYear]."</a><br>";
       }
-
   }
 
 
   function viewArchiveMonth() {
       global $separator, $entries, $config, $optionValue, $lang;
       $i=0;
-      echo "<h3>".$lang['pageArchiveFor']." ".str_replace("-"," ",$optionValue)."</h3>";
+      echo "<h3>".$lang['pageArchiveFor']." ".date("M Y",strtotime($optionValue))."</h3>";
+      //$requestMonth = str_replace("-"," ",$optionValue);
+      $requestMonth = $optionValue;
+      //echo $requestMonth.'<br>';
       echo "<table>";
-      foreach ($entries as $value) {
-          $entry  =explode($separator,$value);
-          $title  =$entry[0];
-          $titleModified=titleModify($title);
-          $content=$entry[1];
-          $date1  =explode(",",$entry[2]);
-          $date2  =explode(" ",$date1[0]);
-          $postDate=$entry[2];
-          $monthYear=$date2[2]."-".$date2[1];
-          $fileName=$entry[3];
-          $postType=$entry[5];
-          if (strcmp($monthYear,$optionValue) == 0) {
-            echo "<tr><td>".$postDate.":&nbsp;</td><td><a style='font-style:normal' href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$fileName."/".$titleModified.">".$title."</a></td></tr>";
-          }
+      $result = sqlite_query($config['db'], "select * from posts WHERE date LIKE '%$requestMonth%';");
+      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          $title         = $row['title'];
+          $titleModified = titleModify($title);
+          $postDate      = $row['date'];
+          $fileName      = $row['postid'];
+          echo "<tr><td>".$postDate.":&nbsp;</td><td><a style='font-style:normal' href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$fileName."/".$titleModified.">".$title."</a></td></tr>";
       }
       echo "</table>";
   }
@@ -2321,19 +2868,19 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
           echo $lang['errorSearchNothing'].'<br>';
       }
       else {
-          foreach ($entries as $value) {
-              $entry  =explode($separator,$value);
-              $title  =$entry[0];
-              $titleModified=titleModify($title);
-              $content=$entry[1];
-              $date1  =$entry[2];
-              $fileName=$entry[3];
-              $category=$entry[4];
-              $postType=$entry[5];
-              if ((stristr($title,$searchkey)) || (stristr($content,$searchkey))) {
-                  echo "<a style='font-style:normal' href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$fileName."/".$titleModified.">".$title."</a><br/>";
-                  $i++;
-              }
+          $result = sqlite_query($config['db'], "select * from posts WHERE title LIKE '%$searchkey%' OR content LIKE '%$searchkey%';");
+          while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+              $title         = $row['title'];
+              $titleModified = titleModify($title);
+              $content       = $row['content'];
+              $date          = $row['date'];
+              $fileName      = $row['postid'];
+              $category      = $row['category'];
+              $postType      = $row['type'];
+              $allowComments = $row['allowcomments'];
+              $visits        = $row['visits'];
+              echo "<a style='font-style:normal' href=".$_SERVER['SCRIPT_NAME']."/viewEntry/".$fileName."/".$titleModified.">".$title."</a><br/>";
+              $i++;
           }
           if ($i == 0) {echo $lang['errorSearchEmptyResult'];}
       }
@@ -2341,3 +2888,4 @@ echo 'var t1   ="'.urlencode($postTitleSave.$config['blogTitle']).'";';
 
 
 ?>
+

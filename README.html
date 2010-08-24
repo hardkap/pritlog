@@ -52,28 +52,14 @@ pritlog @ hardkap.com or <a href="http://hardkap.net/forums">Hardkap Forums</a> 
 <br><strong>YAGNI:</strong> Only add things, when you actually
 need them, not because you think you will.</p>
 
-<h2>Changes for Version 0.7</h2>
+<h2>Changes for Version 0.8</h2>
 <p>Significant changes are highlighted in bold</p>
 <ul>
-<li><strong>Admin interface </strong>(change site properties, add authors, change password)</li>
-<li><strong>Easy translation. </strong>Language selection available in the admin panel</strong></li>
-<li><strong>Pretty Urls</strong></li>
-<li><strong>SEO Optimization</strong></li>
-<li><strong>md5sum encrypted passwords</strong></li>
-<li><strong>Social Bookmarking widget: </strong> to enable easy sharing of post/blog</li>
-<li><strong>Additional authors </strong> can be added by the admin</li>
-<li>New look - 2 additional themes</li>
-<li>Archive has year-month collapsible feature like blogspot</li>
-<li>Catch comment users and other fields with just spaces</li>
-<li>Use CSS framework and change all forms</li>
-<li>Post Options w/ Teaser + Full Story (using *readmore* in the post)</li>
-<li>RSS shorter - summary instead of the whole post? (*readmore* can be used)</li>
-<li>Move the Pritlog version info to the admin page</li>
-<li>Ability to enable / disable comments per post</li>
-<li>Added the number of visits for each post</li>
-<li>Added popular entries block that works based of this visits</li>
-<li>Added author field for posts</li>
-<li>Category cloud</li>
+<li><strong>Sqlite Database. </strong>Pritlog now uses Sqlite database instead of flat files.</li>
+<li><strong>Login Management. </strong>Using sessions, users can login, logout, self register.</li>
+<li><strong>Sticky Posts. </strong>Posts can be made stickies to show up on front page.</li>
+<li>Commenters name can be a link (optional URL and email fields on add comment form).</li>
+<li>Users are auto logged out after few minutes of being inactive.</li>
 </ul>
 
 
@@ -89,13 +75,13 @@ need them, not because you think you will.</p>
 <li>Change the permissions of this folder to 755. (In some cases 777 is required)</li>
 <li>Upload the contents to this folder using the FTP client.</li>
 <li>In your browser, go to the Pritlog url (Example: http://yoursite.com/blog/)</li>
-<li>Visit the admin panel using the default admin password - 'password' and change this default password</li>
+<li>Visit the admin panel using the default login:<br> userid - 'admin' and password - 'password' and change this default password</li>
 <li><strong>Start Pritlogging!</strong></li>
 </ul>
 
 <h2>Updating from an earlier version</h2>
 
-<p>Run the update.php script. You can only use this to update from 0.4 and 0.41.</p>
+<p>Run the update.php script. You can only use this to update from 0.7.</p>
 
 
 <h2>Reset Admin Password</h2>
