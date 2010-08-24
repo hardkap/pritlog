@@ -13,11 +13,19 @@ Powered by YAGNI (You Ain't Gonna Need It)
 YAGNI: Only add things, when you actually 	              
 need them, not because you think you will.	              
 						              
-Version: 0.4					              
+Version: 0.411					              
 
-Changes for 0.4
+Changes for 0.411
 
-    * Deleting entry - keeps the comments. This was a major bug that I had overlooked. Again, Eric (Caneri)'s testing revealed this error. We have real great testers and thinkers in the Puppy community.
+Pritlog 0.411 (Fixes the following things - still in testing)
+
+    * Category does not work when the category name has multiple words
+    * Category is case sensitive now. This can be changed.
+    * Let the post stay on screen, until it's successfully submitted!
+    * Direct scrolling to the exact comment.
+    * Catch comment users and other fields with just spaces. 
+
+
 
 
 SIMPLE INSTALLATION:

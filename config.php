@@ -5,7 +5,7 @@
 /***********************************************************************************/
 
 /* PLEASE CHANGE ATLEAST THE FIRST FOUR OPTIONS                                     */
-  $config_blogTitle                  = "PRITLOG - Simple and Powerful";              // BLOG Title
+  $config_blogTitle                  = "Pritlog 0.411 - Testing";                   // BLOG Title
   $configPass                        = "password";                                   // Admin password for adding entries
   $config_sendMailWithNewComment     = 1;                                            // Receive a mail when someone posts a comment. (0 = No, 1 = Yes) It works only if you host allows sendmail
   $config_sendMailWithNewCommentMail = "yourid@yourmail.com";                        // Email adress to send mail if allowed
@@ -19,7 +19,7 @@
   $config_entriesPerPage             = 5;                                            // For pagination... How many entries will be displayed per page?
   $config_maxPagesDisplayed          = 5;                                            // Maximum number of pages displayed at the bottom
   $config_allowComments              = 1;                                            // Allow comments
-  $config_commentsMaxLength          = 500;                                          // Comment maximum characters
+  $config_commentsMaxLength          = 1000;                                          // Comment maximum characters
   $config_commentsSecurityCode       = 1;                                            // Allow security code for comments (0 = No, 1 = Yes)
   $config_onlyNumbersOnCAPTCHA       = 0;                                            // Use only numbers on CAPTCHA
   $config_CAPTCHALength              = 8;                                            // Just to make different codes

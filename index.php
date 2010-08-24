@@ -19,7 +19,7 @@
 #	YAGNI: Only add things, when you actually 	                #
 #	need them, not because you think you will.	                #
 #							                #
-#	Version: 0.4                                                    #
+#	Version: 0.411                                                  #
 #######################################################################*/
 
 
@@ -82,10 +82,10 @@ else
 <script src="http://js.nicedit.com/nicEdit-latest.js" type="text/javascript"></script>
 <div id="menu">
 <h1>Main menu</h1>
-<a href=<? $_SERVER['PHP_SELF']; ?>?option=mainPage>Home</a>
-<a href=<? $_SERVER['PHP_SELF']; ?>?option=newEntry>New Entry</a>
-<a href=<? $_SERVER['PHP_SELF']; ?>?option=viewArchive>Archive</a>
-<a href=<? $_SERVER['PHP_SELF']; ?>?option=RSS>RSS Feeds</a>
+<a href=<?php $_SERVER['PHP_SELF']; ?>?option=mainPage>Home</a>
+<a href=<?php $_SERVER['PHP_SELF']; ?>?option=newEntry>New Entry</a>
+<a href=<?php $_SERVER['PHP_SELF']; ?>?option=viewArchive>Archive</a>
+<a href=<?php $_SERVER['PHP_SELF']; ?>?option=RSS>RSS Feeds</a>
 <h1>Categories</h1>
 <?php sidebarCategories(); ?>
 <h1>Search</h1>
@@ -112,7 +112,7 @@ else
 <?php sidebarStats() ?>
 <h1>Pritlog Version</h1>
 <script type="text/javascript">
-var clientVersion=0.4;
+var clientVersion=0.41;
 </script>
 <script src="http://hardkap.net/pritlog/checkversion.js" type="text/javascript"></script>
 
@@ -190,7 +190,7 @@ var clientVersion=0.4;
 
   function listPosts() {
       global $separator, $postdir, $entries, $config_entriesPerPage, $requestCategory, $config_maxPagesDisplayed;
-      global $commentdir,$config_dbFilesExtension;
+      global $commentdir,$config_dbFilesExtension, $userFileName;
       $filterEntries=array();
       $totalEntries=0;
       $totalPosts=0;
@@ -233,6 +233,7 @@ var clientVersion=0.4;
                   mkdir($commentdir,0755) or die($errorMessage);
                   mkdir($postdir,0755) or die($errorMessage);
               }
+
               echo '<br><br>No posts yet. Why dont you <a href="'.$_SERVER['PHP_SELF'].'?option=newEntry">make one</a>?<br>';
           }
           else {
@@ -267,14 +268,17 @@ var clientVersion=0.4;
            echo "<h1><a class=\"postTitle\" href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$fileName.">".$title."</a></h1>";
            //echo "<h1>".$title."</h1>";
            echo $content;
-           echo "<center><br/><i>Posted on ".$date1."&nbsp;-&nbsp; Category: <a href=".$_SERVER['PHP_SELF']."?option=viewCategory&category=".$category.">".$category."</a></i><br/>";
+           /* 0.45 Changing '.' to ' ' */
+           $categoryText=str_replace("."," ",$category);
+           echo "<center><br/><i>Posted on ".$date1."&nbsp;-&nbsp; Category: <a href=".$_SERVER['PHP_SELF']."?option=viewCategory&category=".$category.">".$categoryText."</a></i><br/>";
            $commentFile=$commentdir.$fileName.$config_dbFilesExtension;
            if (file_exists($commentFile)) {
                $commentLines=file($commentFile);
                $commentText=count($commentLines)." Comments";
            }
            else {$commentText="No Comments";}
-           echo "<a href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$fileName.">".$commentText."</a>";
+           /* 0.45 #Comments*/
+           echo "<a href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$fileName."#Comments>".$commentText."</a>";
            echo "&nbsp;-&nbsp;<a href=".$_SERVER['PHP_SELF']."?option=editEntry&filename=".$fileName.">Edit</a>";
            echo "&nbsp;-&nbsp;<a href=".$_SERVER['PHP_SELF']."?option=deleteEntry&filename=".$fileName.">Delete</a></center><br/><br/><br/>";
            $i++;
@@ -319,7 +323,7 @@ var clientVersion=0.4;
 	}
 	print '</center>';
   }
-  
+
 
   function sidebarListEntries() {
       global $separator, $postdir, $entries, $config_menuEntriesLimit;
@@ -356,7 +360,9 @@ var clientVersion=0.4;
                   $entry  =explode($separator,$value);
                   $commentFileName=$entry[0];
                   $commentTitle   =$entry[1];
-                  echo "<a href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$commentFileName.">".$commentTitle."</a>";
+                  $commentNum     =$entry[2];
+                  /* Added #$commentNum below for 0.45 */
+                  echo "<a href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$commentFileName."#".$commentNum.">".$commentTitle."</a>";
                   $i++;
               }
           }
@@ -399,7 +405,9 @@ var clientVersion=0.4;
           //echo "Testing Category ..".$category_array_sorted[0]."<br>";
           // Sorting is not working. I need to check later .. todo
           foreach ($category_array_unique as $value) {
-             echo "<a href=".$_SERVER['PHP_SELF']."?option=viewCategory&category=".$value.">".$value."</a>";
+             /* 0.45 Changing ' ' to '.' */
+             $categoryText=str_replace("."," ",$value);
+             echo "<a href=".$_SERVER['PHP_SELF']."?option=viewCategory&category=".$value.">".$categoryText."</a>";
           }
       }
   }
@@ -515,16 +523,23 @@ var clientVersion=0.4;
       $postContent=$_POST["posts"];
       $postDate=date("d M Y h:i");
       $isPage=$_POST["isPage"];
-      $postCategory=$_POST["category"];
+      /* 0.45 added strtolower to make category case insensitive */
+      $postCategory=strtolower($_POST["category"]);
       echo "<h1>Making new entry...</h1>";
       $do = 1;
-      if($postTitle == '' || $postContent == '' || $postCategory == '')
+      /* 0.45 added strstr($postCategory,'.') and trim*/
+      if(trim($postTitle) == '' || trim($postContent) == '' || trim($postCategory) == '' || strstr($postCategory,'.'))
       {
-      	   echo 'All fields are neccessary. Please fill them all.';
+      	   echo 'All fields are neccessary. Please fill them all.<br>';
+      	   /* 0.45 Back button */
+      	   echo "Also, category names cannot have '.' in them<br>";
+      	   echo 'Hit the back button on your browser to go back, change and submit again';
 	   $do = 0;
       }
       if ($do == 1) {
           if ($_POST['pass']===$configPass) {
+              /* 0.45 Changing ' ' to '.' */
+              $postCategory=str_replace(" ",".",$postCategory);
               if ($debugMode=="on") {echo "Writing to ".$newPostFileName;}
               $errorMessage='<br><span style="color: rgb(204, 0, 51);">Error opening or writing to newPostFile '.$newPostFileName.'. <br>Please check the folder permissions<br>';
               $errorMessage=$errorMessage."<br>If this problem continues, please report as a bug to the author of PRITLOG<br>";
@@ -542,8 +557,8 @@ var clientVersion=0.4;
           }
           else {
               echo "Password Incorrect .. <br/>";
-              echo "Sorry, you have to start from the scratch and create the post again .. <br/>";
-              echo "Currently, there is no functionality to goback.";
+              /* 0.45 Back button */
+              echo "Hit the back button on your browser to go back, change and submit again";
           }
       }
   }
@@ -651,6 +666,8 @@ var clientVersion=0.4;
         echo $content;
         echo '</textarea>';
         echo "</td></tr><tr><td>Category<br />";
+        /* 0.45 Changing '.' to ' ' */
+        $category=str_replace("."," ",$category);
         echo '<td><input name="category" type="text" id="category" value="'.$category.'"></td>';
         echo '</tr><tr><td>Is A Page <a href="javascript:alert(\'A page is basically a post which is linked in the menu and not displayed normally\')">(?)</a></td>';
         echo '<td><input type="checkbox" name="isPage" value="1" '.$checking.'></td>';
@@ -675,11 +692,15 @@ var clientVersion=0.4;
       $postContent=$_POST["posts"];
       $postDate=date("d M Y h:i");
       $isPage=$_POST["isPage"];
-      $postCategory=$_POST["category"];
+      /* 0.45 added strtolower to make category case insensitive */
+      $postCategory=strtolower($_POST["category"]);
       $do = 1;
-      if($postTitle == '' || $postContent == '' || $postCategory == '')
+      /* 0.45 add trim */
+      if(trim($postTitle) == '' || trim($postContent) == '' || trim($postCategory) == '' || strstr($postCategory,'.'))
       {
-      	   echo 'All fields are neccessary. Please fill them all.';
+      	   echo "All fields are neccessary. Please fill them all.<br>";
+      	   echo "Also, category names cannot have '.' in them<br>";
+      	   echo 'Hit the back button on your browser to go back, change and submit again';
 	   $do = 0;
       }
       if ($do == 1) {
@@ -690,11 +711,12 @@ var clientVersion=0.4;
               $postType="post";
           }
           if ($debugMode=="on") {echo "Writing to ".$fileName;}
-          $content=$postTitle.$separator.str_replace("\\","",$postContent).$separator.$postDate.$separator.$entryName.$separator.$postCategory.$separator.$postType;
           $errorMessage='<br><span style="color: rgb(204, 0, 51);">Error opening or writing to PostFile '.$fileName.'. <br>Please check the folder permissions<br>';
           $errorMessage=$errorMessage."<br>If this problem continues, please report as a bug to the author of PRITLOG<br>";
           if ($_POST['pass']===$configPass) {
-
+              /* 0.45 Changing ' ' to '.' */
+              $postCategory=str_replace(" ",".",$postCategory);
+              $content=$postTitle.$separator.str_replace("\\","",$postContent).$separator.$postDate.$separator.$entryName.$separator.$postCategory.$separator.$postType;
               $fp = fopen($fileName,"w") or die($errorMessage);
               fwrite($fp, $content) or die($errorMessage);
               fclose($fp);
@@ -712,8 +734,13 @@ var clientVersion=0.4;
       global $config_allowComments, $config_commentsSecurityCode, $config_CAPTCHALength, $config_randomString;
       global $commentdir,$config_dbFilesExtension, $config_onlyNumbersOnCAPTCHA;
       $viewFileName=$postdir.$fileName.$config_dbFilesExtension;
+      $cool=true;
       if ($debugMode=="on") {echo "Editing .. ".$viewFileName."<br>";}
-      if (file_exists($viewFileName)) {
+      if (strstr($fileName,'%') || strstr($fileName,'.')) {
+        $cool=false;
+        echo "<br>Sorry. Invalid URL!<br>";
+      }
+      if (file_exists($viewFileName) && $cool) {
           $fp = fopen($viewFileName, "rb");
           $entry   =explode($separator,fread($fp, filesize($viewFileName)));
           fclose($fp);
@@ -732,14 +759,15 @@ var clientVersion=0.4;
               $commentText=count($commentLines)." Comments";
           }
           else {$commentText="No Comments";}
-          echo "<a href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$fileName.">".$commentText."</a>";
+          /* 0.45 #Comments */
+          echo "<a href=".$_SERVER['PHP_SELF']."?option=viewEntry&filename=".$fileName."#Comments>".$commentText."</a>";
           echo "&nbsp;-&nbsp;<a href=".$_SERVER['PHP_SELF']."?option=editEntry&filename=".$fileName.">Edit</a>";
           echo "&nbsp;-&nbsp;<a href=".$_SERVER['PHP_SELF']."?option=deleteEntry&filename=".$fileName.">Delete</a><br/><br/></center>";
 
 
           $commentFullName=$commentdir.$fileName.$config_dbFilesExtension;
           $i=0;
-          echo "<h1>Comments:</h1>";
+          echo "<a name='Comments'></a><h1>Comments:</h1>";
     	  if (file_exists($commentFullName)) {
                $fp = fopen($commentFullName, "rb");
     	       $allcomments=explode("\n",fread($fp, filesize($commentFullName)));
@@ -751,7 +779,8 @@ var clientVersion=0.4;
                         $author  = $comment[1];
                         $content = $comment[2];
                         $date    = $comment[3];
-                        echo 'Posted on <b>'.$date.'</b> by <b>'.$author.'</b><br /><i>'.$title.'</i><br />';
+                        /* Added $comment[5] below for 0.45 */
+                        echo '<a name="'.$comment[5].'">Posted on <b>'.$date.'</b> by <b>'.$author.'</b><br /><i>'.$title.'</i><br /></a>';
                         echo $content;
                         echo '<br><a href="'.$_SERVER['PHP_SELF'].'?option=deleteComment&filename='.$fileName.'&commentNum='.$i.'">Delete</a><br><br><br>';
                         $i++;
@@ -792,7 +821,8 @@ var clientVersion=0.4;
 		}
 		echo '<tr><td>Password (So people cannot steal your identity)</td>';
 		echo '<td><input name="pass" type="password" id="pass"></td></tr><tr><td>&nbsp;</td>';
-		echo '<td><input type="submit" onclick="javascript:this.disabled=true" name="Submit" value="Add Comment">';
+		//echo '<td><input type="submit" onclick="javascript:this.disabled=true" name="Submit" value="Add Comment">';
+		echo '<td><input type="submit" name="Submit" value="Add Comment">';
                 echo '<input name="sendComment" value="'.$fileName.'" type="hidden" id="sendComment"></td></tr></table></form>';
           }
       }
@@ -806,7 +836,7 @@ var clientVersion=0.4;
         $commentFileName= isset($_POST['sendComment'])?$_POST['sendComment']:$_GET['sendComment'];
 	$commentTitle   = isset($_POST['commentTitle'])?$_POST['commentTitle']:$_GET['commentTitle'];
 	$author  = isset($_POST['author'])?$_POST['author']:$_GET['author'];
-	$comment = $_POST['comment'];
+	$comment = isset($_POST['comment'])?$_POST['comment']:$_GET['comment'];
 	$pass    = isset($_POST['pass'])?$_POST['pass']:$_GET['pass'];
 	$date    = getdate($config_gmt);
 	$code    = $_POST['code'];
@@ -817,9 +847,11 @@ var clientVersion=0.4;
 	//echo 'Comment='.$comment.',<br>';
 	//echo 'Author='.$author.',<br>';
 
-	if($commentTitle == '' || $author == '' || $comment == '' || $pass == '')
+        /* 0.45 Author cannot be spaces anymore */
+	if(trim($commentTitle) == '' || trim($author) == '' || trim($comment) == '' || trim($pass) == '')
 	{
-		echo 'All fields are neccessary. Please fill them all.';
+		echo 'All fields are neccessary. Please fill them all.<br>';
+		echo 'Hit the back button on your browser to go back, change and submit again';
 		$do = 0;
 	}
 
@@ -913,10 +945,16 @@ var clientVersion=0.4;
 		     if($config_sendMailWithNewComment == 1)
                      {
 		 	 $content = "Hello, i am sending this mail because $author commented on your blog. \r\nTitle: $commentTitle\r\nComment: ".str_replace("\\","",$comment)."\r\nDate: ".date("d M Y h:i")."\r\nRemember you can disallow this option changing the ".'$config_sendMailWithNewComment Variable to 0';
-		 	 mail($config_sendMailWithNewCommentMail,
+		 	 if(mail($config_sendMailWithNewCommentMail,
                          "PRITLOG: New Comment",
                          $content
-                         ,"FROM: PRITLOG");
+                         ,"FROM: PRITLOG")) {
+                               echo '<br>Comment email has been sent.';
+                         }
+                         else {
+                             echo '<br>Comment mail could not be sent. Please make sure your server allows this.<br>';
+                             echo 'You can change $config_sendMailWithNewComment to change the setting.';
+                         }
   		     }
 		}
 	}
