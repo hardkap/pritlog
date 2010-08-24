@@ -2,7 +2,7 @@
 <form name="form1" method="post" action="{action}">
 <table>
 <tr><td>{user}</td>
-<td><input class="s" name="author" type="text" id="author">&nbsp;&nbsp;('admin' for master user)</td></tr>
+<td><input class="s" name="author" type="text" id="author"></td></tr>
 {userValidate}
 <tr><td>{password}</td>
 <td><input class="s" name="pass" type="password" id="pass"></td></tr>

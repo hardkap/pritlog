@@ -2,10 +2,10 @@
 /*#######################################################################
 	PRITLOG
 	Pritlog is a lightweight blog app powered by PHP and Sqlite
-	pritlog@hardkap.com
+	prit@pritlog.com
 	PRITLOG now uses the MIT License
 	http://www.opensource.org/licenses/mit-license.php
-	Version: 0.81
+	Version: 0.811
 #######################################################################*/
 /* Enable all kinds of errors - to eliminate as many warnings and errors as possible */
 //error_reporting(E_ALL);
@@ -21,14 +21,12 @@ if (!extension_loaded('sqlite')) {
 }
 $multi_user = false;  // 'true' - multi blog pritlog installation; 'false' - single blog pritlog installation
 $domain = $_SERVER['HTTP_HOST'];
+$domain = $_SERVER['HTTP_HOST'];
 $domain_parts = explode('.',$domain);
 if ($multi_user) {
 	if (count($domain_parts) == 3 && $domain_parts[0]!= "www") { // make sure a subdomain is called
 		$user  = $domain_parts[0];
 		$user1 = $domain_parts[1];
-		//$loc = "http://pritlog.com/pritloggers/$user/";
-		//@header("Location: $loc");
-		//die();
 	}
 }
 else $user="user";
@@ -50,6 +48,8 @@ else $user="user";
   $authorsActCode = array();
   $authorsActStatus = array();
   $tags         = array();
+  $priv 		= "" ;
+  
   readConfig();                                            /* Read the config file and load it into the array */
   if ($config['cleanUrl'] == 0) $config['cleanIndex'] = "/index.php";
   else $config['cleanIndex'] = "";
@@ -67,6 +67,13 @@ else $user="user";
   }
   //echo getcwd().'/themes/'.$config['theme'].'<br>';
   readAuthors();
+  $morepriv	= " status = 1 and ";
+  //echo "More Priv = ".$morepriv."<br>";
+  if ($_SESSION['logged_in']) {
+    $author		= $_SESSION['username'];
+	$morepriv	= " (status = 1 or author = '$author') and ";
+  }
+  getPrivacy();
   $firstTime = false;
   if (!file_exists($postdb)) { $firstTime = true; }
   if (function_exists('sqlite_open')) {
@@ -80,7 +87,7 @@ else $user="user";
               @sqlite_query($config['db'], 'DROP TABLE plugins');
               @sqlite_query($config['db'], 'DROP TABLE ipban');
               @sqlite_query($config['db'], 'DROP TABLE logs');
-              sqlite_query($config['db'], 'CREATE TABLE posts (title CHAR(100), content CHAR(4500), date DATETIME, postid PRIMARY KEY, category CHAR(20), type CHAR(5), stick CHAR(5), allowcomments CHAR(4), visits INTEGER, author CHAR(25));');
+              sqlite_query($config['db'], 'CREATE TABLE posts (title CHAR(100), content CHAR(4500), date DATETIME, postid PRIMARY KEY, category CHAR(20), type CHAR(5), stick CHAR(5), allowcomments CHAR(4), visits INTEGER, author CHAR(25), status INTEGER);');
               sqlite_query($config['db'], 'CREATE TABLE comments (commentid INTEGER PRIMARY KEY, postid CHAR(6), sequence INTEGER, author CHAR(25), title CHAR(100), content CHAR(4500), date DATETIME, ip CHAR(16), url CHAR(50), email CHAR(50), status CHAR(10));');
               sqlite_query($config['db'], 'CREATE TABLE stats (statid INTEGER PRIMARY KEY, stattype CHAR(10), statcount INTEGER);');
               sqlite_query($config['db'], 'CREATE TABLE active_guests (id INTEGER PRIMARY KEY, ip CHAR(16), logtime DATETIME);');
@@ -96,6 +103,14 @@ else $user="user";
        }
   }
   else { die("Your server does not seem to have Sqlite enabled. This version of Pritlog will not work without Sqlite."); }
+  /*
+  sqlite_query($config['db'], 'CREATE TABLE posts1 (title CHAR(100), content CHAR(4500), date DATETIME, postid PRIMARY KEY, category CHAR(20), type CHAR(5), stick CHAR(5), allowcomments CHAR(4), visits INTEGER, author CHAR(25), status INTEGER);');
+  sqlite_query($config['db'], 'INSERT INTO posts1 SELECT *,1 FROM posts;');
+  sqlite_query($config['db'], 'DROP TABLE posts;');
+  sqlite_query($config['db'], 'CREATE TABLE posts (title CHAR(100), content CHAR(4500), date DATETIME, postid PRIMARY KEY, category CHAR(20), type CHAR(5), stick CHAR(5), allowcomments CHAR(4), visits INTEGER, author CHAR(25), status INTEGER);');
+  sqlite_query($config['db'], 'INSERT INTO posts SELECT * FROM posts1;');
+  sqlite_query($config['db'], 'DROP TABLE posts1');
+  */
   $ip = getRealIpAddr();
   //echo $ip.'<br>';
   //phpinfo();
@@ -172,25 +187,29 @@ else $user="user";
   // In seconds. User will be logged out after this
   $inactive = $config['timeoutDuration'];
   // check to see if $_SESSION['timeout'] is set
-  $_SESSION['notice'] = "";
-  if( isset($_SESSION['timeout'])) {
-       $session_life  = time() - $_SESSION['timeout'];
-       if ($session_life > $inactive && isset($_SESSION['logged_in']) && $_SESSION['logged_in']) {
-          /* session_unset();
-           session_destroy();
-           header("Location: ".$blogPath); */
-           $_SESSION['notice']=$lang['loggedOut'];
-           $option="logoutPage";
-       }
+  //echo $inactive.'<br/>';
+  if ($inactive != 0) {
+      $_SESSION['notice'] = "";
+	  if( isset($_SESSION['timeout'])) {
+		   $session_life  = time() - $_SESSION['timeout'];
+		   if ($session_life > $inactive && isset($_SESSION['logged_in']) && $_SESSION['logged_in']) {
+			  /* session_unset();
+			   session_destroy();
+			   header("Location: ".$blogPath); */
+			   $_SESSION['notice']=$lang['loggedOut'];
+			   $option="logoutPage";
+		   }
+	  }
+	  //echo "Logging out ..<br>";
+	  $_SESSION['timeout'] = time();
   }
-  $_SESSION['timeout'] = time();
   if (isset($_SESSION['start'])) $_SESSION['start']   = false;
   else $_SESSION['start']   = true;
-   $mypath  =isset($_SERVER['PATH_INFO'])?str_replace("/index.php","",$_SERVER['PATH_INFO']):"";
+   $mypath  = isset($_SERVER['PATH_INFO'])?str_replace("/index.php","",$_SERVER['PATH_INFO']):"";
    //$referrer=$blogPath.'/index.php'.$mypath;
    $referrer=$serverName.$_SERVER['REQUEST_URI'];
    if ($option == "mainPage") { $_SESSION['url']=$referrer; }
-   $accessArray=array('newEntry', 'newEntryForm', 'newEntrySubmit', 'deleteEntry', 'editEntry', 'editEntryForm', 'editEntrySubmit', 'deleteComment', 'myProfile', 'myProfileSubmit');
+   $accessArray=array('newEntry', 'newEntryForm', 'newEntrySubmit', 'newEntrySuccess', 'deleteEntry', 'editEntry', 'editEntryForm', 'editEntrySubmit', 'deleteComment', 'myProfile', 'myProfileSubmit');
    if (in_array($option,$accessArray)) {
       if (!$ss->Check() || !isset($_SESSION['logged_in']) || !$_SESSION['logged_in']) {
            $_SESSION['notice']="";
@@ -218,6 +237,8 @@ else $user="user";
        logout();
        //die;
    }
+  
+  
   //execute hooks only if there are hooks to execute
   if ($SHP->hooks_exist('hook-head-before')) {
   	$SHP->execute_hooks('hook-head-before');
@@ -390,6 +411,9 @@ sqlite_close($config['db']);
       case "newEntrySubmit":
           newEntrySubmit();
           break;
+      case "newEntrySuccess":
+          newEntrySuccess();
+          break;
       case "mainPage":
           $requestCategory = '';
           listPosts();
@@ -478,7 +502,10 @@ sqlite_close($config['db']);
       case "sendComment":
           sendComment();
           break;
-      case "listAllComments":
+      case "sendCommentSuccess":
+          sendCommentSuccess();
+          break;
+	  case "listAllComments":
           listAllComments();
           break;
       case "deleteComment":
@@ -1277,7 +1304,7 @@ sqlite_close($config['db']);
           else {
               $config['blogTitle']=trim(str_replace("\\","",$_POST['title']));
               $config['sendMailWithNewCommentMail']=trim($_POST['adminEmail']);
-              $config['about']=str_replace("\\","",trim($_POST['posts']));
+              $config['about']=str_replace("\n","<br/>",str_replace("\\","",trim($_POST['posts'])));
               writeConfig(false);
 			  return true;
           }
@@ -1376,6 +1403,30 @@ sqlite_close($config['db']);
 
           $theme_adminadvanced['theme'] .= '</select>';
 
+          $theme_adminadvanced['privacy'] = '<p><label for="privacy">'.$lang['pageAdvancedConfigPrivacy'].'</label><br>';
+          $theme_adminadvanced['privacy'].= '<select name="privacy" id="privacy">';
+		  //$config['privacy'] = 2;
+		  $privacyArray = array(0, 1, 2);
+		  if (is_array($privacyArray)) {
+              foreach ($privacyArray as $value) {
+                  $privacy=$value;
+				  ($config['privacy'] == $privacy)?$selected="selected":$selected="";
+				  switch ($privacy) {
+					case 0: 
+						$privacyText = "0 - Only the author can read the posts";
+						break;
+					case 1:
+						$privacyText = "1 - All registered authors can read posts";
+						break;
+					case 2:
+						$privacyText = "2 - Everybody can read all posts";
+						break;
+				  } 
+				  $theme_adminadvanced['privacy'] .= '<option value="'.$privacy.'" '.$selected.' >'.$privacyText;
+              }
+          }		  
+          $theme_adminadvanced['privacy'] .= '</select>';		 
+		  
           $menuLinks="";
           if (is_array($config['menuLinksArray'])) {
               foreach ($config['menuLinksArray'] as $value) {
@@ -1553,6 +1604,10 @@ sqlite_close($config['db']);
 
           if (isset($_POST['theme'])) {
                $config['theme']=$_POST['theme'];
+          }
+
+          if (isset($_POST['privacy'])) {
+               $config['privacy']=$_POST['privacy'];
           }
 
           setConfigDefaults();
@@ -1989,6 +2044,30 @@ sqlite_close($config['db']);
     //echo $config['Password'].'<br>';
  }
 
+ function getPrivacy() {
+	global $priv, $config, $morepriv;
+	
+	$author = $_SESSION['username'];
+	//echo $config['privacy']."<br>";
+	switch ($config['privacy']) {
+		case 0:
+			if ($author == 'admin')
+				$priv = ""; 	
+			elseif (trim($author) == '')
+				$priv = "author = 'a87890KJLii10101zbUyTrUU' and "; 	
+			else	
+				$priv = "author = '$author' and ";
+			break;
+		case 1:
+			if (!$_SESSION['logged_in'])
+				$priv = "author = 'a87890KJLii10101zbUyTrUU' and "; 	
+			break;
+		case 2:
+			$priv = ""; 	
+			break;
+	}
+	$priv = $priv.$morepriv;
+  }	
 
   function readConfig() {
     /* Read config information from file. */
@@ -2048,6 +2127,7 @@ sqlite_close($config['db']);
                   'theme',
                   'commentModerate',
                   'limitLogins',
+                  'privacy',
                   'cleanUrl');
 
       for ( $i = 0; $i < count( $tempConfigs ); $i++ ) {
@@ -2096,13 +2176,14 @@ sqlite_close($config['db']);
                                                                    $config[ 'menuLinks' ]                  = 'http://google.com,Google;http://pplog.infogami.com/,Get PPLOG;http://hardkap.net/pritlog,Get PRITLOG'; }
         if ( !isset( $config[ 'blogLanguage' ] ) )               { $config[ 'blogLanguage' ]               = 'english-us'; }
         if ( !isset( $config[ 'theme' ] ) )                      { $config[ 'theme' ]                      = 'default'; }
+        if ( !isset( $config[ 'privacy' ] ) )                    { $config[ 'privacy' ]                    = '2'; }
         if ( !isset( $config[ 'blogPath' ] ) )                   { $config[ 'blogPath' ]                   = 'http://localhost'; }
         if ( !isset( $config[ 'showCategoryCloud' ] ) )          { $config[ 'showCategoryCloud' ]          = 1; }
         if ( !isset( $config[ 'allowRegistration' ] ) )          { $config[ 'allowRegistration' ]          = 0; }
         if ( !isset( $config[ 'sendRegistMail' ] ) )             { $config[ 'sendRegistMail' ]             = 1; }
         if ( !isset( $config[ 'commentModerate' ] ) )            { $config[ 'commentModerate' ]            = 0; }
         if ( !isset( $config[ 'cleanUrl' ] ) )                   { $config[ 'cleanUrl' ]                   = 0; }
-        if ( !isset( $config[ 'timeoutDuration' ] ) )            { $config[ 'timeoutDuration' ]            = 900; }
+        if ( !isset( $config[ 'timeoutDuration' ] ) )            { $config[ 'timeoutDuration' ]            = 0; }
         if ( !isset( $config[ 'limitLogins' ] ) )                { $config[ 'limitLogins' ]                = 10; }
         $config['menuLinksOrig']=$config['menuLinks'];
         $config['menuLinksArray']=explode(';',$config['menuLinks']);
@@ -2113,6 +2194,7 @@ sqlite_close($config['db']);
         global $config, $lang, $user;
         $configFile=getcwd()."/data/".$user.'/config.php';
         /*$configContent='<?php /* ';*/
+		//echo 'Writing Config .. <br/>';
 		$configContent = '';
         if (file_exists($configFile)) {
             $configContent=$configContent.
@@ -2152,6 +2234,7 @@ sqlite_close($config['db']);
                           $config['theme'].'|'.
                           $config['commentModerate'].'|'.
                           $config['limitLogins'].'|'.
+                          $config['privacy'].'|'.
                           $config['cleanUrl'];
             //echo $configContent.'<br/>';
 			$configContent='<?php /* '.$configContent.' */ ?>';
@@ -2166,14 +2249,14 @@ sqlite_close($config['db']);
 
 
   function createRSS() {
-    global $config, $separator, $entries, $optionValue, $lang;
+    global $config, $separator, $entries, $optionValue, $lang, $priv;
 	$base = 'http://'.$_SERVER['HTTP_HOST'].substr($_SERVER['REQUEST_URI'],0,-3);
 
 	echo header('Content-type: text/xml').'<?xml version="1.0" encoding="ISO-8859-1"?><rss version="2.0">';
 	echo '<channel><title>'.$config['blogTitle'].'</title><description>'.$config['metaDescription'].'</description>';
 	echo '<link>http://'.$_SERVER['HTTP_HOST'].substr($_SERVER['REQUEST_URI'],0,strlen($_SERVER['REQUEST_URI'])-7).'</link>';
        
-        $result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE type = 'post';");
+        $result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE ".$priv." type = 'post';");
         while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
             $totalEntries = $row['view'];
         }
@@ -2188,7 +2271,7 @@ sqlite_close($config['db']);
 	}
 
         $limit = ($limit > 200) ? 200 : $limit;
-        $result = sqlite_query($config['db'], "select * from posts ORDER BY postid DESC LIMIT $limit;");
+        $result = sqlite_query($config['db'], "select * from posts where ".$priv." 1 ORDER BY postid DESC LIMIT $limit;");
         while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
             $rssTitle      = $row['title'];
             $rssTitleModified=titleModify($rssTitle);
@@ -2216,29 +2299,26 @@ sqlite_close($config['db']);
 
   function titleModify($myTitle)
   {
-          $myTitle=removeAccent(str_replace('"','',str_replace("'","",html_entity_decode($myTitle,ENT_QUOTES))));
-          $myTitleMod1=@preg_replace("/[^a-z\d\'\"]/i", "-", substr($myTitle,0,strlen($myTitle)-1));
+      $myTitle=removeAccent(str_replace('"','',str_replace("'","",html_entity_decode($myTitle,ENT_QUOTES))));
+      $myTitleMod1=@preg_replace("/[^a-z\d\'\"]/i", "-", substr($myTitle,0,strlen($myTitle)-1));
 	  $myTitleMod2=@preg_replace("/[^a-z\d]/i", "", substr($myTitle,strlen($myTitle)-1,1));
-          $myTitleModified=rtrim($myTitleMod1.$myTitleMod2,'-');
-          return $myTitleModified;
+      $myTitleModified=rtrim($myTitleMod1.$myTitleMod2,'-');
+      return $myTitleModified;
   }
 
   function getPosts($start, $end, $requestCategory = "") {
-      global $config, $postdb, $separator;
-
-       $file_array_sorted   = array();
-       //echo $start.' '.$end.'<br>';
-       //echo $requestCategory.'<Br>';
-       if (trim($requestCategory) == "") {
-           $result = sqlite_query($config['db'], "select * from posts WHERE type = 'post' ORDER BY stick desc, postid desc LIMIT $start, $end;");
+      global $config, $postdb, $separator, $priv;
+	   $file_array_sorted   = array();
+	   if (trim($requestCategory) == "") {
+		   $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." (type = 'post' or (type = 'page' AND stick = 'yes')) ORDER BY stick desc, postid desc LIMIT $start, $end;");
        }
        else {
-           //$result = sqlite_query($config['db'], "select * from posts WHERE type = 'post' AND category = '$requestCategory' ORDER BY stick desc, postid desc LIMIT $start, $end;");
-           $result = sqlite_query($config['db'], "select * from posts WHERE type = 'post' AND (category = '$requestCategory' or category like '$requestCategory,%' or category like '%,$requestCategory' or category like '%,$requestCategory,%') ORDER BY stick desc, postid desc LIMIT $start, $end;");
+			$result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." type = 'post' AND (category = '$requestCategory' or category like '$requestCategory,%' or category like '%,$requestCategory' or category like '%,$requestCategory,%') ORDER BY stick desc, postid desc LIMIT $start, $end;");
        }
-       //sqlite_seek($result,11);
-       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
-          $title         = $row['title'];
+       while ($row = @sqlite_fetch_array($result, SQLITE_ASSOC)) {
+		  $status		 = $row['status'];
+		  $mystatus		 = ($status == 1)?"":"(draft)";
+		  $title         = $row['title'].' '.$mystatus;
           $content       = $row['content'];
           $date          = $row['date'];
           $fileName      = $row['postid'];
@@ -2335,14 +2415,16 @@ sqlite_close($config['db']);
 
 
   function listPosts() {
-      global $separator, $entries, $config, $requestCategory;
+      global $separator, $entries, $config, $requestCategory, $priv;
       global $userFileName, $optionValue3, $lang, $theme_main, $SHP, $theme_post;
       $config_Teaser=0;
       $filterEntries=array();
-
+	  $totalEntries = 0;
+	  //echo $priv."<br/>";
       if (trim($requestCategory) == "") {
-          $result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE type = 'post';");
-          while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          //$result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE type = 'post' or (type = 'page' AND stick = 'yes');");
+		  $result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE ".$priv." (type = 'post' or (type = 'page' AND stick = 'yes'));");
+		  while ($row = @sqlite_fetch_array($result, SQLITE_ASSOC)) {
               $totalEntries = $row['view'];
               if ($row['view'] == 0) {
                  $theme_main['content'] = '<br><br>'.$lang['msgNoPosts'].' <a href="'.$config['blogPath'].$config['cleanIndex'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
@@ -2351,12 +2433,18 @@ sqlite_close($config['db']);
       }
       else {
           //$result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE type = 'post' AND category = '$requestCategory';");
-          $result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE type = 'post' AND (category = '$requestCategory' or category like '$requestCategory,%'or category like '%,$requestCategory' or category like '%,$requestCategory,%');");
-          while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+          //$result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE type = 'post' AND (category = '$requestCategory' or category like '$requestCategory,%'or category like '%,$requestCategory' or category like '%,$requestCategory,%');");
+			$result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE ".$priv." type = 'post' AND (category = '$requestCategory' or category like '$requestCategory,%'or category like '%,$requestCategory' or category like '%,$requestCategory,%');");
+		    while ($row = @sqlite_fetch_array($result, SQLITE_ASSOC)) {
               $totalEntries = $row['view'];
           }
       }
 
+      if ($totalEntries == 0) {
+          $theme_main['content'] = '<br><br>'.$lang['msgNoPosts'].' <a href="'.$config['blogPath'].$config['cleanIndex'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
+      }
+	  
+	  
       # Pagination - This is the so called Pagination
       $page=$optionValue3;
       if($page == ''){ $page = 1; }
@@ -2402,7 +2490,7 @@ sqlite_close($config['db']);
            $theme_post['postLink'] = $config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified;
            $theme_post['title']    = $title;
            $theme_post['content']  = html_entity_decode($content[0].$readmore);
-           $categoryText=str_replace("."," ",$category);
+           $categoryText=str_replace("_"," ",$category);
            $theme_post['authorLabel']    = $lang['pageAuthorsNew1'];
            $theme_post['author']         = $author;
            $theme_post['dateLabel']     = $lang['postFtPosted'];
@@ -2418,7 +2506,7 @@ sqlite_close($config['db']);
            $catsep="";
            foreach ($listcats as $catkey => $catvalue)
            {
-              $categoryText=str_replace("."," ",$catkey);
+              $categoryText=str_replace("_"," ",$catkey);
               $theme_post['category'] .= $catsep."<a href=".$config['blogPath'].$config['cleanIndex']."/category/".$catkey.">".$categoryText."</a>";
               $catsep=",";
            }
@@ -2443,7 +2531,10 @@ sqlite_close($config['db']);
                $theme_post['edit']       = "<a href=".$config['blogPath'].$config['cleanIndex']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
                $theme_post['delete']    = "&nbsp;-&nbsp;<a href=".$config['blogPath'].$config['cleanIndex']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a></center><br/>";
            }
-           $theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_post["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/post.tpl"));
+           if ($postType == "page") 
+				$theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_post["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/page.tpl"));
+		   else
+				$theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_post["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/post.tpl"));
            $i++;
       }
       $totalEntries++;
@@ -2470,7 +2561,7 @@ sqlite_close($config['db']);
                         }
                         else
                         {
-                                $categoryText=$config['blogPath'].$config['cleanIndex'].'/category/'.urlencode($requestCategory);
+                                $categoryText='/category/'.urlencode($requestCategory);
                         }
 
                         if($i == (($page-1)+$config['maxPagesDisplayed']) && (($page-1)+$config['maxPagesDisplayed']) < $totalPages)
@@ -2498,10 +2589,11 @@ sqlite_close($config['db']);
 
 
   function sidebarListEntries() {
-      global $separator, $entries, $config, $theme_main;
+      global $separator, $entries, $config, $theme_main, $priv;
       $i=0;
       $limit = $config['menuEntriesLimit'];
-      $result = sqlite_query($config['db'], "select * from posts ORDER BY postid DESC LIMIT $limit;");
+  	  $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." type = 'post' ORDER BY postid desc LIMIT $limit;");
+	  //$result = sqlite_query($config['db'], "select * from posts ORDER BY postid DESC LIMIT $limit;");
       $latest="";
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
             $title         = $row['title'];
@@ -2519,12 +2611,13 @@ sqlite_close($config['db']);
   }
 
   function sidebarPopular() {
-      global $separator, $entries, $config;
+      global $separator, $entries, $config, $priv;
       $i=1;
       $multiArray= Array();
       $limit = $config['menuEntriesLimit'];
       $popular = "";
-      $result = sqlite_query($config['db'], "select * from posts WHERE type = 'post' ORDER BY visits DESC LIMIT $limit;");
+	  $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." type = 'post' ORDER BY visits desc LIMIT $limit;");
+	  //$result = sqlite_query($config['db'], "select * from posts WHERE type = 'post' ORDER BY visits DESC LIMIT $limit;");
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $title         = $row['title'];
           $titleModified = titleModify($title);
@@ -2545,9 +2638,9 @@ sqlite_close($config['db']);
 
 
   function getTitleFromFilename($fileName1) {
-      global $entries, $separator, $config;
+      global $entries, $separator, $config, $priv;
       $limit  = count($entries);
-      $result = sqlite_query($config['db'], "select * from posts WHERE postid = '$fileName1';");
+      $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." postid = '$fileName1';");
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
 	  $fileTitle  = $row['title'];
           $titleText  = titleModify($fileTitle);
@@ -2556,11 +2649,12 @@ sqlite_close($config['db']);
   }
 
   function sidebarListComments() {
-      global $separator, $entries, $config;
+      global $separator, $entries, $config, $priv;
       $latestCommentsFile=$config['commentDir']."latest".$config['dbFilesExtension'];
       $limit = $config['menuEntriesLimit'];
-      $result = sqlite_query($config['db'], "select * from comments WHERE status = 'approved' ORDER BY date DESC LIMIT $limit;");
       $comments = "";
+	  $author = $_SESSION['username'];
+      $result = sqlite_query($config['db'], "select * from comments WHERE status = 'approved' and postid in (select postid from posts where ".$priv." 1) ORDER BY date DESC LIMIT $limit;");
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $commentFileName = $row['postid'];
           $commentNum      = $row['sequence'];
@@ -2574,10 +2668,10 @@ sqlite_close($config['db']);
   }
 
   function sidebarPageEntries() {
-      global $separator, $entries, $config;
+      global $separator, $entries, $config, $priv;
       $i=0;
       $limit = $config['menuEntriesLimit'];
-      $result = sqlite_query($config['db'], "select * from posts WHERE type = 'page' ORDER BY date DESC LIMIT $limit;");
+      $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." type = 'page' ORDER BY date DESC LIMIT $limit;");
       $pages = "";
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
             $title         = $row['title'];
@@ -2631,7 +2725,7 @@ sqlite_close($config['db']);
             $size = $min_size + (($value - $min_qty) * $step);
             $rand_colors = array_rand($colors);
             //$tagCloud .= '<li><a href="'.$_SERVER['SCRIPT_NAME'].'/viewCategory/'.urlencode(str_replace(" ",".",$key)).'" class="tag" style="font-size:'.$size.'px; color:'.$colors[$rand_colors].'" onmouseout="this.style.color=\''.$colors[$rand_colors].'\'" onmouseover="this.style.color=\'#fff\'" title="'.$value.' things tagged with '.$key.'">'.$key.'</a>';
-            $tagCloud .= '<li><a href="'.$config['blogPath'].$config['cleanIndex'].'/category/'.removeAccent(str_replace(" ",".",$key)).'" class="tag" style="font-size:'.$size.'px; color:'.$colors[$rand_colors].'" onmouseout="this.style.color=\''.$colors[$rand_colors].'\'" onmouseover="this.style.color=\'#fff\'" title="'.$value.' things tagged with '.$key.'">'.$key.'</a>';
+            $tagCloud .= '<li><a href="'.$config['blogPath'].$config['cleanIndex'].'/category/'.removeAccent(str_replace(" ","_",$key)).'" class="tag" style="font-size:'.$size.'px; color:'.$colors[$rand_colors].'" onmouseout="this.style.color=\''.$colors[$rand_colors].'\'" onmouseover="this.style.color=\'#fff\'" title="'.$value.' things tagged with '.$key.'">'.$key.'</a>';
             $tagCloud .= '<span class="count"> ('.$value.')</span></li>';
         }
         $tagCloud .= '</ul>';
@@ -2640,9 +2734,9 @@ sqlite_close($config['db']);
 
 
   function loadCategories() {
-      global $separator, $entries, $config, $tags;
+      global $separator, $entries, $config, $tags, $priv;
       $category_array_unsorted=array();
-      $result = sqlite_query($config['db'], 'select DISTINCT category from posts;');
+      $result = sqlite_query($config['db'], "select DISTINCT category from posts WHERE ".$priv." type = 'post';");
       unset($listcats);
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           //$category = $row['category'];
@@ -2652,9 +2746,9 @@ sqlite_close($config['db']);
           foreach ($listcats as $catkey => $catvalue)
           {
               $category = $catkey;
-              $categoryText=str_replace("."," ",$category);
+              $categoryText=str_replace("_"," ",$category);
               //$result1 = sqlite_query($config['db'], "select count(category) AS view from posts WHERE category = '$category';");
-              $result1 = sqlite_query($config['db'], "select count(category) AS view from posts WHERE (category = '$category' or category like '$category,%' or category like '%,$category' or category like '%,$category,%') and type = 'post';");
+              $result1 = sqlite_query($config['db'], "select count(category) AS view from posts WHERE ".$priv." (category = '$category' or category like '$category,%' or category like '%,$category' or category like '%,$category,%') and type = 'post';");
               while ($row1 = sqlite_fetch_array($result1, SQLITE_ASSOC)) {
                   $catcount = $row1['view'];
                   $tags[$categoryText] = $catcount;
@@ -2664,19 +2758,19 @@ sqlite_close($config['db']);
   }
 
   function sidebarCategories() {
-      global $separator, $entries, $config, $tags, $categories;
-      $result = sqlite_query($config['db'], 'select DISTINCT category from posts ORDER BY category;');
+      global $separator, $entries, $config, $tags, $categories, $priv;
+      $result = sqlite_query($config['db'], "select DISTINCT category from posts WHERE ".$priv." type = 'post' ORDER BY category;");
       unset($listcats);
       $categories = "";
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
-          //$categoryText=str_replace("."," ",$row['category']);
+          //$categoryText=str_replace("_"," ",$row['category']);
           foreach (explode(",",$row['category']) as $singlecat) $listcats[$singlecat]="1";
       }
       if (@is_array($listcats)) {
           ksort($listcats);
           foreach ($listcats as $catkey => $catvalue)
           {
-              $categoryText=str_replace("."," ",$catkey);
+              $categoryText=str_replace("_"," ",$catkey);
               $theme_categories['link']     = $config['blogPath'].$config['cleanIndex']."/category/".urlencode($catkey);
               $theme_categories['linktext'] = $categoryText;
               $categories .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_categories["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/categories.tpl"));
@@ -2698,12 +2792,12 @@ sqlite_close($config['db']);
   }
 
   function listAllComments() {
-      global $config, $separator, $lang, $theme_main;
+      global $config, $separator, $lang, $theme_main, $priv;
       $theme_main['content'] = "";
       $latestCommentsFile=$config['commentDir']."latest".$config['dbFilesExtension'];
       $userFileName=$config['commentDir']."users".$config['dbFilesExtension'].".dat";
       $theme_main['content'].= '<h3>'.$lang['pageAllComments'].'</h3>';
-      $result = sqlite_query($config['db'], "select count(commentid) AS view from comments WHERE status = 'approved'");
+      $result = sqlite_query($config['db'], "select count(commentid) AS view from comments WHERE status = 'approved' and postid in (select postid from posts where ".$priv." 1)");
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $commentCount  = $row['view'];
           if ($commentCount > 0) {
@@ -2712,7 +2806,7 @@ sqlite_close($config['db']);
           else {
               $theme_main['content'].= $lang['pageAllCommentsNo'].'!<br>';
           }
-          $result = sqlite_query($config['db'], "select * from comments WHERE status = 'approved' ORDER BY date DESC");
+          $result = sqlite_query($config['db'], "select * from comments WHERE status = 'approved' and postid in (select postid from posts where ".$priv." 1) ORDER BY date DESC");
           while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
               $postid        = $row['postid'];
               $sequence      = $row['sequence'];
@@ -2784,6 +2878,7 @@ sqlite_close($config['db']);
                         $theme_new['isPage']           = $lang['pageNewIsPage'];
                         $theme_new['isPageHelp']       = $lang['pageNewIsPageDesc'];
                         $theme_new['isSticky']         = $lang['pageNewIsSticky'];
+						$theme_new['isDraft']          = $lang['pageNewIsDraft'];
                         $theme_new['hidden']           = '<input name="process" type="hidden" id="process" value="newEntry">';
                         $theme_new['hidden']          .= '<input name="author" type="hidden" id="author" value="'.$thisAuthor.'">';
                         $theme_new['submit']           = $lang['pageNewSubmit'];
@@ -2814,6 +2909,7 @@ sqlite_close($config['db']);
       $public_data['postDate']      = $postDate=date("Y-m-d H:i:s");
       $public_data['isPage']        = $isPage=isset($_POST["isPage"])?$_POST["isPage"]:0;
       $public_data['stick']         = $stick=isset($_POST["isSticky"])?$_POST["isSticky"]:"no";
+	  $public_data['status']        = $status=isset($_POST["isDraft"])?$_POST["isDraft"]:1;
       $public_data['allowComments'] = $allowComments=isset($_POST["allowComments"])?$_POST["allowComments"]:"no";
       $public_data['thisAuthor']    = $thisAuthor = $_POST['author'];
       $visits=0;
@@ -2849,7 +2945,7 @@ sqlite_close($config['db']);
       if ($SHP->hooks_exist('hook-newsubmit-validate')) {
          $SHP->execute_hooks('hook-newsubmit-validate', $public_data);
       }
-      $result = sqlite_query($config['db'], "select * from posts WHERE title = '$postTitle';");
+      $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." title = '$postTitle';");
       $dupMsg = "";
       if (sqlite_num_rows($result) > 0) {
            $dupMsg = $dupMsg.$lang['errorDuplicatePost'].'.<br>';
@@ -2857,7 +2953,7 @@ sqlite_close($config['db']);
       }
       if ($do == 1) {
           if ($authorsPass[$thisAuthor] === $authorsPass[$_SESSION['username']] && (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false)) {
-              $postCategory=str_replace(" ",".",$postCategory);
+              $postCategory=str_replace(" ","_",$postCategory);
               if ($debugMode=="on") {$theme_main['content'] .= "Writing to ".$newPostFileName;}
               $errorMessage='<br><span style="color: rgb(204, 0, 51);">'.$lang['errornewPostFile'].'<br>';
               $errorMessage=$errorMessage.'<br>'.$lang['errorReportBug'].'<br>';
@@ -2869,11 +2965,13 @@ sqlite_close($config['db']);
               }
               $postContent=str_replace("\\","",$postContent);
               $content=$postTitle.$separator.str_replace("\\","",$postContent).$separator.$postDate.$separator.$newFullPostNumber.$separator.$postCategory.$separator.$postType.$separator.$allowComments.$separator.$visits.$separator.$thisAuthor;
-              sqlite_query($config['db'], "INSERT INTO posts (postid, title, content, date, category, type, stick, allowcomments, visits, author) VALUES('$newFullPostNumber', '$postTitle', '$postContent', '$postDate', '$postCategory', '$postType', '$stick', '$allowComments','$visits', '$thisAuthor');");
+              sqlite_query($config['db'], "INSERT INTO posts (postid, title, content, date, category, type, stick, allowcomments, visits, author, status) VALUES('$newFullPostNumber', '$postTitle', '$postContent', '$postDate', '$postCategory', '$postType', '$stick', '$allowComments','$visits', '$thisAuthor', '$status');");
               if ($SHP->hooks_exist('hook-newsubmit-after')) {
                  $SHP->execute_hooks('hook-newsubmit-after');
               }
-              $theme_main['content'] .= $dupMsg.$lang['msgNewPost'].'&nbsp;&nbsp;<a href="'.$blogPath.'">'.$lang['msgGoBack'].'</a>';
+              //$theme_main['content'] .= $dupMsg.$lang['msgNewPost'].'&nbsp;&nbsp;<a href="'.$blogPath.'">'.$lang['msgGoBack'].'</a>';
+			  $_SESSION['newSuccess'] = $dupMsg.$lang['msgNewPost'].'&nbsp;&nbsp;<a href="'.$blogPath.'">'.$lang['msgGoBack'].'</a>';
+			  header('Location: '.$config['blogPath'].$config['cleanIndex'].'/newEntrySuccess');
           }
           else {
               $theme_main['content'] .= $lang['errorPasswordIncorrect'].'<br>';
@@ -2884,6 +2982,14 @@ sqlite_close($config['db']);
        	   $theme_main['content'] .= $lang['errorPleaseGoBack'];
       }
   }
+  
+  function newEntrySuccess() {
+  	  global $config, $lang, $blogPath, $theme_main;
+	  $theme_main['content'] = "<h3>".$lang['pageNew']."...</h3>";
+	  if (trim($_SESSION['newSuccess']) != '') $theme_main['content'] .= $_SESSION['newSuccess'];
+	  else header('Location: '.$config['blogPath']);
+	  $_SESSION['newSuccess'] = '';
+  }  
 
   function deleteEntryForm() {
       global $debugMode, $optionValue, $lang, $theme_main,$config;
@@ -2901,12 +3007,12 @@ sqlite_close($config['db']);
 
   function deleteEntrySubmit() {
        global $separator, $newPostFile, $newFullPostNumber, $config, $debugMode, $optionValue, $lang, $authors, $authorsPass;
-       global $theme_main, $SHP;
+       global $theme_main, $SHP, $priv;
        $theme_main['content'] = "";
        if ($debugMode=="on") {$theme_main['content'] .=  "Inside deleteEntrySubmit ..<br>";}
        $entryName= $_POST['fileName'];
        $fileName = $config['postDir'].$entryName.$config['dbFilesExtension'];
-       $result = sqlite_query($config['db'], "select * from posts WHERE postid = '$entryName';");
+       $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." postid = '$entryName';");
        while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
            //echo $row['postid'].'<br>';
            $author=$row['author'];
@@ -2918,8 +3024,8 @@ sqlite_close($config['db']);
        $thisAuthor = $_SESSION['username'];
        if ((($config['authorEditPost'] == 1) && ($_SESSION['logged_in'])) ||
            (($config['authorEditPost'] == 0) && ($thisAuthor == 'admin' || $thisAuthor == $author) && $_SESSION['logged_in'])) {
-          @sqlite_query($config['db'], "DELETE FROM posts WHERE postid = '$entryName';");
-          @sqlite_query($config['db'], "DELETE FROM comments WHERE postid = '$entryName';");
+          if (@sqlite_query($config['db'], "DELETE FROM posts WHERE ".$priv." postid = '$entryName';"))
+			@sqlite_query($config['db'], "DELETE FROM comments WHERE postid = '$entryName';");
           $theme_main['content'] .= $lang['msgDeleteSuccess'].'...<a href="'.$_SESSION['referrer'].'">'.$lang['msgGoBack'].'</a>';
           if ($SHP->hooks_exist('hook-delete-entry')) {
               $SHP->execute_hooks('hook-delete-entry');
@@ -2932,7 +3038,7 @@ sqlite_close($config['db']);
 
   function editEntryForm() {
       global $separator, $newPostFile, $newFullPostNumber, $debugMode, $config, $authors, $authorsPass;
-      global $optionValue, $blogPath, $lang, $theme_main, $SHP, $theme_edit;
+      global $optionValue, $blogPath, $lang, $theme_main, $SHP, $theme_edit, $priv;
       $fileName = $optionValue;
       $editFileName=$config['postDir'].$fileName.$config['dbFilesExtension'];
       $theme_main['content'] = "";
@@ -2940,7 +3046,7 @@ sqlite_close($config['db']);
       if ($debugMode=="on") {$theme_main['content'] .= "Editing .. ".$editFileName."<br>";}
       $thisAuthor = $_SESSION['username'];
       //$thisPass = md5($config['randomString'].$_POST['pass']);
-      $result = sqlite_query($config['db'], "select * from posts WHERE postid = '$fileName';");
+      $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." postid = '$fileName';");
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $title         = $row['title'];
           $titleModified = titleModify($title);
@@ -2952,6 +3058,7 @@ sqlite_close($config['db']);
           $allowComments = $row['allowcomments'];
           $visits        = $row['visits'];
           $stick         = $row['stick'];
+		  $status		 = $row['status'];
           $author=(trim($row['author'])=="")?'admin':$row['author'];
         if ($postType == "page") {
             $checking='checked="checked"';
@@ -2970,6 +3077,12 @@ sqlite_close($config['db']);
         }
         else {
             $checkStick='';
+        }
+		if ($status == "0") {
+            $checkDraft='checked="checked"';
+        }
+        else {
+            $checkDraft='';
         }
         if ((($config['authorEditPost'] == 1) && ($_SESSION['logged_in'])) ||
             (($config['authorEditPost'] == 0) && ($_SESSION['isAdmin'] || $thisAuthor == $author) && ($_SESSION['logged_in']))) {
@@ -3002,7 +3115,7 @@ sqlite_close($config['db']);
             $theme_edit['textAreaRows']     = $config['textAreaRows'];
             $theme_edit['content']     = $content;
             $theme_edit['labelCategory']     = $lang['pageNewCategory'];
-            $category=str_replace("."," ",$category);
+            $category=str_replace("_"," ",$category);
             $theme_edit['category']     = $category;
             $theme_edit['categoryValidate'] = '<script>';
             $theme_edit['categoryValidate'].= 'var category = new LiveValidation( "category", {onlyOnSubmit: true } );';
@@ -3016,6 +3129,8 @@ sqlite_close($config['db']);
             $theme_edit['isPageHelp'] = $lang['pageNewIsPageDesc'];
             $theme_edit['checkSticky'] = $checkStick;
             $theme_edit['isSticky'] = $lang['pageNewIsSticky'];
+			$theme_edit['checkDraft'] = $checkDraft;
+            $theme_edit['isDraft'] = $lang['pageNewIsDraft'];
             $theme_edit['hidden'] = '<input name="fileName" type="hidden" id="fileName" value="'.$fileName.'">';
             $theme_edit['hidden'].= '<input name="visits" type="hidden" id="visits" value="'.$visits.'">';
             $theme_edit['hidden'].= '<input name="process" type="hidden" id="process" value="editEntrySubmit">';
@@ -3045,6 +3160,7 @@ sqlite_close($config['db']);
       $public_data['postDate']      = $postDate=date("Y-m-d H:i:s");
       $public_data['isPage']        = $isPage=isset($_POST["isPage"])?$_POST["isPage"]:0;
       $public_data['stick']         = $stick=isset($_POST["isSticky"])?$_POST["isSticky"]:"no";
+	  $public_data['status']        = $status=isset($_POST["isDraft"])?$_POST["isDraft"]:1;
       $public_data['allowComments'] = $allowComments=isset($_POST["allowComments"])?$_POST["allowComments"]:"no";
       $public_data['visits']        = $visits=isset($_POST["visits"])?$_POST["visits"]:0;
       $public_data['postCategory']  = $postCategory=htmlentities(sqlite_escape_string(removeAccent(strtolower($_POST["category"]))));
@@ -3067,7 +3183,7 @@ sqlite_close($config['db']);
       {
       	   $theme_main['content'] .= $lang['errorAllFields'].'.<br>';
       	   $theme_main['content'] .= $lang['errorCatName'].'<br>';
-	   $do = 0;
+	       $do = 0;
       }
 
       if ($do == 1) {
@@ -3084,9 +3200,9 @@ sqlite_close($config['db']);
               if ($SHP->hooks_exist('hook-editsubmit-validate')) {
                  $SHP->execute_hooks('hook-editsubmit-validate', $public_data);
               }
-              $postCategory=str_replace(" ",".",$postCategory);
+              $postCategory=str_replace(" ","_",$postCategory);
               $content=$postTitle.$separator.str_replace("\\","",$postContent).$separator.$postDate.$separator.$entryName.$separator.$postCategory.$separator.$postType.$separator.$allowComments.$separator.$visits.$separator.$thisAuthor;
-              sqlite_query($config['db'], "UPDATE posts SET title='$postTitle', content='$postContent', category='$postCategory', type='$postType', stick='$stick', allowcomments='$allowComments', visits='$visits', author='$thisAuthor' WHERE postid='$entryName';");
+              sqlite_query($config['db'], "UPDATE posts SET title='$postTitle', content='$postContent', category='$postCategory', type='$postType', stick='$stick', status = '$status', allowcomments='$allowComments', visits='$visits', author='$thisAuthor' WHERE postid='$entryName';");
               $theme_main['content'] .= $lang['msgEditSuccess'].' .. <a href="'.$_SESSION['referrer'].'">'.$lang['msgGoBack'].'</a> .. <a href="'.$blogPath.'">'.$lang['msgGoHome'].'</a>';
               if ($SHP->hooks_exist('hook-editsubmit-after')) {
                  $SHP->execute_hooks('hook-editsubmit-after');
@@ -3113,7 +3229,7 @@ sqlite_close($config['db']);
   }
 
   function viewEntry() {
-      global $optionValue, $blogPath, $lang, $nicEditUrl, $SHP, $theme_post;
+      global $optionValue, $blogPath, $lang, $nicEditUrl, $SHP, $theme_post, $priv;
       global $separator, $newPostFile, $newFullPostNumber, $debugMode, $config, $theme_main, $public_data;
       $fileName=$optionValue;
       $viewFileName=$config['postDir'].$fileName.$config['dbFilesExtension'];
@@ -3124,7 +3240,7 @@ sqlite_close($config['db']);
           $cool=false;
           echo '<br>'.$lang['errorInvalidRequest'].'<br>';
       }
-      $result = sqlite_query($config['db'], "select * from posts WHERE postid = '$fileName';");
+      $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." postid = '$fileName';");
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $title         = $row['title'];
           $titleModified = titleModify($title);
@@ -3142,7 +3258,7 @@ sqlite_close($config['db']);
           else { $visits++; }
           $author=(trim($row['author'])=="")?'admin':$row['author'];
           sqlite_query($config['db'], "UPDATE posts SET visits = '$visits' WHERE postid = '$fileName';");
-          $categoryText=str_replace("."," ",$category);
+          $categoryText=str_replace("_"," ",$category);
 
           $theme_post['loc_top']           = "";
           $theme_post['loc_title_after']   = "";
@@ -3153,7 +3269,7 @@ sqlite_close($config['db']);
           $theme_post['postLink'] = $config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified;
           $theme_post['title']    = $title;
           $theme_post['content']  = $content;
-          $categoryText=str_replace("."," ",$category);
+          $categoryText=str_replace("_"," ",$category);
           $theme_post['authorLabel']    = $lang['pageAuthorsNew1'];
           $theme_post['author']         = $author;
           $theme_post['dateLabel']    = $lang['postFtPosted'];
@@ -3169,7 +3285,7 @@ sqlite_close($config['db']);
           $catsep="";
 	  foreach ($listcats as $catkey => $catvalue)
 	  {
-	     $categoryText=str_replace("."," ",$catkey);
+	     $categoryText=str_replace("_"," ",$catkey);
 	     $theme_post['category'] .= $catsep."<a href=".$config['blogPath'].$config['cleanIndex']."/category/".urlencode($catkey).">".$categoryText."</a>";
              $catsep=",";
 	  }
@@ -3199,127 +3315,132 @@ sqlite_close($config['db']);
               $theme_post['delete'] = "&nbsp;-&nbsp;<a href=".$config['blogPath'].$config['cleanIndex']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a>";
           }
 
-          $theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_post["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/post.tpl"));
-          $commentFullName=$config['commentDir'].$fileName.$config['dbFilesExtension'];
-          $i=0;
-          $theme_main['content'] .= "<a name='Comments'></a><h3>".$lang['pageViewComments'].":</h3>";
+          if ($postType == "page") {
+			$theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_post["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/page.tpl"));
+		  }
+		  else {	
+			  $theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_post["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/post.tpl"));
+			  $commentFullName=$config['commentDir'].$fileName.$config['dbFilesExtension'];
+			  $i=0;
+			  $theme_main['content'] .= "<a name='Comments'></a><h3>".$lang['pageViewComments'].":</h3>";
 
-          if($allowComments == "yes")
-          {
-                unset($GLOBALS['$public_data']);
-                $public_data['postid'] = $fileName;
-                if ($SHP->hooks_exist('hook-comment-replace')) {
-               	     $SHP->execute_hooks('hook-comment-replace', $public_data);
-                }
-                else {
-                    if (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false)
-                         $result = sqlite_query($config['db'], "select * from comments WHERE postid = '$fileName';");
-                    else
-                         $result = sqlite_query($config['db'], "select * from comments WHERE postid = '$fileName' AND status = 'approved';");
-                    while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
-                        $postid        = $row['postid'];
-                        $sequence      = $row['sequence'];
-                        $author        = $row['author'];
-                        $title         = $row['title'];
-                        $content       = $row['content'];
-                        $date          = $row['date'];
-                        $ip            = $row['ip'];
-                        $url           = $row['url'];
-                        $email         = $row['email'];
-                        $authorLink    = (trim($url) == "")?$author:'<a href="'.$url.'">'.$author.'</a>';
-                        $theme_comment['sequence']    = $sequence;
-                        $theme_comment['commentsBy']  = $lang['pageCommentsBy'];
-                        $theme_comment['authorLink']  = $authorLink;
-                        $theme_comment['commentDate'] = $lang['pageViewCommentsOn'];
-                        $theme_comment['date'] = $date;
-                        $theme_comment['content'] = $content;
-                        if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
-                            $theme_comment['delete'] = '<a href="'.$config['blogPath'].$config['cleanIndex'].'/deleteComment/'.$fileName.'/'.$sequence.'">'.$lang['postFtDelete'].'</a>';
-                            if (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false) {
-                                $theme_comment['ip'] =  '&nbsp;&nbsp;-&nbsp;&nbsp;'.$ip;
-                            }
-                        }
-                        $theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_comment["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/comment.tpl"));
-                        $i++;
-                    }
-                    if ($i == 0) {$theme_main['content'] .= $lang['pageViewCommentsNo']."<br>";}
-                }
+			  if($allowComments == "yes")
+			  {
+					unset($GLOBALS['$public_data']);
+					$public_data['postid'] = $fileName;
+					if ($SHP->hooks_exist('hook-comment-replace')) {
+						 $SHP->execute_hooks('hook-comment-replace', $public_data);
+					}
+					else {
+						if (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false)
+							 $result = sqlite_query($config['db'], "select * from comments WHERE postid = '$fileName';");
+						else
+							 $result = sqlite_query($config['db'], "select * from comments WHERE postid = '$fileName' AND status = 'approved';");
+						while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+							$postid        = $row['postid'];
+							$sequence      = $row['sequence'];
+							$author        = $row['author'];
+							$title         = $row['title'];
+							$content       = $row['content'];
+							$date          = $row['date'];
+							$ip            = $row['ip'];
+							$url           = $row['url'];
+							$email         = $row['email'];
+							$authorLink    = (trim($url) == "")?$author:'<a href="'.$url.'">'.$author.'</a>';
+							$theme_comment['sequence']    = $sequence;
+							$theme_comment['commentsBy']  = $lang['pageCommentsBy'];
+							$theme_comment['authorLink']  = $authorLink;
+							$theme_comment['commentDate'] = $lang['pageViewCommentsOn'];
+							$theme_comment['date'] = $date;
+							$theme_comment['content'] = $content;
+							if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
+								$theme_comment['delete'] = '<a href="'.$config['blogPath'].$config['cleanIndex'].'/deleteComment/'.$fileName.'/'.$sequence.'">'.$lang['postFtDelete'].'</a>';
+								if (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false) {
+									$theme_comment['ip'] =  '&nbsp;&nbsp;-&nbsp;&nbsp;'.$ip;
+								}
+							}
+							$theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_comment["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/comment.tpl"));
+							$i++;
+						}
+						if ($i == 0) {$theme_main['content'] .= $lang['pageViewCommentsNo']."<br>";}
+					}
 
-                if ($SHP->hooks_exist('hook-commentform-replace')) {
-                    $SHP->execute_hooks('hook-commentform-replace');
-                }
-                else {
-                    $theme_commentform['nicEdit']  = '';
-                    $theme_commentform['nicEdit'] .= $nicEditUrl;
-                    $theme_commentform['nicEdit'] .= '<br /><br /><h3>'.$lang['pageComments'].'</h3>';
-    	 	    $theme_commentform['nicEdit'] .= '<script type="text/javascript">';
-                    $theme_commentform['nicEdit'] .= '    bkLib.onDomLoaded(function(){';
-                    $theme_commentform['nicEdit'] .= "          new nicEditor({buttonList : ['bold','italic','underline','link','unlink'], iconsPath : '".$blogPath."/images/nicEditorIcons.gif'}).panelInstance('comment');";
-                    $theme_commentform['nicEdit'] .= "          });";
-                    $theme_commentform['nicEdit'] .= "</script>";
-    
-    
-                    $theme_commentform['commentAction'] = $config['blogPath'].$config['cleanIndex']."/sendComment";
-                    $theme_commentform['legend']        = $lang['pageCommentsForm'];
-                    $theme_commentform['authorLabel']   = $lang['pageCommentsAuthor'];
-                    $theme_commentform['required']      = $lang['pageCommentsRequired'];
-                    $theme_commentform['authorValidate'] = '<script>';
-                    $theme_commentform['authorValidate'].= 'var author = new LiveValidation( "author", {onlyOnSubmit: true } );';
-                    $theme_commentform['authorValidate'].= 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-                    $theme_commentform['authorValidate'].= '</script>';
-                    $theme_commentform['emailLabel']     = $lang['pageAuthorsNewEmail'];
-                    $theme_commentform['optional']       = $lang['pageCommentsOptionalEmail'];
-                    $theme_commentform['emailValidate'] = '<script>';
-                    $theme_commentform['emailValidate'].= 'var commentEmail = new LiveValidation( "commentEmail", {onlyOnSubmit: true } );';
-                    $theme_commentform['emailValidate'].= 'commentEmail.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
-                    $theme_commentform['emailValidate'].= '</script>';
-                    $theme_commentform['url']           = $lang['pageCommentsUrl'];
-                    $theme_commentform['optionalUrl']   = $lang['pageCommentsOptionalUrl'];
-                    $theme_commentform['urlValidate'] = '<script>';
-                    $theme_commentform['urlValidate'].= 'var commentUrl = new LiveValidation( "commentUrl", {onlyOnSubmit: true } );';
-                    $theme_commentform['urlValidate'].= 'commentUrl.add( Validate.Format, { pattern: /(http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/i,  failureMessage: "'.$lang['errorInvalidUrl'].'" } );';
-                    $theme_commentform['urlValidate'].= '</script>';
-                    $theme_commentform['contentLabel'] = $lang['pageCommentsContent'];
-                    $theme_commentform['textAreaCols'] = $config['textAreaCols'];
-                    $theme_commentform['textAreaRows'] = $config['textAreaRows'];
-    		    if($config['commentsSecurityCode'] == 1)
-    		    {
-    			$code = '';
-    			if($config['onlyNumbersOnCAPTCHA'] == 1)
-    			{
-    				$code = substr(rand(0,999999),1,$config['CAPTCHALength']);
-    			}
-    			else
-    			{
-    				//$code = strtoupper(substr(crypt(rand(0,999999), $config['randomString']),1,$config['CAPTCHALength']));
-    				$code = genRandomString($config['CAPTCHALength']);
-    			}
-    			$theme_commentform['securityCode'] = '<p><label for="code">'.$lang['pageCommentsCode'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$code.')</font><br>';
-    			$theme_commentform['securityCode'].= '<input name="code" class="s" type="text" id="code"><p>';
-                            $theme_commentform['securityCode'].= '<input name="originalCode" value="'.$code.'" type="hidden" id="originalCode">';
-    		    }
+					if ($SHP->hooks_exist('hook-commentform-replace')) {
+						$SHP->execute_hooks('hook-commentform-replace');
+					}
+					else {
+						$theme_commentform['nicEdit']  = '';
+						$theme_commentform['nicEdit'] .= $nicEditUrl;
+						$theme_commentform['nicEdit'] .= '<br /><br /><h3>'.$lang['pageComments'].'</h3>';
+						$theme_commentform['nicEdit'] .= '<script type="text/javascript">';
+						$theme_commentform['nicEdit'] .= '    bkLib.onDomLoaded(function(){';
+						$theme_commentform['nicEdit'] .= "          new nicEditor({buttonList : ['bold','italic','underline','link','unlink'], iconsPath : '".$blogPath."/images/nicEditorIcons.gif'}).panelInstance('comment');";
+						$theme_commentform['nicEdit'] .= "          });";
+						$theme_commentform['nicEdit'] .= "</script>";
+		
+		
+						$theme_commentform['commentAction'] = $config['blogPath'].$config['cleanIndex']."/sendComment";
+						$theme_commentform['legend']        = $lang['pageCommentsForm'];
+						$theme_commentform['authorLabel']   = $lang['pageCommentsAuthor'];
+						$theme_commentform['required']      = $lang['pageCommentsRequired'];
+						$theme_commentform['authorValidate'] = '<script>';
+						$theme_commentform['authorValidate'].= 'var author = new LiveValidation( "author", {onlyOnSubmit: true } );';
+						$theme_commentform['authorValidate'].= 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+						$theme_commentform['authorValidate'].= '</script>';
+						$theme_commentform['emailLabel']     = $lang['pageAuthorsNewEmail'];
+						$theme_commentform['optional']       = $lang['pageCommentsOptionalEmail'];
+						$theme_commentform['emailValidate'] = '<script>';
+						$theme_commentform['emailValidate'].= 'var commentEmail = new LiveValidation( "commentEmail", {onlyOnSubmit: true } );';
+						$theme_commentform['emailValidate'].= 'commentEmail.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
+						$theme_commentform['emailValidate'].= '</script>';
+						$theme_commentform['url']           = $lang['pageCommentsUrl'];
+						$theme_commentform['optionalUrl']   = $lang['pageCommentsOptionalUrl'];
+						$theme_commentform['urlValidate'] = '<script>';
+						$theme_commentform['urlValidate'].= 'var commentUrl = new LiveValidation( "commentUrl", {onlyOnSubmit: true } );';
+						$theme_commentform['urlValidate'].= 'commentUrl.add( Validate.Format, { pattern: /(http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/i,  failureMessage: "'.$lang['errorInvalidUrl'].'" } );';
+						$theme_commentform['urlValidate'].= '</script>';
+						$theme_commentform['contentLabel'] = $lang['pageCommentsContent'];
+						$theme_commentform['textAreaCols'] = $config['textAreaCols'];
+						$theme_commentform['textAreaRows'] = $config['textAreaRows'];
+					if($config['commentsSecurityCode'] == 1)
+					{
+					$code = '';
+					if($config['onlyNumbersOnCAPTCHA'] == 1)
+					{
+						$code = substr(rand(0,999999),1,$config['CAPTCHALength']);
+					}
+					else
+					{
+						//$code = strtoupper(substr(crypt(rand(0,999999), $config['randomString']),1,$config['CAPTCHALength']));
+						$code = genRandomString($config['CAPTCHALength']);
+					}
+					$theme_commentform['securityCode'] = '<p><label for="code">'.$lang['pageCommentsCode'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$code.')</font><br>';
+					$theme_commentform['securityCode'].= '<input name="code" class="s" type="text" id="code"><p>';
+								$theme_commentform['securityCode'].= '<input name="originalCode" value="'.$code.'" type="hidden" id="originalCode">';
+					}
 
-                    $theme_commentform['hidden'] = '<input name="sendComment" value="'.$fileName.'" type="hidden" id="sendComment">';
-                    $theme_commentform['loc_form'] = '';
-                    if ($SHP->hooks_exist('hook-commentform')) {
-                        $SHP->execute_hooks('hook-commentform');
-                    }
-                    $theme_commentform['submit'] = $lang['pageCommentsSubmit'];
-                    $theme_commentform['reset']  = $lang['pageCommentsReset'];
-                    $theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_commentform["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/commentform.tpl"));
-                }
-          }
-          else {$theme_main['content'] .= $lang['pageCommentsDisabled'].'!<br>';}
+						$theme_commentform['hidden'] = '<input name="sendComment" value="'.$fileName.'" type="hidden" id="sendComment">';
+						$theme_commentform['loc_form'] = '';
+						if ($SHP->hooks_exist('hook-commentform')) {
+							$SHP->execute_hooks('hook-commentform');
+						}
+						$theme_commentform['submit'] = $lang['pageCommentsSubmit'];
+						$theme_commentform['reset']  = $lang['pageCommentsReset'];
+						$theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_commentform["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/commentform.tpl"));
+					}
+			  }
+			  else {$theme_main['content'] .= $lang['pageCommentsDisabled'].'!<br>';}
+			}
       }
   }
 
   function sendComment() {
 	# Send Comment Process
-        global $separator, $config, $lang, $theme_main, $SHP, $public_data;
-        unset($GLOBALS['$public_data']);
-        $theme_main['content'] = "";
+    global $separator, $config, $lang, $theme_main, $SHP, $public_data;
+    unset($GLOBALS['$public_data']);
+    $theme_main['content'] = "";
 	$theme_main['content'] .= "<h3>".$lang['pageViewComments']."</h3>";
-        $public_data['commentFileName'] = $commentFileName = isset($_POST['sendComment'])?$_POST['sendComment']:$_GET['sendComment'];
+    $public_data['commentFileName'] = $commentFileName = isset($_POST['sendComment'])?$_POST['sendComment']:$_GET['sendComment'];
 	$public_data['author']          = $author          = isset($_POST['author'])?$_POST['author']:"";
 	$public_data['commentTitle']    = $commentTitle    = $lang['pageCommentsBy'].' '.$author;
 	$public_data['comment']         = $comment         = isset($_POST['comment'])?$_POST['comment']:"";
@@ -3329,23 +3450,33 @@ sqlite_close($config['db']);
 	$public_data['originalCode']    = $originalCode    = $_POST['originalCode'];
 	$do              = 1;
 	$triedAsAdmin    = 0;
+	if($config['onlyNumbersOnCAPTCHA'] == 1)
+	{
+		$code1 = substr(rand(0,999999),1,$config['CAPTCHALength']);
+	}
+	else
+	{
+		$code1 = genRandomString($config['CAPTCHALength']);
+	}
+	$_POST['code'] = $code1;
 
 	if (!$SHP->hooks_exist('hook-commentform-replace')) {
-            if(trim($commentTitle) == '' || trim($author) == '' || trim($comment) == '')
+
+			if(trim($commentTitle) == '' || trim($author) == '' || trim($comment) == '')
     	    {
-    		$theme_main['content'] .= $lang['errorAllFields'].'<br>';
-    		$do = 0;
+				$theme_main['content'] .= $lang['errorAllFields'].'<br>';
+				$do = 0;
     	    }
 
     	    if($config['commentsSecurityCode'] == 1)
     	    {
-    		$code = $_POST['code'];
-    		$originalCode = $_POST['originalCode'];
-    		if ($code !== $originalCode)
-    		{
-    			$theme_main['content'] .= $lang['errorSecurityCode'].'<br>';
-    			$do = 0;
-    		}
+				//$code = $_POST['code'];
+				$originalCode = $_POST['originalCode'];
+				if ($code !== $originalCode)
+				{
+					$theme_main['content'] .= $lang['errorSecurityCode'].'<br>';
+					$do = 0;
+				}
     	    }
 
     	    $hasPosted = 0;
@@ -3355,8 +3486,8 @@ sqlite_close($config['db']);
     	    {
     		if($value == $author)
     		{
-                         $theme_main['content'] .= $lang['errorCommentUser1']." ".$author." ".$lang['errorCommentUser2'];
-      		         $do=0;
+				$theme_main['content'] .= $lang['errorCommentUser1']." ".$author." ".$lang['errorCommentUser2'];
+				$do=0;
     	 	}
     	    }
 	}
@@ -3372,23 +3503,21 @@ sqlite_close($config['db']);
 		{
 		     $theme_main['content'] .= $lang['errorLongComment1'].' '.$config['commentsMaxLength'].' '.$lang['errorLongComment2'].' '.strlen($comment);
 		}
-                else
+        else
 		{
-                     $commentFullName=$config['commentDir'].$commentFileName.$config['dbFilesExtension'];
-                     $result = sqlite_query($config['db'], "select count(sequence) AS view from comments WHERE postid='$commentFileName';");
-                     $commentCount = sqlite_fetch_array($result);
-                     $result = sqlite_query($config['db'], "select * from comments WHERE postid = '$commentFileName' ORDER BY sequence DESC LIMIT 1;");
-                     while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
-                         $maxseq = $row['sequence'];
-                     }
+			 $commentFullName=$config['commentDir'].$commentFileName.$config['dbFilesExtension'];
+			 $result = sqlite_query($config['db'], "select count(sequence) AS view from comments WHERE postid='$commentFileName';");
+			 $commentCount = sqlite_fetch_array($result);
+			 $result = sqlite_query($config['db'], "select * from comments WHERE postid = '$commentFileName' ORDER BY sequence DESC LIMIT 1;");
+			 while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
+				 $maxseq = $row['sequence'];
+			 }
  		     if ($commentCount['view'] == 0) {
                          $thisCommentSeq=1;
                      }
                      else { $thisCommentSeq = $maxseq + 1; }
                      $comment = sqlite_escape_string(str_replace("\\","",str_replace("\n","",$comment)));
                      $date    = date("Y-m-d H:i:s");
-                     //echo $date;
-                     //die();
                      $ip      = $_SERVER["REMOTE_ADDR"];
                      if ($config['commentModerate'] == 1) {
                          $status = 'pending';
@@ -3398,41 +3527,53 @@ sqlite_close($config['db']);
                          $status = 'approved';
                          $message = $lang['msgCommentAdded'];
                      }
-                     sqlite_query($config['db'], "INSERT INTO comments (postid, sequence, title, author, content, date, ip, url, email, status) VALUES('$commentFileName', '$thisCommentSeq', '$commentTitle', '$author', '$comment', '$date', '$ip', '$url', '$email', '$status');");
-
+					 sqlite_query($config['db'], "INSERT INTO comments (postid, sequence, title, author, content, date, ip, url, email, status) VALUES('$commentFileName', '$thisCommentSeq', '$commentTitle', '$author', '$comment', '$date', '$ip', '$url', '$email', '$status');");
+					 $_SESSION['message'] = $message;
                      $theme_main['content'] .= $message.' '.$author.'!<br />';
 
                      # If Comment Send Mail is active
-		     if($config['sendMailWithNewComment'] == 1)
-                     {
-		 	 $subject = "PRITLOG: ".$lang['msgMail7'];
-		 	 $message = $lang['msgMail1']." ".$author." ".$lang['msgMail2']."\n\n"
+		    if($config['sendMailWithNewComment'] == 1)
+            {
+				$subject = "PRITLOG: ".$lang['msgMail7'];
+				$message = $lang['msgMail1']." ".$author." ".$lang['msgMail2']."\n\n"
                                   .$lang['msgMail3'].": ".$commentTitle."\n"
                                   .$lang['msgMail4'].": ".str_replace("\\","",$comment)."\n"
                                   .$lang['msgMail5'].": ".date("d M Y h:i A")."\n\n"
                                   .$lang['msgMail6']."\n\n";
 
-                         // To send HTML mail, the Content-type header must be set
-                         $headers  = 'MIME-Version: 1.0' . "\r\n";
-                         $headers .= 'Content-type: text/html; charset=iso-8859-1' . "\r\n";
-                         // Additional headers
-                         $headers .= 'To: '.$config['sendMailWithNewCommentMail']. "\r\n";
-                         $headers = 'From: Pritlog <'.$config['sendMailWithNewCommentMail'].'>' . "\r\n";
-		 	 @mail($config['sendMailWithNewCommentMail'], $subject, $message, $headers);
-  		     }
+				// To send HTML mail, the Content-type header must be set
+				$headers  = 'MIME-Version: 1.0' . "\r\n";
+				$headers .= 'Content-type: text/html; charset=iso-8859-1' . "\r\n";
+				// Additional headers
+				$headers .= 'To: '.$config['sendMailWithNewCommentMail']. "\r\n";
+				$headers = 'From: Pritlog <'.$config['sendMailWithNewCommentMail'].'>' . "\r\n";
+				@mail($config['sendMailWithNewCommentMail'], $subject, $message, $headers);
+			}
+			header('Location: '.$config['blogPath'].$config['cleanIndex'].'/sendCommentSuccess');
 		}
+		//unset($_POST);
 		if ($SHP->hooks_exist('hook-comment-success')) {
-                    $SHP->execute_hooks('hook-comment-success');
-                }
+            $SHP->execute_hooks('hook-comment-success');
+        }
 	}
 	else {
-             $theme_main['content'] .= $lang['errorPleaseGoBack'];
-             if ($SHP->hooks_exist('hook-comment-fail')) {
-                 $SHP->execute_hooks('hook-comment-fail');
-             }
+            $theme_main['content'] .= $lang['errorPleaseGoBack'];
+            if ($SHP->hooks_exist('hook-comment-fail')) {
+                $SHP->execute_hooks('hook-comment-fail');
+            }
         }
   }
-
+  
+  function sendCommentSuccess() {
+		global $separator, $config, $lang, $theme_main, $SHP, $public_data;
+		$theme_main['content'] = "";
+	    $theme_main['content'] .= "<h3>".$lang['pageViewComments']."</h3>";
+		if (trim($_SESSION['message']) != '') $theme_main['content'] .= $_SESSION['message'];
+		else header('Location: '.$config['blogPath']);
+		$_SESSION['message'] = '';
+		
+  }
+  
   function deleteCommentForm() {
       global $debugMode, $optionValue, $optionValue2, $lang, $theme_main, $config;
       $fileName = $optionValue;
@@ -3450,13 +3591,13 @@ sqlite_close($config['db']);
 
   function deleteCommentSubmit() {
        global $separator, $newPostFile, $newFullPostNumber, $config, $debugMode, $lang, $authors, $authorsPass;
-       global $fileName, $theme_main, $SHP, $public_data;
+       global $fileName, $theme_main, $SHP, $public_data, $priv;
        $theme_main['content'] = "";
        if ($debugMode=="on") {echo "Inside deleteCommentSubmit ..<br>";}
        $public_data['fileName'] = $fileName   = $_POST['fileName'];
        $public_data['commentNum'] = $commentNum = $_POST['commentNum'];
        $postFile = $config['postDir'].$fileName.$config['dbFilesExtension'];
-       $result = sqlite_query($config['db'], "select * from posts WHERE postid = '$fileName';");
+       $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." postid = '$fileName';");
        while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
            $author = $row['author'];
        }
@@ -3480,14 +3621,14 @@ sqlite_close($config['db']);
 
 
   function viewArchive() {
-      global $separator, $entries, $config, $lang, $theme_main;
+      global $separator, $entries, $config, $lang, $theme_main, $priv;
       $theme_main['content'] = "";
       $i=0;
       $theme_main['content'].= "<h3>".$lang['pageArchive']."</h3>";
       $archiveArray   = array();
       $archiveArrayUnique = array();
       $archiveArrayFormat = array();
-      $result = sqlite_query($config['db'], "select * from posts ORDER BY date;");
+      $result = sqlite_query($config['db'], "select * from posts where ".$priv." 1 ORDER BY date;");
       if (sqlite_num_rows($result) == 0) {
           $theme_main['content'].= '<br><br>'.$lang['msgNoPosts'].' <a href="'.$config['blogPath'].$config['cleanIndex'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
       }
@@ -3508,7 +3649,7 @@ sqlite_close($config['db']);
 
 
   function viewArchiveMonth() {
-      global $separator, $entries, $config, $optionValue, $lang, $theme_main;
+      global $separator, $entries, $config, $optionValue, $lang, $theme_main, $priv;
       $i=0;
       $theme_main['content'] = "";
       $theme_main['content'].= "<h3>".$lang['pageArchiveFor']." ".date("M Y",strtotime($optionValue))."</h3>";
@@ -3516,7 +3657,7 @@ sqlite_close($config['db']);
       $requestMonth = $optionValue;
       //echo $requestMonth.'<br>';
       $theme_main['content'].= "<table>";
-      $result = sqlite_query($config['db'], "select * from posts WHERE date LIKE '%$requestMonth%';");
+      $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." date LIKE '%$requestMonth%';");
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $title         = $row['title'];
           $titleModified = titleModify($title);
@@ -3529,7 +3670,7 @@ sqlite_close($config['db']);
 
 
   function searchPosts() {
-      global $separator, $config, $entries, $lang, $theme_main, $SHP, $public_data;
+      global $separator, $config, $entries, $lang, $theme_main, $SHP, $public_data, $priv;
       $theme_main['content'] = "";
       $searchkey   = isset($_POST['searchkey'])?$_POST['searchkey']:$_GET['searchkey'];
       $theme_main['content'].= "<h3>".$lang['pageSearch']."</h3>";
@@ -3552,7 +3693,7 @@ sqlite_close($config['db']);
                   $searchexpr.="(lower(title) like lower('%$singlekey%') or lower(content) like lower('%$singlekey%'))";
               }
               //$result = sqlite_query($config['db'], "select * from posts WHERE title LIKE '%$searchkey%' OR content LIKE '%$searchkey%';");
-              $result = sqlite_query($config['db'], "select * from posts WHERE $searchexpr;");
+              $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." $searchexpr;");
               while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
                   $title         = $row['title'];
                   $titleModified = titleModify($title);
@@ -3573,7 +3714,7 @@ sqlite_close($config['db']);
                   $searchexpr.="(lower(title) like lower('%$singlekey%') or lower(content) like lower('%$singlekey%'))";
               }
               //$result = sqlite_query($config['db'], "select * from posts WHERE title LIKE '%$searchkey%' OR content LIKE '%$searchkey%';");
-              $result = sqlite_query($config['db'], "select * from posts WHERE $searchexpr;");
+              $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." $searchexpr;");
               while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
                   $title         = $row['title'];
                   $titleModified = titleModify($title);

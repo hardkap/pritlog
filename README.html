@@ -35,7 +35,7 @@
 
 <h2>Thanks to</h2>
 <ul>
-<li>Ken, Bert, John, Andreas and few others for all the testing, feedback and valuable suggestions for developing this version.</li>
+<li>Ken, Bert, John, Andreas, Alexandre, Charles and few others for the testing, feedback and suggestions for developing this version.</li>
 <li>Federico Ramírez, for the inspiration.</li>
 <li>Barry K, the creator of Puppy Linux, for introducing me to PPLOG.</li>
 <li>My wife, for the support and encouragement.</li>
@@ -49,23 +49,15 @@ pritlog @ hardkap.com or <a href="http://hardkap.net/forums">Hardkap Forums</a> 
 <p>PRITLOG now uses the MIT License.
 <br><a href="http://www.opensource.org/licenses/mit-license.php">http://www.opensource.org/licenses/mit-license.php</a></p>
 
-<h2>Changes for Version 0.81</h2>
-<p>Significant changes are highlighted in bold</p>
+<h2>Changes for Version 0.811</h2>
 <ul>
-<li><strong>Easier Navigation. </strong>Admin panel and other panels are easier to navigate.</li>
-<li><strong>Cleaner Urls. </strong>Enable cleaner urls if mod_rewrite works on the server.</li>
-<li><strong>Multi Blog. </strong>A switch in the program for enabling multi blogging.</li>
-<li><strong>Theme Management. </strong>Presentation and logic are separate, easy theme creation.</li>
-<li><strong>Plugin Management. </strong>Additional features can be added through plugins.</li>
-<li><strong>Better search results. </strong> Multiple words in search work better.</li>
-<li><strong>Comment moderation. </strong>Option to enable comment moderation.</li>
-<li>Hits are counted only once per session.</li>
-<li>nicEdit is a plugin now.</li>
-<li>Use *readmore* (Continue Reading) to RSS feeds as well.</li>
-<li>Special accented characters are handled well.</li>
-<li>Option for multiple tags or categories (thanks to Andreas).</li>
-<li>Ban IP's.</li>
-<li>Limit the number of invalid login attempts.</li>
+<li>About block can now handle multi line data.</li>
+<li>Deleting comment resulted in showing a page not found. This is fixed.</li>
+<li>Page entries will not have option for comments. This will enable a CMS like operation.</li>
+<li>The default login session timeout has been changed to never timeout. This can be changed in the admin panel.</li>
+<li>Refreshing the page after submitting a comment or a new post was causing duplicate entries to be posted. This could lead to easy spamming. This has been fixed.</li>
+<li>Global privacy option has been added to control the privacy of the blog posts.</li>
+<li>Draft option has been added to posts. Users can keep a post as draft and only they and the admin of the site will be able to see the post. </li>
 </ul>
 
 
@@ -87,7 +79,8 @@ pritlog @ hardkap.com or <a href="http://hardkap.net/forums">Hardkap Forums</a> 
 
 <h2>Updating from an earlier version</h2>
 
-<p>Run the update.php script. You can only use this to update from 0.8.</p>
+<p>If you are on Pritlog 0.81, just overwrite all the files except your data folder ones.</p>
+<p>If you are using Pritlog version earlier than 0.81, you will need to go through updating one version at a time until you are at 0.811.</p>
 
 <br/>
 

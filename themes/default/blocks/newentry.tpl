@@ -17,7 +17,8 @@
 <p><label>{options}</label><br>
 <input type="checkbox" name="allowComments" value="yes" checked="checked">{allowComments}<br>
 <input type="checkbox" name="isPage" value="1">{isPage} <a href="javascript:alert('{isPageHelp}')">(?)</a><br>
-<input type="checkbox" name="isSticky" value="yes">{isSticky}</p>
+<input type="checkbox" name="isSticky" value="yes">{isSticky}<br>
+<input type="checkbox" name="isDraft" value="0">{isDraft}</p>
 {hidden}
 {loc_form_bottom}
 <p><input type="submit" class="submit" style="width:100px;" value="{submit}"></p>

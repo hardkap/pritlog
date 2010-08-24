@@ -1,60 +1,25 @@
 <?php
 
 /*#######################################################################
- 	PRITLOG
-
-	Version: 0.81
+# 	PRITLOG		                                                        #
+#	                                                                    #
+#	Version: 0.811                                                      #
 #######################################################################*/
-  
-  // Example loading an extension based on OS
-  if (!extension_loaded('sqlite')) {
-	if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
-		@dl('php_sqlite.dll');
-	} else {
-		@dl('sqlite.so');
-	}
-  }   
+
 
   $separator    = "#~#";                                        // Separator used between fields when the entry files are created.
 
   $config       = array();
+  $user 		= "user";
   /*
   if (file_exists(getcwd().'/config_admin.php')) { require("config_admin.php"); }
   else {die("Old config file not found"); }
   */
-  $old_postdb = getcwd()."/data/postdb.sqlite";
-  $new_postdb = getcwd()."/data/user/postdb.sqlite";
-  if (!file_exists($new_postdb)) {
-	  mkdir(getcwd()."/data/user");
-	  if (!copy($old_postdb,$new_postdb)) {
-		  die("Failed copying postdb.sqlite from $old_postdb to $new_postdb. Please do this manually and rerun this script");
-	  } 
-  }
-  $old_config = getcwd()."/data/config_admin.php";
-  $new_config = getcwd()."/data/user/config.php";
-  if (!file_exists($new_config)) {
-	  if (!copy($old_config,$new_config)) {
-		  die("Failed copying config file from $old_config to $new_config. Please do this manually and rerun this script");
-	  } 
-  }
-  $old_authors = getcwd()."/data/authors.php";
-  $new_authors = getcwd()."/data/user/authors.php";
-  if (!file_exists($new_authors)) {
-	  if (!copy($old_authors,$new_authors)) {
-		  die("Failed copying config file from $old_authors to $new_authors. Please do this manually and rerun this script");
-	  } 
-  }
-  $postdb = $new_postdb;
+
+  $postdb = getcwd()."/data/user/postdb.sqlite";
   if (function_exists('sqlite_open')) {
       if ($config['db'] = sqlite_open($postdb, 0666, $sqliteerror)) {
-          @sqlite_query($config['db'], 'DROP TABLE plugins');
-          @sqlite_query($config['db'], 'DROP TABLE ipban');
-          @sqlite_query($config['db'], 'DROP TABLE logs');
-          sqlite_query($config['db'], 'CREATE TABLE plugins (id PRIMARY KEY, name CHAR(50), author CHAR(50), url CHAR(80), description CHAR(300), status INTEGER);');
-          sqlite_query($config['db'], 'CREATE TABLE ipban (id INTEGER PRIMARY KEY, ip CHAR(16));');
-          sqlite_query($config['db'], 'CREATE TABLE logs (id INTEGER PRIMARY KEY, ip CHAR(16), action CHAR(30), date DATE);');
-          sqlite_query($config['db'], "INSERT INTO plugins (id, name, author, url, description, status) VALUES('nicedit', 'nicEdit Plugin', 'Prit', 'http://hardkap.net/forums', 'Plugin to add nicEdit WYSIWYG editor to Pritlog', 1);");
-          //unset($db);
+			//echo "There is an error with the sqlite database .. <br>";	
       }
       else {die("Update failed. Please make sure the <strong>data</strong> folder has write permissions."); }
   }
@@ -75,7 +40,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en-US">
 <head>
 <title>
-Pritlog Update to 0.81
+Pritlog Update to 0.811
 </title>
 <meta name="Keywords" content="Pritlog Update"/>
 <meta name="Description" content="Pritlog Update"/>
@@ -106,7 +71,7 @@ Pritlog Update to 0.81
 
 <div id="container">
 
-<h1>Updating Pritlog to 0.81</h1>
+<h1>Updating Pritlog to 0.811</h1>
 <hr>
 
 <p>
@@ -136,18 +101,16 @@ Pritlog Update to 0.81
   }
 
   function startProcess() {
-         echo '<p>You are about to update Pritlog to the latest test version 0.81.</p>';
+         echo '<p>You are about to update Pritlog to the latest test version 0.811.</p>';
          echo '<p><strong>Before you start:</strong><br>';
-		 echo '<li>Delete all files except the following:';
-		 echo '<ul><li>data/postdb.sqlite</li><li>data/config_admin.php</li><li>data/authors.php</li></ul></li>';
          echo '<li>Extract latest Pritlog files to your blog path - overwriting any old ones</li>';
+         echo '<li>Take a backup of the files <strong>data/user/config.php</strong>, <strong>data/users/authors.php</strong> and <strong>data/users/postdb.sqlite</strong>.</li>';
          echo '</p>';
          echo '<p><strong>All this script does is: </strong><br>';
-         echo '<li>Adds, modifies the new or updated tables</li>';
-         echo '<li>Load the tables with appropriate date</li>';
+         echo '<li>Alter the structure of the Posts table to include the new field (status)</li>';
+		 echo '<li>Include the privacy setting in config.php</li>';
          echo '<li>List additional language variables that need to be added</li>';
          echo '</p>';
-         echo '<p>It is recommended that you take a backup of your <strong>data</strong> folder before the update process</p>';
          echo '<form action="'.$_SERVER['SCRIPT_NAME'].'?action=performProcess" method="post">';
          echo '<p><strong>Ready to start the update process?</strong></p>';
          echo '<p><input type="submit" value="Start update"></p>';
@@ -157,14 +120,10 @@ Pritlog Update to 0.81
   function performProcess() {
          global $blogPath;
          echo '<p>Starting the process ... </p>';
-         modifyComments();
-         readConfig();
+		 readConfig();
          writeConfig();
-         echo '<p><strong>You may now delete the following files/folders from your blog path: </strong><br/>(Keeping a backup of these files for sometime is a great idea too)';
-		 echo '<li>data/authors.php</li>';
-		 echo '<li>data/config_admin.php</li>';
-		 echo '<li>data/postdb.sqlite</li>';
-         echo '<p><strong>CONGRATULATIONS !! Your Pritlog installation has been updated to the 0.81</strong></p>';
+         loadPosts();
+         echo '<p><strong>CONGRATULATIONS !! Your Pritlog installation has been updated to the 0.811</strong></p>';
          echo '<p><a href="'.$blogPath.'">Home page</a></p>';
          translationInfo();
   }
@@ -194,34 +153,22 @@ Pritlog Update to 0.81
       }
   }
 
-
-  function modifyComments() {
-      global $config, $entries, $separator, $db;
-      $result = sqlite_query($config['db'], "select * from comments");
-      @sqlite_query($config['db'], 'DROP TABLE comments');
-      sqlite_query($config['db'], 'CREATE TABLE comments (commentid INTEGER PRIMARY KEY, postid CHAR(6), sequence INTEGER, author CHAR(25), title CHAR(100), content CHAR(4500), date DATETIME, ip CHAR(16), url CHAR(50), email CHAR(50), status CHAR(10));');
-      while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
-          $commentid     = $row['commentid'];
-          $postid        = $row['postid'];
-          $sequence      = $row['sequence'];
-          $author        = sqlite_escape_string($row['author']);
-          $title         = sqlite_escape_string($row['title']);
-          $content       = sqlite_escape_string($row['content']);
-          $date          = $row['date'];
-          $ip            = $row['ip'];
-          $url           = sqlite_escape_string($row['url']);
-          $email         = sqlite_escape_string($row['email']);
-          $status        = 'approved';
-          sqlite_query($config['db'], "INSERT INTO comments (postid, sequence, title, author, content, date, ip, url, email, status) VALUES('$postid', '$sequence', '$title', '$author', '$content', '$date', '$ip', '$url', '$email', '$status');");
-      }
-      echo '<p>Comment table has been modified ... </p>';
+  function loadPosts() {
+      global $config;
+	  sqlite_query($config['db'], 'CREATE TABLE posts1 (title CHAR(100), content CHAR(4500), date DATETIME, postid PRIMARY KEY, category CHAR(20), type CHAR(5), stick CHAR(5), allowcomments CHAR(4), visits INTEGER, author CHAR(25), status INTEGER);');
+	  sqlite_query($config['db'], 'INSERT INTO posts1 SELECT *,1 FROM posts;');
+	  sqlite_query($config['db'], 'DROP TABLE posts;');
+	  sqlite_query($config['db'], 'CREATE TABLE posts (title CHAR(100), content CHAR(4500), date DATETIME, postid PRIMARY KEY, category CHAR(20), type CHAR(5), stick CHAR(5), allowcomments CHAR(4), visits INTEGER, author CHAR(25), status INTEGER);');
+	  sqlite_query($config['db'], 'INSERT INTO posts SELECT * FROM posts1;');
+	  sqlite_query($config['db'], 'DROP TABLE posts1');
+	  echo '<p>Posts table has been altered to include the new status field ... </p>';
   }
-
 
   function readConfig() {
     /* Read config information from file. */
-    global $config,$new_config;	
-    $contents = file( $new_config ) or die("Config file not found in the 'data' subfolder");
+    global $config, $user;	
+	$configFile = getcwd()."/data/".$user."/config.php";
+    $contents = file( $configFile ) or die("Config file not found in the 'data' subfolder");
     $contents[0]=trim(str_replace("<?php /*","",$contents[0]));
     $contents[0]=trim(str_replace("*/ ?>","",$contents[0]));
     if ( $contents[0] ) {
@@ -310,22 +257,23 @@ Pritlog Update to 0.81
                                                                    $config[ 'menuLinks' ]                  = 'http://google.com,Google;http://pplog.infogami.com/,Get PPLOG;http://hardkap.net/pritlog,Get PRITLOG'; }
         if ( !isset( $config[ 'blogLanguage' ] ) )               { $config[ 'blogLanguage' ]               = 'english-us'; }
         if ( !isset( $config[ 'theme' ] ) )                      { $config[ 'theme' ]                      = 'default'; }
+        if ( !isset( $config[ 'privacy' ] ) )                    { $config[ 'privacy' ]                    = '2'; }
         if ( !isset( $config[ 'blogPath' ] ) )                   { $config[ 'blogPath' ]                   = 'http://localhost'; }
         if ( !isset( $config[ 'showCategoryCloud' ] ) )          { $config[ 'showCategoryCloud' ]          = 1; }
         if ( !isset( $config[ 'allowRegistration' ] ) )          { $config[ 'allowRegistration' ]          = 0; }
         if ( !isset( $config[ 'sendRegistMail' ] ) )             { $config[ 'sendRegistMail' ]             = 1; }
         if ( !isset( $config[ 'commentModerate' ] ) )            { $config[ 'commentModerate' ]            = 0; }
-        if ( !isset( $config[ 'timeoutDuration' ] ) )            { $config[ 'timeoutDuration' ]            = 900; }
-		if ( !isset( $config[ 'limitLogins' ] ) )                { $config[ 'limitLogins' ]                = 10; }
         if ( !isset( $config[ 'cleanUrl' ] ) )                   { $config[ 'cleanUrl' ]                   = 0; }
-		$config['menuLinksOrig']=$config['menuLinks'];
+        if ( !isset( $config[ 'timeoutDuration' ] ) )            { $config[ 'timeoutDuration' ]            = 0; }
+        if ( !isset( $config[ 'limitLogins' ] ) )                { $config[ 'limitLogins' ]                = 10; }
+        $config['menuLinksOrig']=$config['menuLinks'];
         $config['menuLinksArray']=explode(';',$config['menuLinks']);
 
   }
 
   function writeConfig() {
-        global $config, $lang, $new_config;
-        $configFile=$new_config;
+        global $config, $lang, $user;
+        $configFile = getcwd()."/data/".$user."/config.php";
         $configContent='<?php /* ';
         if (file_exists($configFile)) {
             $configContent=$configContent.
@@ -365,7 +313,8 @@ Pritlog Update to 0.81
                           $config['theme'].'|'.
                           $config['commentModerate'].'|'.
                           $config['limitLogins'].'|'.
-						  $config['cleanUrl'];
+                          $config['privacy'].'|'.
+                          $config['cleanUrl'];
             $configContent=$configContent.' */ ?>';
             $fp=fopen($configFile,"w");
             fwrite($fp,$configContent);

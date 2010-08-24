@@ -6,6 +6,7 @@
 <legend>{legend}</legend>
 {theme}
 {language}
+{privacy}
 <p><label for="metaDesc">{metaDescLabel}</label><br>
 <input type="text" class="ptext" name="metaDesc" id="metaDesc" value="{metaDesc}"></p>
 <p><label for="metaKeywords">{metaKeywordsLabel}</label><br>
@@ -31,7 +32,7 @@
 <p><label for="ipBan">{ipBanLabel}</label><br>
 <textarea name="ipBan" id="ipBan" rows="5" cols="25" value="">{ipBan}</textarea></p>
 
-{sendMailWithComments}
+{sendMailComments}
 {commentsSecurityCode}
 {authorEditPost}
 {authorDeleteComment}
