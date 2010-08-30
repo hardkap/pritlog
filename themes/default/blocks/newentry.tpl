@@ -12,7 +12,7 @@
 <textarea name="posts" cols="{textAreaCols}" rows="{textAreaRows}" style="height: 400px; width: 550px;" id="posts"></textarea><br><br>
 {loc_content_after}
 <p><label for="category">{category}</label><br>
-<input type="text" class="ptext" id="category" name="category" value=""></p>
+<input type="text" class="ptext" id="category" name="category" ></p>
 {categoryValidate}
 <p><label>{options}</label><br>
 <input type="checkbox" name="allowComments" value="yes" checked="checked">{allowComments}<br>

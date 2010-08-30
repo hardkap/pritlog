@@ -5,7 +5,7 @@
 	prit@pritlog.com
 	PRITLOG now uses the MIT License
 	http://www.opensource.org/licenses/mit-license.php
-	Version: 0.811
+	Version: 0.813
 #######################################################################*/
 /* Enable all kinds of errors - to eliminate as many warnings and errors as possible */
 //error_reporting(E_ALL);
@@ -69,7 +69,7 @@ else $user="user";
   readAuthors();
   $morepriv	= " status = 1 and ";
   //echo "More Priv = ".$morepriv."<br>";
-  if ($_SESSION['logged_in']) {
+  if (@$_SESSION['logged_in']) {
     $author		= $_SESSION['username'];
 	$morepriv	= " (status = 1 or author = '$author') and ";
   }
@@ -141,6 +141,7 @@ else $user="user";
 
   $serverName='http://'.$_SERVER['SERVER_NAME'];
   $serverPort=($_SERVER['SERVER_PORT']=='80')?'':':'.$_SERVER['SERVER_PORT'];
+  //$serverName.=':'.$serverPort;
   $scriptName=$_SERVER["SCRIPT_NAME"];
   $blogPath=dirname($serverName.$serverPort.$scriptName);  /* Detect the absolute path to Pritlog */
   if ($config['blogPath'] !== $blogPath) {                 /* Update the absolute path to Pritlog in the config file */
@@ -206,9 +207,12 @@ else $user="user";
   if (isset($_SESSION['start'])) $_SESSION['start']   = false;
   else $_SESSION['start']   = true;
    $mypath  = isset($_SERVER['PATH_INFO'])?str_replace("/index.php","",$_SERVER['PATH_INFO']):"";
+	if (isset($_SESSION['growlmsg'])) {$growlmsg = '$.jGrowl("'.$_SESSION['growlmsg'].'");'; unset($_SESSION['growlmsg']);}
+	else $growlmsg = '';
    //$referrer=$blogPath.'/index.php'.$mypath;
    $referrer=$serverName.$_SERVER['REQUEST_URI'];
    if ($option == "mainPage") { $_SESSION['url']=$referrer; }
+   //echo $_SESSION['referrer'].'<br>';
    $accessArray=array('newEntry', 'newEntryForm', 'newEntrySubmit', 'newEntrySuccess', 'deleteEntry', 'editEntry', 'editEntryForm', 'editEntrySubmit', 'deleteComment', 'myProfile', 'myProfileSubmit');
    if (in_array($option,$accessArray)) {
       if (!$ss->Check() || !isset($_SESSION['logged_in']) || !$_SESSION['logged_in']) {
@@ -263,6 +267,7 @@ $theme_header['metaDesc']    = $config['metaDescription'];
 $theme_header['loc_head']   = "";
 $theme_header['loc_top']    = "";
 $theme_header['loc_title_after'] = "";
+$theme_header['growlmsg']     = $growlmsg;
 //execute hooks only if there are hooks to execute
 if ($SHP->hooks_exist('hook-head')) {
     $SHP->execute_hooks('hook-head');
@@ -403,11 +408,13 @@ sqlite_close($config['db']);
       case "newEntry":
           if ($debugMode=="on") {echo "Calling newEntryPass()";}
           newEntryForm();
+		  $referrer=$serverName.$_SERVER['REQUEST_URI'];
+	      $_SESSION['referrer'] = $referrer; 
           break;
       case "newEntryForm":
           if ($debugMode=="on") {echo "Calling newEntryForm()";}
           newEntryForm();
-          break;
+		  break;
       case "newEntrySubmit":
           newEntrySubmit();
           break;
@@ -469,6 +476,10 @@ sqlite_close($config['db']);
               deleteEntrySubmit();
           }
           break;
+	  case "deleteEntrySubmit":
+          if ($debugMode=="on") {echo "deleteEntry  ".$_POST['process']."<br>";}
+		  deleteEntrySubmit();
+          break;		
       case "editEntry":
           if ($debugMode=="on") {echo "editEntry  ".$_POST['process']."<br>";}
           editEntryForm();
@@ -626,6 +637,7 @@ sqlite_close($config['db']);
       if ($SHP->hooks_exist('hook-logout')) {
           $SHP->execute_hooks('hook-logout');
       }
+	  $_SESSION['growlmsg'] = 'Logged Out';
       //header('Location: '.$_SESSION['url']);
       header('Location: '.$blogPath);
       die();
@@ -684,6 +696,7 @@ sqlite_close($config['db']);
       if ((md5($config['randomString'].$_POST['pass']) === $authorsPass[$_POST['author']]) && ($authorsActStatus[$_POST['author']] == 1)) {
          $ss->Open();
          $_SESSION['logged_in'] = true;
+		 $_SESSION['growlmsg'] = 'Logged In';
          $_SESSION['username']  = $_POST['author'];
          @sqlite_query($config['db'], "DELETE FROM logs WHERE ip = '$ip'");
          @sqlite_query($config['db'], "DELETE FROM ipban WHERE ip = '$ip'");
@@ -697,10 +710,12 @@ sqlite_close($config['db']);
          else {
              if ($_SESSION['access_type'] == "admin" || $authorsActStatus[$_POST['author']] == 0) {
                  $_SESSION["loginError"] = $lang['errorUserPassIncorrect'];
+				 $_SESSION['growlmsg'] = $_SESSION["loginError"];
                  $loginError=true;
              }
              $_SESSION['access_type'] = "regular";
              $_SESSION["loginError"]  = $lang['errorNotAuthorized'];
+			 $_SESSION['growlmsg'] = $_SESSION["loginError"];
              if ($SHP->hooks_exist('hook-login-invalid')) {
                  $SHP->execute_hooks('hook-login-invalid');
              }
@@ -717,6 +732,7 @@ sqlite_close($config['db']);
             if (sqlite_num_rows($result) == 0) sqlite_query($config['db'], "INSERT INTO ipban (ip) VALUES ('$ip')");
          }
          $_SESSION["loginError"] = $lang['errorUserPassIncorrect'];
+		 $_SESSION['growlmsg'] = $_SESSION["loginError"];
          header('Location: '.$config['blogPath'].$config['cleanIndex'].'/loginPage');
       }
   }
@@ -1227,6 +1243,10 @@ sqlite_close($config['db']);
 		  $msgclass   = "hide";
 		  if (isset($_POST['submitted'])) {
 			  $submit_result = adminPageBasicSubmit();
+			  $_SESSION['growlmsg'] = $lang['msgConfigSaved'];
+			  header('Location: '.$config['blogPath'].$config['cleanIndex'].'/adminPageBasic');
+			  die();
+			  /*
 			  if ($submit_result === true) {
 				  $msgtext = $lang['msgConfigSaved'];
 				  $msgclass= "success";
@@ -1235,6 +1255,7 @@ sqlite_close($config['db']);
 				  $msgtext = $submit_result;
 				  $msgclass= "error"; 
 			  }
+			  */
 		  }		
 		  $theme_adminbasic['msgtext']  = $msgtext;
 		  $theme_adminbasic['msgclass'] = $msgclass;
@@ -1299,6 +1320,7 @@ sqlite_close($config['db']);
               }
           }
           if ($do == 0) {
+			  $_SESSION['growlmsg'] = $msgtext;
 			  return $msgtext;
           }
           else {
@@ -1306,6 +1328,7 @@ sqlite_close($config['db']);
               $config['sendMailWithNewCommentMail']=trim($_POST['adminEmail']);
               $config['about']=str_replace("\n","<br/>",str_replace("\\","",trim($_POST['posts'])));
               writeConfig(false);
+			  $_SESSION['growlmsg'] = $lang['msgConfigSaved'];
 			  return true;
           }
        }
@@ -1328,13 +1351,18 @@ sqlite_close($config['db']);
 		  if (isset($_POST['submitted'])) {
 			  $submit_result = adminPageAdvancedSubmit();
 			  if ($submit_result === true) {
-				  $msgtext = $lang['msgConfigSaved'];
-				  $msgclass= "success";
+				  //$msgtext = $lang['msgConfigSaved'];
+				  //$msgclass= "success";
+				  $_SESSION['growlmsg'] = $lang['msgConfigSaved'];
 			  }
 			  else {
-				  $msgtext = $submit_result;
-				  $msgclass= "error"; 
+				  //$msgtext = $submit_result;
+				  //$msgclass= "error"; 
+				  $_SESSION['growlmsg'] = $submit_result;
 			  }
+
+			  header('Location: '.$config['blogPath'].$config['cleanIndex'].'/adminPageAdvanced');
+			  die();
 		  }		
 		  $theme_adminadvanced['msgtext']  = $msgtext;
 		  $theme_adminadvanced['msgclass'] = $msgclass;
@@ -1633,24 +1661,33 @@ sqlite_close($config['db']);
 		  if (isset($_POST['authoradd'])) {
 			  $submit_result = adminAuthorsAdd();
 			  if ($submit_result === true) {
-				  $msgtext = $lang['msgConfigSaved'];
-				  $msgclass= "success";
+				  //$msgtext = $lang['msgConfigSaved'];
+				  //$msgclass= "success";
+				  $_SESSION['growlmsg'] = $lang['msgConfigSaved'];
 			  }
 			  else {
-				  $msgtext = $submit_result;
-				  $msgclass= "error"; 
+				  //$msgtext = $submit_result;
+				  //$msgclass= "error"; 
+				  $_SESSION['growlmsg'] = $submit_result;
 			  }
+			  header('Location: '.$config['blogPath'].$config['cleanIndex'].'/adminPageAuthors');
+			  die();
 		  }	
 		  else if (isset($_POST['authoredit'])) {	
 		      $submit_result = adminAuthorsEdit();
 			  if ($submit_result === true) {
-				  $msgtext = $lang['msgConfigSaved'];
-				  $msgclass= "success";
+				  //$msgtext = $lang['msgConfigSaved'];
+				  //$msgclass= "success";
+				  $_SESSION['growlmsg'] = $lang['msgConfigSaved'];
 			  }
 			  else {
-				  $msgtext = $submit_result;
-				  $msgclass= "error"; 
+				  //$msgtext = $submit_result;
+				  //$msgclass= "error"; 
+				  $_SESSION['growlmsg'] = $submit_result;
 			  }
+			  
+			  header('Location: '.$config['blogPath'].$config['cleanIndex'].'/adminPageAuthors');
+			  die();
 		  }
 		  $theme_authoradd['msgtext']  = $msgtext;
 		  $theme_authoradd['msgclass'] = $msgclass;
@@ -1972,8 +2009,11 @@ sqlite_close($config['db']);
 		  $msgclass = "hide";
 		  $msgtext	= "";
           if (isset($_POST['notfirst'])) {
-			  $msgtext = $lang['msgConfigSaved'];
-			  $msgclass= "success";
+			  //$msgtext = $lang['msgConfigSaved'];
+			  //$msgclass= "success";
+			  $_SESSION['growlmsg'] = $lang['msgConfigSaved'];
+			  header('Location: '.$config['blogPath'].$config['cleanIndex'].'/adminPagePlugins');
+			  die();
 		  }	
 		  $theme_main['content'] .= "<div class='$msgclass'>$msgtext</div>";
 		  $theme_main['content'] .= '<br><form method="post" action="'.$config['blogPath'].$config['cleanIndex'].'/adminPluginsSubmit">';
@@ -2002,8 +2042,11 @@ sqlite_close($config['db']);
 	  	  $msgclass = "hide";
 		  $msgtext	= "";
           if (isset($_POST['notfirst'])) {
-			  $msgtext = $lang['pageModerateMessage'];
-			  $msgclass= "success";
+			  //$msgtext = $lang['pageModerateMessage'];
+			  //$msgclass= "success";
+			  $_SESSION['growlmsg'] = $lang['pageModerateMessage'];
+			  header('Location:'.$config['blogPath'].$config['cleanIndex'].'/adminPageModerate');
+			  die();
 		  }	
 		  $theme_main['content'] .= "<div class='$msgclass'>$msgtext</div>"; 
 	      $theme_main['content'] .= '<br><form method="post" action="'.$config['blogPath'].$config['cleanIndex'].'/adminModerateSubmit">';
@@ -2047,7 +2090,7 @@ sqlite_close($config['db']);
  function getPrivacy() {
 	global $priv, $config, $morepriv;
 	
-	$author = $_SESSION['username'];
+	$author = @$_SESSION['username'];
 	//echo $config['privacy']."<br>";
 	switch ($config['privacy']) {
 		case 0:
@@ -2529,7 +2572,7 @@ sqlite_close($config['db']);
            $theme_post['edit'] = $theme_post['delete'] = "";
            if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
                $theme_post['edit']       = "<a href=".$config['blogPath'].$config['cleanIndex']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
-               $theme_post['delete']    = "&nbsp;-&nbsp;<a href=".$config['blogPath'].$config['cleanIndex']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a></center><br/>";
+               $theme_post['delete']    = '&nbsp;&nbsp;<a href="#" onclick="'.'confirm_delete(\''.$config['blogPath'].$config['cleanIndex']."/deleteEntrySubmit/".$fileName.'\')'.'">'.$lang['postFtDelete']."</a></center><br/>";
            }
            if ($postType == "page") 
 				$theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_post["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/page.tpl"));
@@ -2653,7 +2696,7 @@ sqlite_close($config['db']);
       $latestCommentsFile=$config['commentDir']."latest".$config['dbFilesExtension'];
       $limit = $config['menuEntriesLimit'];
       $comments = "";
-	  $author = $_SESSION['username'];
+	  $author = @$_SESSION['username'];
       $result = sqlite_query($config['db'], "select * from comments WHERE status = 'approved' and postid in (select postid from posts where ".$priv." 1) ORDER BY date DESC LIMIT $limit;");
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $commentFileName = $row['postid'];
@@ -2860,7 +2903,7 @@ sqlite_close($config['db']);
                         $theme_new['script']           = $config['blogPath'].$config['cleanIndex'];
                         $theme_new['pageLegend']       = $lang['pageNewForm'];
                         $theme_new['title']            = $lang['pageNewTitle'];
-                        $theme_new['titleValidate']    = '<script>';
+						$theme_new['titleValidate']    = '<script>';
                         $theme_new['titleValidate']   .= 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
                         $theme_new['titleValidate']   .= 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
                         $theme_new['titleValidate']   .= '</script>';
@@ -2935,11 +2978,12 @@ sqlite_close($config['db']);
       $stick         = $public_data['stick'];
       $allowComments = $public_data['allowComments'];
       $thisAuthor    = $public_data['thisAuthor'];
+	  $msglog		 = "";
 
       if(trim($postTitle) == '' || trim($postContent) == '' || trim($postCategory) == '' || strstr($postCategory,'.'))
       {
-      	   $theme_main['content'] .= $lang['errorAllFields'].'.<br>';
-      	   $theme_main['content'] .= $lang['errorCatName'].'<br>';
+      	   $msglog .= $lang['errorAllFields'].'.<br>';
+      	   $msglog .= $lang['errorCatName'].'<br>';
            $do = 0;
       }
       if ($SHP->hooks_exist('hook-newsubmit-validate')) {
@@ -2970,17 +3014,18 @@ sqlite_close($config['db']);
                  $SHP->execute_hooks('hook-newsubmit-after');
               }
               //$theme_main['content'] .= $dupMsg.$lang['msgNewPost'].'&nbsp;&nbsp;<a href="'.$blogPath.'">'.$lang['msgGoBack'].'</a>';
-			  $_SESSION['newSuccess'] = $dupMsg.$lang['msgNewPost'].'&nbsp;&nbsp;<a href="'.$blogPath.'">'.$lang['msgGoBack'].'</a>';
-			  header('Location: '.$config['blogPath'].$config['cleanIndex'].'/newEntrySuccess');
+			  $msglog .= $dupMsg.$lang['msgNewPost'];
+			  $_SESSION['growlmsg'] = $msglog;
+			  //header('Location: '.$config['blogPath'].$config['cleanIndex'].'/newEntrySuccess');
+			  header('Location: '.$config['blogPath'].$config['cleanIndex']);
+			  die();
           }
           else {
-              $theme_main['content'] .= $lang['errorPasswordIncorrect'].'<br>';
-              $theme_main['content'] .= $lang['errorPleaseGoBack'];
+              $msglog .= $lang['errorPasswordIncorrect'].'<br>';
           }
       }
-      else {
-       	   $theme_main['content'] .= $lang['errorPleaseGoBack'];
-      }
+      $_SESSION['growlmsg'] = $msglog;
+	  header('Location: '.$_SESSION['referrer']);
   }
   
   function newEntrySuccess() {
@@ -3010,7 +3055,7 @@ sqlite_close($config['db']);
        global $theme_main, $SHP, $priv;
        $theme_main['content'] = "";
        if ($debugMode=="on") {$theme_main['content'] .=  "Inside deleteEntrySubmit ..<br>";}
-       $entryName= $_POST['fileName'];
+       $entryName= $optionValue;
        $fileName = $config['postDir'].$entryName.$config['dbFilesExtension'];
        $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." postid = '$entryName';");
        while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
@@ -3026,14 +3071,16 @@ sqlite_close($config['db']);
            (($config['authorEditPost'] == 0) && ($thisAuthor == 'admin' || $thisAuthor == $author) && $_SESSION['logged_in'])) {
           if (@sqlite_query($config['db'], "DELETE FROM posts WHERE ".$priv." postid = '$entryName';"))
 			@sqlite_query($config['db'], "DELETE FROM comments WHERE postid = '$entryName';");
-          $theme_main['content'] .= $lang['msgDeleteSuccess'].'...<a href="'.$_SESSION['referrer'].'">'.$lang['msgGoBack'].'</a>';
+          $msglog .= $lang['msgDeleteSuccess'];
           if ($SHP->hooks_exist('hook-delete-entry')) {
               $SHP->execute_hooks('hook-delete-entry');
           }
        }
        else {
-          $theme_main['content'] .= $lang['errorNotAuthorized'].' .. <br>';
+          $msglog .= $lang['errorNotAuthorized'].' .. <br>';
        }
+	   $_SESSION['growlmsg'] = $msglog;
+	   header('Location: '.$_SESSION['url']);
   }
 
   function editEntryForm() {
@@ -3181,8 +3228,8 @@ sqlite_close($config['db']);
       }
       if(trim($postTitle) == '' || trim($postContent) == '' || trim($postCategory) == '' || strstr($postCategory,'.'))
       {
-      	   $theme_main['content'] .= $lang['errorAllFields'].'.<br>';
-      	   $theme_main['content'] .= $lang['errorCatName'].'<br>';
+      	   $msglog .= $lang['errorAllFields'].'.<br>';
+      	   $msglog .= $lang['errorCatName'].'<br>';
 	       $do = 0;
       }
 
@@ -3203,18 +3250,17 @@ sqlite_close($config['db']);
               $postCategory=str_replace(" ","_",$postCategory);
               $content=$postTitle.$separator.str_replace("\\","",$postContent).$separator.$postDate.$separator.$entryName.$separator.$postCategory.$separator.$postType.$separator.$allowComments.$separator.$visits.$separator.$thisAuthor;
               sqlite_query($config['db'], "UPDATE posts SET title='$postTitle', content='$postContent', category='$postCategory', type='$postType', stick='$stick', status = '$status', allowcomments='$allowComments', visits='$visits', author='$thisAuthor' WHERE postid='$entryName';");
-              $theme_main['content'] .= $lang['msgEditSuccess'].' .. <a href="'.$_SESSION['referrer'].'">'.$lang['msgGoBack'].'</a> .. <a href="'.$blogPath.'">'.$lang['msgGoHome'].'</a>';
+              $msglog .= $lang['msgEditSuccess'];
               if ($SHP->hooks_exist('hook-editsubmit-after')) {
                  $SHP->execute_hooks('hook-editsubmit-after');
               }
           }
           else {
-              $theme_main['content'] .= $lang['errorNotAuthorized'].' .. <br>';
+              $msglog .= $lang['errorNotAuthorized'].' .. <br>';
           }
       }
-      else {
-           $theme_main['content'] .= $lang['errorPleaseGoBack'];
-      }
+	  $_SESSION['growlmsg'] = $msglog;
+	  header('Location: '.$_SESSION['referrer']);
   }
   
   function genRandomString($length = 10) {
@@ -3624,7 +3670,7 @@ sqlite_close($config['db']);
       global $separator, $entries, $config, $lang, $theme_main, $priv;
       $theme_main['content'] = "";
       $i=0;
-      $theme_main['content'].= "<h3>".$lang['pageArchive']."</h3>";
+	  $theme_main['content'].= "<h3>".$lang['pageArchive']."</h3>";
       $archiveArray   = array();
       $archiveArrayUnique = array();
       $archiveArrayFormat = array();
