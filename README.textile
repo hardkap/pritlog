@@ -1,0 +1,55 @@
+h2. PRITLOG
+
+PRITLOG is an extremely simple, small and powerful blog system. It does not use or need a MYSQL database and fully works based on Sqlite. Sqlite is very similar to flat files and does not need any server setup and comes as default with most PHP5 installations. Just drop Pritlog into your server and it starts running. No separate installation is required. 
+
+*PRITLOG now uses the MIT License.*
+"MIT License":http://www.opensource.org/licenses/mit-license.php
+
+h2. CHANGES FOR 0.813
+* Improve user friendliness.
+* Added jQuery messages.
+
+
+h2. INSTALLATION:
+
+*First time*
+
+* Download the package and extract the contents to your hard disk.
+* Make sure you have a web hosting account with PHP.
+* Connect to your hosting account using an FTP client.
+* Create a folder on your website. (Example: "blog")
+* Change the permissions of this folder to 755. (In some cases 777 is required)
+* Upload the contents to this folder using the FTP client.
+* In your browser, go to the Pritlog url (Example: http://yoursite.com/blog/)
+* Visit the admin panel using the default login: userid - 'admin' and password - 'password' and change this default password
+* Start Pritlogging!
+
+*Updating from an earlier version*
+
+If you are on Pritlog 0.811 or later, just overwrite all the files except your data folder ones.
+
+If you are using Pritlog version earlier than 0.811, you will need to go through updating one version at a time until you are at 0.811.
+
+h2. TROUBLESHOOTING
+
+1. *Reset Admin Password*
+If you lose or forget your main admin password, the only way to reset it is to manually edit the config_admin.php file and change the characters between the first and the second '|' character to a0c551398833948214f921e984868883. After you change this on your server, you can use 'password' to login to the admin menu. Now you can change the password as you wish.
+
+2. *Sqlite not working*
+Pritlog will run out of the box on most servers with PHP5. In some cases however, even though Sqlite is compiled into PHP5, the host may not have Sqlite enabled.
+
+Pritlog already has code to try to dynamically load Sqlite module if not already loaded. But even this may not work on some servers
+
+You can try this solution if you have access to php.ini on your server. All you have to do is to add the below lines to your php.ini (somewhere near other 'extension=' lines): 
+
+<pre>
+Loading PDO 
+extension=pdo.so
+extension=pdo_sqlite.so
+extension=sqlite.so
+extension=pdo_mysql.so
+</pre>
+
+If the above solution does not work, try talking to your web hosting company to find out how to enable Sqlite.
+
+h3. Enjoy!
