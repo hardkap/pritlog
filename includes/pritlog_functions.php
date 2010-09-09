@@ -212,6 +212,7 @@
   function listPosts() {
       global $separator, $entries, $config, $requestCategory, $priv;
       global $userFileName, $optionValue3, $lang, $theme_main, $SHP, $theme_post;
+	  unset($_SESSION['viewurl']);
       $config_Teaser=0;
       $filterEntries=array();
 	  $totalEntries = 0;

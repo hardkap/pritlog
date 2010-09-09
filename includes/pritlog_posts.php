@@ -34,8 +34,8 @@
                         $theme_new['pageLegend']       = $lang['pageNewForm'];
                         $theme_new['title']            = $lang['pageNewTitle'];
 						$theme_new['titleValidate']    = '<script>';
-                        $theme_new['titleValidate']   .= 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
-                        $theme_new['titleValidate']   .= 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+                        //$theme_new['titleValidate']   .= 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
+                        //$theme_new['titleValidate']   .= 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
                         $theme_new['titleValidate']   .= '</script>';
                         $theme_new['content']          = $lang['pageNewContent'];
                         $theme_new['readmore']         = $lang['pageNewReadmore'];
@@ -43,8 +43,8 @@
                         $theme_new['textAreaRows']     = $config['textAreaRows'];
                         $theme_new['category']         = $lang['pageNewCategory'];
                         $theme_new['categoryValidate'] = '<script>';
-                        $theme_new['categoryValidate'].= 'var category = new LiveValidation( "category", {onlyOnSubmit: true } );';
-                        $theme_new['categoryValidate'].= 'category.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+                        //$theme_new['categoryValidate'].= 'var category = new LiveValidation( "category", {onlyOnSubmit: true } );';
+                        //$theme_new['categoryValidate'].= 'category.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
                         $theme_new['categoryValidate'].= '</script>';
                         $theme_new['options']          = $lang['pageNewOptions'];
                         $theme_new['allowComments']    = $lang['pageNewAllowComments'];
@@ -74,19 +74,20 @@
 
   function newEntrySubmit() {
       global $separator, $newPostFile, $newFullPostNumber, $debugMode, $config, $lang, $authors, $authorsPass;
-      global $theme_main, $SHP, $public_data, $blogPath;
+      global $theme_main, $SHP, $public_data, $blogPath, $priv;
       $newPostFileName=$config['postDir'].$newPostFile;
+	  $msglog = "";
       unset($GLOBALS['$public_data']);
-      $public_data['postTitle']     = $postTitle=htmlentities(sqlite_escape_string(str_replace("\\","",$_POST["title"])));
-      $public_data['postContent']   = $postContent=htmlentities(sqlite_escape_string(str_replace("\\","",$_POST["posts"])));
+      $public_data['postTitle']     = $postTitle=@htmlentities(sqlite_escape_string(str_replace("\\","",$_POST["title"])));
+      $public_data['postContent']   = $postContent=@htmlentities(sqlite_escape_string(str_replace("\\","",$_POST["posts"])));
       $public_data['postDate']      = $postDate=date("Y-m-d H:i:s");
-      $public_data['isPage']        = $isPage=isset($_POST["isPage"])?$_POST["isPage"]:0;
-      $public_data['stick']         = $stick=isset($_POST["isSticky"])?$_POST["isSticky"]:"no";
-	  $public_data['status']        = $status=isset($_POST["isDraft"])?$_POST["isDraft"]:1;
-      $public_data['allowComments'] = $allowComments=isset($_POST["allowComments"])?$_POST["allowComments"]:"no";
-      $public_data['thisAuthor']    = $thisAuthor = $_POST['author'];
+      $public_data['isPage']        = $isPage=@isset($_POST["isPage"])?$_POST["isPage"]:0;
+      $public_data['stick']         = $stick=@isset($_POST["isSticky"])?$_POST["isSticky"]:"no";
+	  $public_data['status']        = $status=@isset($_POST["isDraft"])?$_POST["isDraft"]:1;
+      $public_data['allowComments'] = $allowComments=@isset($_POST["allowComments"])?$_POST["allowComments"]:"no";
+      $public_data['thisAuthor']    = $thisAuthor = @$_POST['author'];
       $visits=0;
-      $public_data['postCategory'] = $postCategory=htmlentities(sqlite_escape_string(removeAccent(strtolower($_POST["category"]))));
+      $public_data['postCategory'] = $postCategory=@htmlentities(sqlite_escape_string(removeAccent(strtolower($_POST["category"]))));
       $theme_main['content'] = "<h3>".$lang['pageNew']."...</h3>";
       $do = 1;
       unset($listcats);
@@ -125,6 +126,7 @@
            $dupMsg = $dupMsg.$lang['errorDuplicatePost'].'.<br>';
            $do = 1;
       }
+	  $msgstat = "error";
       if ($do == 1) {
           if ($authorsPass[$thisAuthor] === $authorsPass[$_SESSION['username']] && (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false)) {
               $postCategory=str_replace(" ","_",$postCategory);
@@ -146,16 +148,20 @@
               //$theme_main['content'] .= $dupMsg.$lang['msgNewPost'].'&nbsp;&nbsp;<a href="'.$blogPath.'">'.$lang['msgGoBack'].'</a>';
 			  $msglog .= $dupMsg.$lang['msgNewPost'];
 			  $_SESSION['growlmsg'] = $msglog;
+			  $msgstat = "success";
 			  //header('Location: '.$config['blogPath'].$config['cleanIndex'].'/newEntrySuccess');
-			  header('Location: '.$config['blogPath'].$config['cleanIndex']);
-			  die();
+			  //header('Location: '.$config['blogPath'].$config['cleanIndex']);
+			  //die();
           }
           else {
+		      $msgstat = "error";
               $msglog .= $lang['errorPasswordIncorrect'].'<br>';
           }
       }
-      $_SESSION['growlmsg'] = $msglog;
-	  header('Location: '.$_SESSION['referrer']);
+      //$_SESSION['growlmsg'] = $msglog;
+	  //header('Location: '.$_SESSION['referrer']);
+	  $data = array ("status" => $msgstat, "out" => $msglog, "func" => "newentry");
+	  echo json_encode($data);	
   }
   
   function newEntrySuccess() {
@@ -281,8 +287,8 @@
             $theme_edit['labelTitle'] = $lang['pageNewTitle'];
             $theme_edit['title'] = $title;
             $theme_edit['titleValidate']    = '<script>';
-            $theme_edit['titleValidate']   .= 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
-            $theme_edit['titleValidate']   .= 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+            //$theme_edit['titleValidate']   .= 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
+            //$theme_edit['titleValidate']   .= 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
             $theme_edit['titleValidate']   .= '</script>';
             $theme_edit['labelContent'] = $lang['pageNewContent'];
             $theme_edit['readmore']     = $lang['pageNewReadmore'];
@@ -293,8 +299,8 @@
             $category=str_replace("_"," ",$category);
             $theme_edit['category']     = $category;
             $theme_edit['categoryValidate'] = '<script>';
-            $theme_edit['categoryValidate'].= 'var category = new LiveValidation( "category", {onlyOnSubmit: true } );';
-            $theme_edit['categoryValidate'].= 'category.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+            //$theme_edit['categoryValidate'].= 'var category = new LiveValidation( "category", {onlyOnSubmit: true } );';
+            //$theme_edit['categoryValidate'].= 'category.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
             $theme_edit['categoryValidate'].= '</script>';
             $theme_edit['options'] = $lang['pageNewOptions'];
             $theme_edit['checkAllowComments'] = $checkAllowComments;
@@ -328,18 +334,18 @@
       if ($debugMode=="on") {$theme_main['content'] .= "Inside editEntrySubmit ..".$_POST['fileName']."<br>";}
       $theme_main['content'] .= "<h3>".$lang['pageEdit']."...</h3>";
       unset($GLOBALS['$public_data']);
-      $public_data['entryName']     = $entryName= $_POST['fileName'];
-      $public_data['postTitle']     = $postTitle=htmlentities(sqlite_escape_string(str_replace("\\","",$_POST["title"])));
-      $public_data['postContent']   = $postContent=htmlentities(sqlite_escape_string(str_replace("\\","",$_POST["posts"])));
+      $public_data['entryName']     = $entryName= @$_POST['fileName'];
+      $public_data['postTitle']     = $postTitle=@htmlentities(sqlite_escape_string(str_replace("\\","",$_POST["title"])));
+      $public_data['postContent']   = $postContent=@htmlentities(sqlite_escape_string(str_replace("\\","",$_POST["posts"])));
       $public_data['postDate']      = $postDate=date("Y-m-d H:i:s");
-      $public_data['isPage']        = $isPage=isset($_POST["isPage"])?$_POST["isPage"]:0;
-      $public_data['stick']         = $stick=isset($_POST["isSticky"])?$_POST["isSticky"]:"no";
-	  $public_data['status']        = $status=isset($_POST["isDraft"])?$_POST["isDraft"]:1;
-      $public_data['allowComments'] = $allowComments=isset($_POST["allowComments"])?$_POST["allowComments"]:"no";
-      $public_data['visits']        = $visits=isset($_POST["visits"])?$_POST["visits"]:0;
-      $public_data['postCategory']  = $postCategory=htmlentities(sqlite_escape_string(removeAccent(strtolower($_POST["category"]))));
-      $public_data['thisAuthor']    = $thisAuthor = $_POST['author'];
-      $thisPass   = $_POST['pass'];
+      $public_data['isPage']        = $isPage=@isset($_POST["isPage"])?$_POST["isPage"]:0;
+      $public_data['stick']         = $stick=@isset($_POST["isSticky"])?$_POST["isSticky"]:"no";
+	  $public_data['status']        = $status=@isset($_POST["isDraft"])?$_POST["isDraft"]:1;
+      $public_data['allowComments'] = $allowComments=@isset($_POST["allowComments"])?$_POST["allowComments"]:"no";
+      $public_data['visits']        = $visits=@isset($_POST["visits"])?$_POST["visits"]:0;
+      $public_data['postCategory']  = $postCategory=@htmlentities(sqlite_escape_string(removeAccent(strtolower($_POST["category"]))));
+      $public_data['thisAuthor']    = $thisAuthor = @$_POST['author'];
+      $thisPass   = @$_POST['pass'];
       $do = 1;
       unset($listcats);
       foreach (explode(",",$postCategory) as $singlecat) $listcats[$singlecat]="1";
@@ -355,11 +361,11 @@
       }
       if(trim($postTitle) == '' || trim($postContent) == '' || trim($postCategory) == '' || strstr($postCategory,'.'))
       {
-      	   $msglog .= $lang['errorAllFields'].'.<br>';
+      	   $msglog = $lang['errorAllFields'].'.<br>';
       	   $msglog .= $lang['errorCatName'].'<br>';
 	       $do = 0;
       }
-
+	  $msgstat = "error";
       if ($do == 1) {
           if ($isPage == 1) {
               $public_data['postType'] = $postType="page";
@@ -376,8 +382,13 @@
               }
               $postCategory=str_replace(" ","_",$postCategory);
               $content=$postTitle.$separator.str_replace("\\","",$postContent).$separator.$postDate.$separator.$entryName.$separator.$postCategory.$separator.$postType.$separator.$allowComments.$separator.$visits.$separator.$thisAuthor;
-              sqlite_query($config['db'], "UPDATE posts SET title='$postTitle', content='$postContent', category='$postCategory', type='$postType', stick='$stick', status = '$status', allowcomments='$allowComments', visits='$visits', author='$thisAuthor' WHERE postid='$entryName';");
-              $msglog .= $lang['msgEditSuccess'];
+              $rc = sqlite_query($config['db'], "UPDATE posts SET title='$postTitle', content='$postContent', category='$postCategory', type='$postType', stick='$stick', status = '$status', allowcomments='$allowComments', visits='$visits', author='$thisAuthor' WHERE postid='$entryName';");
+			  if ($rc) {
+			     $msgstat = "success";
+				 @$msglog .= $lang['msgEditSuccess'];
+			  }	 
+			  else 	
+			     @$msglog .= "Strange!!";
               if ($SHP->hooks_exist('hook-editsubmit-after')) {
                  $SHP->execute_hooks('hook-editsubmit-after');
               }
@@ -386,8 +397,11 @@
               $msglog .= $lang['errorNotAuthorized'].' .. <br>';
           }
       }
-	  $_SESSION['growlmsg'] = $msglog;
-	  header('Location: '.$_SESSION['referrer']);
+	  //$_SESSION['growlmsg'] = $msglog;
+	  //header('Location: '.$_SESSION['referrer']);
+	  $data = array ("status" => $msgstat, "out" => $msglog, "func" => "editentry");
+	  //fwrite(fopen("debug.txt","w"),json_encode($data)."\nEdit entry"."\n");
+	  echo json_encode($data);	  
   }
   
 
@@ -430,6 +444,7 @@
           $theme_post['loc_bottom']        = "";
 
           $theme_post['postLink'] = $config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified;
+		  $_SESSION['viewurl'] = $theme_post['postLink'];
           $theme_post['title']    = $title;
           $theme_post['content']  = $content;
           $categoryText=str_replace("_"," ",$category);
@@ -474,7 +489,8 @@
           $theme_post['edit'] = $theme_post['delete'] = "";
           if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
               $theme_post['edit'] = "<a href=".$config['blogPath'].$config['cleanIndex']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
-              $theme_post['delete'] = "&nbsp;-&nbsp;<a href=".$config['blogPath'].$config['cleanIndex']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a>";
+              //$theme_post['delete'] = "&nbsp;-&nbsp;<a href=".$config['blogPath'].$config['cleanIndex']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a>";
+			  $theme_post['delete'] = '&nbsp;-&nbsp;<a href="#" onclick="'.'confirm_delete(\''.$config['blogPath'].$config['cleanIndex']."/deleteEntrySubmit/".$fileName.'\')'.'">'.$lang['postFtDelete']."</a>";
           }
 
           if ($postType == "page") {
@@ -516,7 +532,8 @@
 							$theme_comment['date'] = $date;
 							$theme_comment['content'] = $content;
 							if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
-								$theme_comment['delete'] = '<a href="'.$config['blogPath'].$config['cleanIndex'].'/deleteComment/'.$fileName.'/'.$sequence.'">'.$lang['postFtDelete'].'</a>';
+								//$theme_comment['delete'] = '<a href="'.$config['blogPath'].$config['cleanIndex'].'/deleteComment/'.$fileName.'/'.$sequence.'">'.$lang['postFtDelete'].'</a>';
+								$theme_comment['delete']    = '<a href="#" onclick="'.'confirm_delete(\''.$config['blogPath'].$config['cleanIndex'].'/deleteCommentSubmit/'.$fileName.'/'.$sequence.'\')'.'">'.$lang['postFtDelete']."</a>";
 								if (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false) {
 									$theme_comment['ip'] =  '&nbsp;&nbsp;-&nbsp;&nbsp;'.$ip;
 								}
@@ -536,7 +553,7 @@
 						$theme_commentform['nicEdit'] .= '<br /><br /><h3>'.$lang['pageComments'].'</h3>';
 						$theme_commentform['nicEdit'] .= '<script type="text/javascript">';
 						$theme_commentform['nicEdit'] .= '    bkLib.onDomLoaded(function(){';
-						$theme_commentform['nicEdit'] .= "          new nicEditor({buttonList : ['bold','italic','underline','link','unlink'], iconsPath : '".$blogPath."/images/nicEditorIcons.gif'}).panelInstance('comment');";
+						$theme_commentform['nicEdit'] .= "          editor1 = new nicEditor({buttonList : ['bold','italic','underline','link','unlink'], iconsPath : '".$blogPath."/images/nicEditorIcons.gif'}).panelInstance('comment');";
 						$theme_commentform['nicEdit'] .= "          });";
 						$theme_commentform['nicEdit'] .= "</script>";
 		
@@ -546,20 +563,20 @@
 						$theme_commentform['authorLabel']   = $lang['pageCommentsAuthor'];
 						$theme_commentform['required']      = $lang['pageCommentsRequired'];
 						$theme_commentform['authorValidate'] = '<script>';
-						$theme_commentform['authorValidate'].= 'var author = new LiveValidation( "author", {onlyOnSubmit: true } );';
-						$theme_commentform['authorValidate'].= 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
+						//$theme_commentform['authorValidate'].= 'var author = new LiveValidation( "author", {onlyOnSubmit: true } );';
+						//$theme_commentform['authorValidate'].= 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
 						$theme_commentform['authorValidate'].= '</script>';
 						$theme_commentform['emailLabel']     = $lang['pageAuthorsNewEmail'];
 						$theme_commentform['optional']       = $lang['pageCommentsOptionalEmail'];
 						$theme_commentform['emailValidate'] = '<script>';
-						$theme_commentform['emailValidate'].= 'var commentEmail = new LiveValidation( "commentEmail", {onlyOnSubmit: true } );';
-						$theme_commentform['emailValidate'].= 'commentEmail.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
+						//$theme_commentform['emailValidate'].= 'var commentEmail = new LiveValidation( "commentEmail", {onlyOnSubmit: true } );';
+						//$theme_commentform['emailValidate'].= 'commentEmail.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
 						$theme_commentform['emailValidate'].= '</script>';
 						$theme_commentform['url']           = $lang['pageCommentsUrl'];
 						$theme_commentform['optionalUrl']   = $lang['pageCommentsOptionalUrl'];
 						$theme_commentform['urlValidate'] = '<script>';
-						$theme_commentform['urlValidate'].= 'var commentUrl = new LiveValidation( "commentUrl", {onlyOnSubmit: true } );';
-						$theme_commentform['urlValidate'].= 'commentUrl.add( Validate.Format, { pattern: /(http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/i,  failureMessage: "'.$lang['errorInvalidUrl'].'" } );';
+						//$theme_commentform['urlValidate'].= 'var commentUrl = new LiveValidation( "commentUrl", {onlyOnSubmit: true } );';
+						//$theme_commentform['urlValidate'].= 'commentUrl.add( Validate.Format, { pattern: /(http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/i,  failureMessage: "'.$lang['errorInvalidUrl'].'" } );';
 						$theme_commentform['urlValidate'].= '</script>';
 						$theme_commentform['contentLabel'] = $lang['pageCommentsContent'];
 						$theme_commentform['textAreaCols'] = $config['textAreaCols'];
@@ -602,16 +619,18 @@
     unset($GLOBALS['$public_data']);
     $theme_main['content'] = "";
 	$theme_main['content'] .= "<h3>".$lang['pageViewComments']."</h3>";
-    $public_data['commentFileName'] = $commentFileName = isset($_POST['sendComment'])?$_POST['sendComment']:$_GET['sendComment'];
-	$public_data['author']          = $author          = isset($_POST['author'])?$_POST['author']:"";
+    $public_data['commentFileName'] = $commentFileName = @isset($_POST['sendComment'])?$_POST['sendComment']:"";
+	$public_data['author']          = $author          = @isset($_POST['author'])?$_POST['author']:"";
 	$public_data['commentTitle']    = $commentTitle    = $lang['pageCommentsBy'].' '.$author;
-	$public_data['comment']         = $comment         = isset($_POST['comment'])?$_POST['comment']:"";
-	$public_data['url']             = $url             = isset($_POST['commentUrl'])?$_POST['commentUrl']:"";
-	$public_data['email']           = $email           = isset($_POST['commentEmail'])?$_POST['commentEmail']:"";
-	$public_data['code']            = $code            = $_POST['code'];
-	$public_data['originalCode']    = $originalCode    = $_POST['originalCode'];
+	$public_data['comment']         = $comment         = @isset($_POST['comment'])?$_POST['comment']:"";
+	$public_data['url']             = $url             = @isset($_POST['commentUrl'])?$_POST['commentUrl']:"";
+	$public_data['email']           = $email           = @isset($_POST['commentEmail'])?$_POST['commentEmail']:"";
+	$public_data['code']            = $code            = @$_POST['code'];
+	$public_data['originalCode']    = $originalCode    = @$_POST['originalCode'];
 	$do              = 1;
 	$triedAsAdmin    = 0;
+	$msgstat = "error";
+	$msglog  = "";
 	if($config['onlyNumbersOnCAPTCHA'] == 1)
 	{
 		$code1 = substr(rand(0,999999),1,$config['CAPTCHALength']);
@@ -627,16 +646,18 @@
 			if(trim($commentTitle) == '' || trim($author) == '' || trim($comment) == '')
     	    {
 				$theme_main['content'] .= $lang['errorAllFields'].'<br>';
+				$msglog .= $lang['errorAllFields'].'<br>';
 				$do = 0;
     	    }
 
     	    if($config['commentsSecurityCode'] == 1)
     	    {
 				//$code = $_POST['code'];
-				$originalCode = $_POST['originalCode'];
+				$originalCode = @$_POST['originalCode'];
 				if ($code !== $originalCode)
 				{
 					$theme_main['content'] .= $lang['errorSecurityCode'].'<br>';
+					$msglog .= $lang['errorSecurityCode'].'<br>';
 					$do = 0;
 				}
     	    }
@@ -649,6 +670,7 @@
     		if($value == $author)
     		{
 				$theme_main['content'] .= $lang['errorCommentUser1']." ".$author." ".$lang['errorCommentUser2'];
+				$msglog .= $lang['errorCommentUser1']." ".$author." ".$lang['errorCommentUser2'];
 				$do=0;
     	 	}
     	    }
@@ -711,7 +733,11 @@
 				$headers = 'From: Pritlog <'.$config['sendMailWithNewCommentMail'].'>' . "\r\n";
 				@mail($config['sendMailWithNewCommentMail'], $subject, $message, $headers);
 			}
-			header('Location: '.$config['blogPath'].$config['cleanIndex'].'/sendCommentSuccess');
+			$msgstat = "success";
+			//fwrite(fopen("debug.txt","w"),"Successful addition of comment".$msgstat.$_SESSION['message']."\n");
+			$msglog = $_SESSION['growlmsg'] = $_SESSION['message'];
+			//$msglog  = $msgstat;
+			//header('Location: '.$config['blogPath'].$config['cleanIndex'].'/sendCommentSuccess');
 		}
 		//unset($_POST);
 		if ($SHP->hooks_exist('hook-comment-success')) {
@@ -720,10 +746,14 @@
 	}
 	else {
             $theme_main['content'] .= $lang['errorPleaseGoBack'];
+			//$msglog .= $lang['errorPleaseGoBack'];
             if ($SHP->hooks_exist('hook-comment-fail')) {
                 $SHP->execute_hooks('hook-comment-fail');
             }
         }
+	$data = array ("status" => $msgstat, "out" => $msglog, "func" => "addcomment");
+	//$data = array ("status" => "success", "out" => "Something", "func" => "addcomment");
+    echo json_encode($data);	   	
   }
   
   function sendCommentSuccess() {
@@ -753,11 +783,12 @@
 
   function deleteCommentSubmit() {
        global $separator, $newPostFile, $newFullPostNumber, $config, $debugMode, $lang, $authors, $authorsPass;
-       global $fileName, $theme_main, $SHP, $public_data, $priv;
+       global $fileName, $theme_main, $SHP, $public_data, $priv, $optionValue, $optionValue2;
        $theme_main['content'] = "";
+	   $msglog = "";
        if ($debugMode=="on") {echo "Inside deleteCommentSubmit ..<br>";}
-       $public_data['fileName'] = $fileName   = $_POST['fileName'];
-       $public_data['commentNum'] = $commentNum = $_POST['commentNum'];
+       $public_data['fileName']   = $fileName   = $optionValue;
+       $public_data['commentNum'] = $commentNum = $optionValue2;
        $postFile = $config['postDir'].$fileName.$config['dbFilesExtension'];
        $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." postid = '$fileName';");
        while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
@@ -765,11 +796,11 @@
        }
        $public_data['thisAuthor'] = $thisAuthor = $_SESSION['username'];
        $theme_main['content'] .= "<h3>".$lang['pageCommentDel']."...</h3>";
-       $commentNum=$_POST['commentNum'];
        if ((($config['authorDeleteComment'] == 1) && ($_SESSION['logged_in'])) ||
            (($config['authorDeleteComment'] == 0) && ($thisAuthor == 'admin' || $thisAuthor == $author) && ($_SESSION['logged_in']))) {
             sqlite_query($config['db'], "delete from comments WHERE postid = '$fileName' and sequence = '$commentNum';");
 			$theme_main['content'] .= $lang['msgCommentDeleted'].'...<a href="'.$_SESSION['referrer'].'">'.$lang['msgGoBack'].'</a>';
+			$msglog .= $lang['msgCommentDeleted'];
             unset($GLOBALS['$public_data']);
             if ($SHP->hooks_exist('hook-deletecomment')) {
                 $SHP->execute_hooks('hook-deletecomment', $public_data);
@@ -777,6 +808,9 @@
        }
        else {
           $theme_main['content'] .= $lang['errorNotAuthorized'].' .. <br>';
+		  $msglog .= $lang['errorNotAuthorized'].' .. <br>';
        }
+	   $_SESSION['growlmsg'] = $msglog;
+	   header('Location: '.$_SESSION['viewurl']);
   }
 

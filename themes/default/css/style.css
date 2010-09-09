@@ -463,3 +463,5 @@ h5 {
 	color: black;
         border-left: 3px solid #6CE26C;
 }
+
+img.loader { border:none; }

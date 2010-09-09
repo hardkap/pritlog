@@ -1,7 +1,7 @@
 {loc_top}
 <h3>{header}</h3>
 
-<form method="post" action="{script}/editEntrySubmit">
+<form id="myform" method="post" action="{script}/editEntrySubmit">
 <fieldset>
 <legend>{pageLegend}</legend>
 {loc_form_top}
@@ -20,6 +20,7 @@
 <input type="checkbox" name="isPage" value="1" {checkIsPage}>{isPage} <a href="javascript:alert('{isPageHelp}')">(?)</a><br>
 <input type="checkbox" name="isSticky" value="yes" {checkSticky}>{isSticky}<br>
 <input type="checkbox" name="isDraft" value="0" {checkDraft}>{isDraft}</p>
+<input type="hidden" name="func" value="editEntrySubmit" >
 {hidden}
 {loc_form_bottom}
 <p><input type="submit" class="submit" style="width:100px;" value="{submit}"></p>

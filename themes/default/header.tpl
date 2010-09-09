@@ -17,7 +17,7 @@
 <script type="text/javascript" src="{blogPath}/javascripts/jquery.jgrowl.min.js"></script>
 
 <link href="{blogPath}/themes/default/css/style.css" rel=stylesheet type=text/css>
-<script type="text/javascript">var blogPath="{blogPath}"; var errorGeneral="{errorGeneral}";</script>
+<script type="text/javascript">var blogPath="{blogPath}"; var editor1 = ""; var errorGeneral="{errorGeneral}";</script>
 <script src="{blogPath}/javascripts/livevalidation.js" type="text/javascript"></script>
 <script src="{blogPath}/javascripts/main.js" type="text/javascript"></script>
 

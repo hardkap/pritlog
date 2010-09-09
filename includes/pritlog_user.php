@@ -52,7 +52,7 @@
           if ($config['allowRegistration'] == 1) {
               $theme_login['register'].= '<br>Not registered?&nbsp;<a href="'.$config['blogPath'].$config['cleanIndex'].'/registerPage">'.$lang['titleRegisterPageSubmit'].'!</a><br>';
           }
-          $theme_main['content'].= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_login["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/login.tpl"));
+          @$theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_login["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/login.tpl"));
       }
       if (isset($_SESSION["loginError"])) {
            $theme_main['content'].= '<br>'.$_SESSION["loginError"].'<br>';

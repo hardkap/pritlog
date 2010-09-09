@@ -668,8 +668,8 @@
                                         }
                                         if (isset($_POST['notfirst'])) {
                                             sqlite_query($config['db'], "UPDATE plugins SET status = '$status' WHERE id = '$pluginid';");
-                                        if ((@$_POST[$pluginid] == 1) || $active) {
                                         }
+                                        if ((@$_POST[$pluginid] == 1) || $active) {
                                             $checking='checked="checked"';
                                         }
                                         else {
@@ -770,9 +770,9 @@
 		  $msgclass = "hide";
 		  $msgtext	= "";
           if (isset($_POST['notfirst'])) {
-			  $_SESSION['growlmsg'] = $lang['msgConfigSaved'];
-			  header('Location: '.$config['blogPath'].$config['cleanIndex'].'/adminPagePlugins');
-			  die();
+			  $msgtext = $lang['msgConfigSaved'];
+			  //$msgclass= "success";
+			  $theme_main['content'] .= '<script type="text/javascript">$.jGrowl("'.$lang['msgConfigSaved'].'");</script>';
 		  }	
 		  $theme_main['content'] .= "<div class='$msgclass'>$msgtext</div>";
 		  $theme_main['content'] .= '<br><form method="post" action="'.$config['blogPath'].$config['cleanIndex'].'/adminPluginsSubmit">';
@@ -801,9 +801,11 @@
 	  	  $msgclass = "hide";
 		  $msgtext	= "";
           if (isset($_POST['notfirst'])) {
-			  $_SESSION['growlmsg'] = $lang['pageModerateMessage'];
-			  header('Location:'.$config['blogPath'].$config['cleanIndex'].'/adminPageModerate');
-			  die();
+			  //header('Location:'.$config['blogPath'].$config['cleanIndex'].'/adminPageModerate');
+			  //die();
+			  $msgtext = $lang['pageModerateMessage'];
+			  //$msgclass= "success";
+			  $theme_main['content'] .= '<script type="text/javascript">$.jGrowl("'.$lang['pageModerateMessage'].'");</script>';
 		  }	
 		  $theme_main['content'] .= "<div class='$msgclass'>$msgtext</div>"; 
 	      $theme_main['content'] .= '<br><form method="post" action="'.$config['blogPath'].$config['cleanIndex'].'/adminModerateSubmit">';
@@ -817,6 +819,7 @@
        else {
           $theme_main['content'].= $lang['errorPasswordIncorrect'].' .. <br/>';
        }
+	   //$_SESSION['growlmsg'] = $msgtext;
   }
 
 

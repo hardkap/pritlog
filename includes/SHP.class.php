@@ -59,7 +59,7 @@ class SHP {
                                                      $status = $row['status'];
                                                 }
 						if (isset($_POST['notfirst'])) {
-                                                    if ($_POST[$pluginid] == 1) {$status = 1; }
+                                                    if (@$_POST[$pluginid] == 1) {$status = 1; }
                                                     else { $status = 0; }
                                                 }
                                                 $this->plugins[$file]['found'] = true;

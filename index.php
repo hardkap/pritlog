@@ -150,10 +150,11 @@ else $user="user";
   $baseScript=basename($scriptName);
   //echo $blogPath.'1<br>';
   $i=0;
-  
+
   $option = isset($data[$optionIndex])?$data[$optionIndex]:"mainPage";
   @$option = (trim($data[$optionIndex]) == "")?"mainPage":$data[$optionIndex];
   $option = str_replace("index.php","",$option); // PritlogMU
+  if (isset($_REQUEST["func"])) $option = $_REQUEST["func"];
   $nicEditType = "default";
   $nicEditUrl  = '<script src="'.$blogPath.'/javascripts/nicEdit.js" type="text/javascript"></script>';
   /* To get the query string from the pretty urls */
@@ -179,6 +180,7 @@ else $user="user";
 	  }
 	  $_SESSION['timeout'] = time();
   }
+  //echo '<pre>'; print_r($_SESSION); echo '</pre>';
   if (isset($_SESSION['start'])) $_SESSION['start']   = false;
   else $_SESSION['start']   = true;
    $mypath  = isset($_SERVER['PATH_INFO'])?str_replace("/index.php","",$_SERVER['PATH_INFO']):"";
@@ -364,8 +366,10 @@ $theme_main['comments']      .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."them
 $theme_main['aboutHeader']    = $lang['pageBasicConfigAbout'];
 $theme_main['about']          = $config['about'];
 $theme_main['footer']    = $lang['footerCopyright'].' '.$config['blogTitle'].' '.date('Y').' - '.$lang['footerRightsReserved'].' - Powered by <a href="http://hardkap.net/pritlog/">Pritlog</a></div>';
-print @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_header["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/header.tpl"));
-print @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_main["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/main.tpl"));
+if (!isset($_REQUEST["func"])) {
+   print @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_header["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/header.tpl"));
+   print @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_main["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/main.tpl"));
+}
 sqlite_close($config['db']);
 
 }
@@ -398,45 +402,6 @@ sqlite_close($config['db']);
           listPosts();
 		  $referrer=$serverName.$_SERVER['REQUEST_URI'];
 	      $_SESSION['referrer'] = $referrer;
-          break;
-      case "adminPage":
-          adminPage();
-          break;
-      case "adminPageBasic":
-          if ($debugMode=="on") {echo "adminPageBasic  ".$_POST['process']."<br>";}
-          adminPageBasic();
-          break;
-      case "adminPageBasicSubmit":
-          if ($debugMode=="on") {echo "adminPageBasicSubmit  ".$_POST['process']."<br>";}
-          adminPageBasicSubmit();
-          break;
-      case "adminPageAdvanced":
-          if ($debugMode=="on") {echo "adminPageAdvanced  ".$_POST['process']."<br>";}
-          adminPageAdvanced();
-          break;
-      case "adminPageAdvancedSubmit":
-          if ($debugMode=="on") {echo "adminPageAdvancedSubmit  ".$_POST['process']."<br>";}
-          adminPageAdvancedSubmit();
-          break;
-      case "adminPageAuthors":
-          if ($debugMode=="on") {echo "adminPageAuthors  ".$_POST['process']."<br>";}
-          adminPageAuthors();
-          break;
-      case "adminAuthorsAdd":
-          if ($debugMode=="on") {echo "adminAuthorsAdd  ".$_POST['process']."<br>";}
-          adminAuthorsAdd();
-          break;
-      case "adminAuthorsEdit":
-          if ($debugMode=="on") {echo "adminAuthorsEdit  ".$_POST['process']."<br>";}
-          adminAuthorsEdit();
-          break;
-      case "adminPluginsSubmit":
-      case "adminPagePlugins":
-          adminPagePlugins();
-          break;
-      case "adminPageModerate":
-      case "adminModerateSubmit":
-          adminPageModerate();
           break; 
       case "deleteEntry":
           if ($debugMode=="on") {echo "deleteEntry  ".$_POST['process']."<br>";}
@@ -501,6 +466,10 @@ sqlite_close($config['db']);
               deleteCommentSubmit();
           }
           break;
+	  case "deleteCommentSubmit":	 
+		  if ($debugMode=="on") {echo "deleteEntrySubmit  ".$_POST['process']."<br>";}
+		  deleteCommentSubmit();
+          break;	  
       case "loginPage":
            loginPage();
            break;
@@ -528,6 +497,45 @@ sqlite_close($config['db']);
       case "myProfileSubmit":
            myProfileSubmit();
            break;
+      case "adminPage":
+          adminPage();
+          break;
+      case "adminPageBasic":
+          if ($debugMode=="on") {echo "adminPageBasic  ".$_POST['process']."<br>";}
+          adminPageBasic();
+          break;
+      case "adminPageBasicSubmit":
+          if ($debugMode=="on") {echo "adminPageBasicSubmit  ".$_POST['process']."<br>";}
+          adminPageBasicSubmit();
+          break;
+      case "adminPageAdvanced":
+          if ($debugMode=="on") {echo "adminPageAdvanced  ".$_POST['process']."<br>";}
+          adminPageAdvanced();
+          break;
+      case "adminPageAdvancedSubmit":
+          if ($debugMode=="on") {echo "adminPageAdvancedSubmit  ".$_POST['process']."<br>";}
+          adminPageAdvancedSubmit();
+          break;
+      case "adminPageAuthors":
+          if ($debugMode=="on") {echo "adminPageAuthors  ".$_POST['process']."<br>";}
+          adminPageAuthors();
+          break;
+      case "adminAuthorsAdd":
+          if ($debugMode=="on") {echo "adminAuthorsAdd  ".$_POST['process']."<br>";}
+          adminAuthorsAdd();
+          break;
+      case "adminAuthorsEdit":
+          if ($debugMode=="on") {echo "adminAuthorsEdit  ".$_POST['process']."<br>";}
+          adminAuthorsEdit();
+          break;
+      case "adminPluginsSubmit":
+      case "adminPagePlugins":
+          adminPagePlugins();
+          break;
+      case "adminPageModerate":
+      case "adminModerateSubmit":
+          adminPageModerate();
+          break; 
       case "pluginFunction1":
            pluginFunction1();
            break;
