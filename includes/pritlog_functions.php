@@ -1,4 +1,33 @@
 <?php
+	function closeUnclosedTags($unclosedString){ 
+		$unclosedString = html_entity_decode($unclosedString);
+		//$unclosedString = strip_tags($unclosedString, '<b><strong><h2><h3><h4><h5><pre><p><a><img><div><br><br/>');
+		//echo substr($unclosedString,0,10)." ";
+		preg_match_all("/<([^\/]\w*)>/", $closedString = $unclosedString, $tags); 
+		for ($i=count($tags[1])-1;$i>=0;$i--){ 
+			$tag = $tags[1][$i]; 
+			//if ($tag !== "br") echo substr($unclosedString,0,10)."  ".$tag." ".substr_count($closedString, "</$tag>")." ".substr_count($closedString, "<$tag>")."<br/>";
+			if (($tag !== "br") && (substr_count($closedString, "</$tag>") < substr_count($closedString, "<$tag>"))) $closedString .= "</$tag>"; 
+		} 
+		return $closedString; 
+	} 
+
+
+	function myTruncate($text, $limit, $break=". ", $pad="...") {
+		if((strlen($text) <= $limit) || ($limit == 0)) return closeUnclosedTags($text);
+		if(false !== ($breakpoint = strpos($text, $break, $limit))) {
+			$texta = html_entity_decode($text);
+			if (( substr_count($texta, "<div", 0, $breakpoint) == substr_count($texta, "</div", 0, $breakpoint) ) && !strpos(substr($texta,0,$breakpoint),"<div class")) {
+				//echo $limit." ".strlen($text)."  ".substr($text,0,50)."<br/>";
+				if ( ($breakpoint < strlen($text) - 1) ) { $text = substr($text, 0, $breakpoint) . $pad; }
+			}	
+			else { 
+				//myTruncate($text, $limit+1, $break, $pad);
+			}	
+		}
+		return closeUnclosedTags($text);
+	}
+
   function getRealIpAddr()
   {
       if (!empty($_SERVER['HTTP_CLIENT_IP']))   //check ip from share internet
@@ -217,12 +246,14 @@
       $filterEntries=array();
 	  $totalEntries = 0;
 	  $theme_main['content'] = '';
+	  $theme_general['header'] = '';
       if (trim($requestCategory) == "") {
 		  $result = sqlite_query($config['db'], "select count(postid) AS view from posts WHERE ".$priv." (type = 'post' or (type = 'page' AND stick = 'yes'));");
 		  while ($row = @sqlite_fetch_array($result, SQLITE_ASSOC)) {
               $totalEntries = $row['view'];
               if ($row['view'] == 0) {
-                 $theme_main['content'] = '<br><br>'.$lang['msgNoPosts'].' <a href="'.$config['blogPath'].$config['cleanIndex'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
+                 $theme_general['content'] = '<br><br>'.$lang['msgNoPosts'].' <a href="'.$config['blogPath'].$config['cleanIndex'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
+				 $theme_main['content'] = @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_general["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/general.tpl"));;
               }
           }
       }
@@ -234,7 +265,8 @@
       }
 
       if ($totalEntries == 0) {
-          $theme_main['content'] = '<br><br>'.$lang['msgNoPosts'].' <a href="'.$config['blogPath'].$config['cleanIndex'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
+          $theme_general['content'] = '<br><br>'.$lang['msgNoPosts'].' <a href="'.$config['blogPath'].$config['cleanIndex'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
+		  $theme_main['content'] = @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_general["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/general.tpl"));;
       }
 	  
 	  
@@ -271,7 +303,8 @@
            $visits  =$entry[7];
            $author  =(trim($entry[8])== "")?'admin':$entry[8];
            if (trim($visits) == "") { $visits=0; }
-           if (strstr($entry[1],"*readmore*")) { $readmore='<br><br><a href="'.$config['blogPath'].$config['cleanIndex'].'/posts/'.$fileName."/".$titleModified.'">'.$lang['pageViewFullPost'].' &raquo;</a>'; }
+		   $continue_reading='<br><br><a href="'.$config['blogPath'].$config['cleanIndex'].'/posts/'.$fileName."/".$titleModified.'">'.$lang['pageViewFullPost'].' &raquo;</a>';
+           if (strstr($entry[1],"*readmore*")) { $readmore=$continue_reading; }
            else { $readmore=""; }
            $content =explode("*readmore*",$entry[1]);
 
@@ -282,7 +315,11 @@
            $theme_post['loc_bottom']        = "";
            $theme_post['postLink'] = $config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified;
            $theme_post['title']    = $title;
-           $theme_post['content']  = html_entity_decode($content[0].$readmore);
+		   if ($readmore == "")
+				$theme_post['content']   = html_entity_decode(myTruncate($content[0],$config['excerptLength'],". ",$continue_reading));
+		   else		
+				$theme_post['content']  = html_entity_decode(myTruncate($content[0],0,". ",$continue_reading).$readmore);
+		   
            $categoryText=str_replace("_"," ",$category);
            $theme_post['authorLabel']    = $lang['pageAuthorsNew1'];
            $theme_post['author']         = $author;
@@ -320,7 +357,7 @@
            $theme_post['edit'] = $theme_post['delete'] = "";
            if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
                $theme_post['edit']       = "<a href=".$config['blogPath'].$config['cleanIndex']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
-               $theme_post['delete']    = '&nbsp;&nbsp;<a href="#" onclick="'.'confirm_delete(\''.$config['blogPath'].$config['cleanIndex']."/deleteEntrySubmit/".$fileName.'\')'.'">'.$lang['postFtDelete']."</a></center><br/>";
+               $theme_post['delete']    = '&nbsp;-&nbsp;<a href="javascript:void(null)" onclick="'.'confirm_delete(\''.$config['blogPath'].$config['cleanIndex']."/deleteEntrySubmit/".$fileName.'\')'.'">'.$lang['postFtDelete']."</a></center><br/>";
            }
            if ($postType == "page") 
 				$theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_post["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/page.tpl"));
@@ -332,7 +369,7 @@
       $totalPages = ceil(($totalEntries)/($config['entriesPerPage']));
       if($totalPages >= 1)
       {
-	   $theme_main['content'] .= '<center> '.$lang['msgPages'].': ';
+			$theme_main['pagenav'] = $lang['msgPages'].': ';
       }
       else
       {
@@ -357,25 +394,24 @@
 
                         if($i == (($page-1)+$config['maxPagesDisplayed']) && (($page-1)+$config['maxPagesDisplayed']) < $totalPages)
 			{
-				$theme_main['content'] .=  '<a href='.$config['blogPath'].$config['cleanIndex'].$categoryText.'/page/'.$i.'>['.$i.']</a> ...';
+				$theme_main['pagenav'] .=  '<a href='.$config['blogPath'].$config['cleanIndex'].$categoryText.'/page/'.$i.'>['.$i.']</a> ...';
 			}
 			elseif($startPage > 1 && $displayed == 0)
 			{
-				$theme_main['content'] .= '... <a href='.$config['blogPath'].$config['cleanIndex'].$categoryText.'/page/'.$i.'>['.$i.']</a> ';
+				$theme_main['pagenav'] .= '... <a href='.$config['blogPath'].$config['cleanIndex'].$categoryText.'/page/'.$i.'>['.$i.']</a> ';
 	 			$displayed = 1;
 			}
 			else
 			{
-				$theme_main['content'] .= '<a href='.$config['blogPath'].$config['cleanIndex'].$categoryText.'/page/'.$i.'>['.$i.']</a> ';
+				$theme_main['pagenav'] .= '<a href='.$config['blogPath'].$config['cleanIndex'].$categoryText.'/page/'.$i.'>['.$i.']</a> ';
 			}
 		}
 		else
 		{
-			$theme_main['content'] .= '['.$i.'] ';
+			$theme_main['pagenav'] .= '['.$i.'] ';
 		}
 	    }
 	}
-	$theme_main['content'] .= '</center>';
   }
 
 
@@ -581,18 +617,18 @@
 
   function listAllComments() {
       global $config, $separator, $lang, $theme_main, $priv;
-      $theme_main['content'] = "";
+      $theme_main['content'] = $theme_general['content'] = "";
       $latestCommentsFile=$config['commentDir']."latest".$config['dbFilesExtension'];
       $userFileName=$config['commentDir']."users".$config['dbFilesExtension'].".dat";
-      $theme_main['content'].= '<h3>'.$lang['pageAllComments'].'</h3>';
+      $theme_general['header'] = $lang['pageAllComments'];
       $result = sqlite_query($config['db'], "select count(commentid) AS view from comments WHERE status = 'approved' and postid in (select postid from posts where ".$priv." 1)");
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $commentCount  = $row['view'];
           if ($commentCount > 0) {
-              $theme_main['content'].= '<table><tr><th>'.$lang['pageAllCommentsTitle'].'</th><th>'.$lang['pageAllCommentsDate'].'</th><th>'.$lang['pageAllCommentsBy'].'</th></tr>';
+              $theme_general['content'].= '<table><tr><th>'.$lang['pageAllCommentsTitle'].'</th><th>'.$lang['pageAllCommentsDate'].'</th><th>'.$lang['pageAllCommentsBy'].'</th></tr>';
           }
           else {
-              $theme_main['content'].= $lang['pageAllCommentsNo'].'!<br>';
+              $theme_general['content'].= $lang['pageAllCommentsNo'].'!<br>';
           }
           $result = sqlite_query($config['db'], "select * from comments WHERE status = 'approved' and postid in (select postid from posts where ".$priv." 1) ORDER BY date DESC");
           while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
@@ -606,25 +642,26 @@
               $url           = $row['url'];
               $email         = $row['email'];
               $titleModified=getTitleFromFilename($postid);
-              $theme_main['content'].= "<tr><td><a style='font-style:normal' href=".$config['blogPath'].$config['cleanIndex']."/posts/".$postid."/".$titleModified."#Comments>".$title."</a></td>";
-              $theme_main['content'].= "<td>".$date."</td><td>".$author."</td></tr>";
+              $theme_general['content'].= "<tr><td><a style='font-style:normal' href=".$config['blogPath'].$config['cleanIndex']."/posts/".$postid."/".$titleModified."#Comments>".$title."</a></td>";
+              $theme_general['content'].= "<td>".$date."</td><td>".$author."</td></tr>";
           }
-          $theme_main['content'].= "</table>";
+          $theme_general['content'].= "</table>";
+		  $theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_general["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/general.tpl"));
       }
   }
   
 
   function viewArchive() {
       global $separator, $entries, $config, $lang, $theme_main, $priv;
-      $theme_main['content'] = "";
+      $theme_main['content'] = $theme_general['content'] = "";
       $i=0;
-	  $theme_main['content'].= "<h3>".$lang['pageArchive']."</h3>";
+	  $theme_general['header'] = $lang['pageArchive'];
       $archiveArray   = array();
       $archiveArrayUnique = array();
       $archiveArrayFormat = array();
       $result = sqlite_query($config['db'], "select * from posts where ".$priv." 1 ORDER BY date;");
       if (sqlite_num_rows($result) == 0) {
-          $theme_main['content'].= '<br><br>'.$lang['msgNoPosts'].' <a href="'.$config['blogPath'].$config['cleanIndex'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
+          $theme_general['content'].= '<br><br>'.$lang['msgNoPosts'].' <a href="'.$config['blogPath'].$config['cleanIndex'].'/newEntry">'.$lang['msgNoPostsMakeOne'].'</a>?<br>';
       }
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $title         = $row['title'];
@@ -636,40 +673,42 @@
       }
       $archiveArrayUnique=array_unique($archiveArray);
       foreach ($archiveArrayUnique as $archiveMonthYear) {
-          $theme_main['content'].= "<a style='font-style:normal' href=\"".$config['blogPath'].$config['cleanIndex']."/month/".str_replace(" ","-",$archiveMonthYear)."\">".$archiveArrayFormat[$archiveMonthYear]."</a><br>";
+          $theme_general['content'].= "<a href=\"".$config['blogPath'].$config['cleanIndex']."/month/".str_replace(" ","-",$archiveMonthYear)."\">".$archiveArrayFormat[$archiveMonthYear]."</a><br>";
       }
+	  $theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_general["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/general.tpl"));
   }
 
 
   function viewArchiveMonth() {
       global $separator, $entries, $config, $optionValue, $lang, $theme_main, $priv;
       $i=0;
-      $theme_main['content'] = "";
-      $theme_main['content'].= "<h3>".$lang['pageArchiveFor']." ".date("M Y",strtotime($optionValue))."</h3>";
+      $theme_main['content'] = $theme_general['content'] = "";
+      $theme_general['header'] = $lang['pageArchiveFor']." ".date("M Y",strtotime($optionValue));
       $requestMonth = $optionValue;
-      $theme_main['content'].= "<table>";
       $result = sqlite_query($config['db'], "select * from posts WHERE ".$priv." date LIKE '%$requestMonth%';");
+	  $theme_general['content'].= "<table>";
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $title         = $row['title'];
           $titleModified = titleModify($title);
           $postDate      = $row['date'];
           $fileName      = $row['postid'];
-          $theme_main['content'].= "<tr><td>".$postDate.":&nbsp;</td><td><a href=".$config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified.">".$title."</a></td></tr>";
+          $theme_general['content'].= "<tr><td>".$postDate.":&nbsp;</td><td><a href=".$config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified.">".$title."</a></td></tr>";
       }
-      $theme_main['content'].= "</table>";
+	  $theme_general['content'].= "</table>";
+      $theme_main['content'].= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_general["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/general.tpl"));;
   }
 
 
   function searchPosts() {
       global $separator, $config, $entries, $lang, $theme_main, $SHP, $public_data, $priv;
-      $theme_main['content'] = "";
+      $theme_main['content'] = $theme_general['content'] = "";
       $searchkey   = isset($_POST['searchkey'])?$_POST['searchkey']:$_GET['searchkey'];
-      $theme_main['content'].= "<h3>".$lang['pageSearch']."</h3>";
+      $theme_general['header'] = $lang['pageSearch'];
       $i=0;
       $searchResults = array();
       unset($GLOBALS['$public_data']);
       if (trim($searchkey) == "") {
-          $theme_main['content'].= $lang['errorSearchNothing'].'<br>';
+          $theme_general['content'] .= $lang['errorSearchNothing'].'<br>';
       }
       else {
           $public_data['searchkey'] = $searchkey;
@@ -694,7 +733,7 @@
                   $postType      = $row['type'];
                   $allowComments = $row['allowcomments'];
                   $visits        = $row['visits'];
-                  $theme_main['content'].= "<a href=".$config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified.">".$title."</a><br/>";
+                  $theme_general['content'].= "<a href=".$config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified.">".$title."</a><br/>";
                   $i++;
                   array_push($searchResults, $fileName);
               }
@@ -715,12 +754,15 @@
                   $allowComments = $row['allowcomments'];
                   $visits        = $row['visits'];
                   if (!in_array($fileName, $searchResults)) {
-                      $theme_main['content'].= "<a href=".$config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified.">".$title."</a><br/>";
+                      $theme_general['content'].= "<a href=".$config['blogPath'].$config['cleanIndex']."/posts/".$fileName."/".$titleModified.">".$title."</a><br/>";
                       $i++;
                   }
               }
           }
-          if ($i == 0) {$theme_main['content'].= $lang['errorSearchEmptyResult'];}
+          if ($i == 0) {$theme_general['content'].= $lang['errorSearchEmptyResult'];}
+		  $theme_main['content'].= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_general["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/general.tpl"));;
       }
   }
 
+
+  

@@ -1,0 +1,442 @@
+/*   
+Theme Name: Upstart Blogger Voluptua
+Theme URI: http://www.upstartblogger.com
+Description: A minimalist yet imposing Wordpress theme from <a href="http://www.upstartblogger.com/" title="Upstart Blogger">Upstart Blogger</a>. 
+Author: Ashley Morgan
+Author URI: http://www.upstartblogger.com
+Version: 0.1
+License: Creative Commons Attribution-Share Alike 3.0 (http://creativecommons.org/licenses/by-sa/3.0/). Feel free to make any changes, but please keep a link back to Upstart Blogger in your sidebar or footer.
+*/
+
+body {
+	background-color: #E1EDF1;
+	font-family: "Helvetica Neue", Helvetica, Arial, Sans-Serif;
+	font-size: 1em;
+	line-height: 1.5;
+	color: #000000;
+	background-position: top;
+	margin-bottom: -4px;
+	padding-top: 0px;
+	padding-right: 0px;
+	padding-bottom: 20px;
+	padding-left: 0px;
+}
+
+#container {
+	width: 960px;
+	margin-top: 36px;
+	margin-right: auto;
+	margin-bottom: 0;
+	margin-left: auto;
+}
+
+#entrypage {
+	font-size: .9em;
+	line-height: 1.4em;
+	margin-top: 0;
+	margin-right: auto;
+	margin-bottom: 0;
+	margin-left: auto;
+	padding-top: 0;
+	padding-right: 0px;
+	padding-bottom: 25px;
+	padding-left: 0;
+	}
+
+#sidebar {
+	width: 960px;
+	float: right;
+	font-size: 1em;
+	line-height: 1.5;
+	text-align: left;
+	padding-right: 0px;
+	padding-bottom: 25px;
+	padding-left: 0;
+	margin-top: 50px;
+	padding-top: 20px;
+	border-top:10px solid silver;
+	}
+
+#sidebarleft {
+	width:590px;
+	float: left;
+}
+
+#sidebarright {
+	width: 310px;
+	float: right;
+}
+
+#footer {
+	width:960px;
+	float: none;
+	clear: both;
+	border-top: 10px solid silver;
+	font-weight: bold;
+}
+
+#entries {
+	width: 960px;
+	float: left;
+	margin-left: 0px;
+	}
+
+.linktext {
+	font-size:9px;
+	margin-left:5%;
+	margin-right:5%;
+}
+.linktextarea {
+	font-size:9px;
+	overflow:hidden;
+}
+
+.post ul li {list-style-type: disc; margin-left:37px; }
+
+.post {
+	margin-bottom: 4em;
+	border-bottom:2px solid silver;
+}
+
+a {
+	color: #20A0CF;
+	text-decoration: none;
+	font-weight: bold;
+}
+
+h1 a, h2 a, h3 a {
+	color: #000000;
+}
+
+a:hover {
+	color: #DB1750;
+	font-weight: bold;
+}
+
+h1 a:hover {
+	color: #DB1750;
+	font-weight: bold;
+}
+
+
+a:link img {
+}
+
+ul {
+	list-style: none;
+	margin-left: 0px;
+	padding-left: 0px;
+	margin-top: 0px;
+}
+
+li.linkcat {
+	list-style-type: none;
+}
+
+img {
+	border: 5px solid #000000;
+}
+
+.imgleft {
+	float:left;
+	margin-right: 10px;
+	margin-bottom: 10px;
+}
+
+.imgright {
+	float: right;
+	margin-left: 10px;
+	margin-bottom: 10px;
+}
+
+img.frame {
+	padding: 2px;
+	border: solid 1px #DEE4E5;
+}
+
+
+
+h1 {
+	font-size: 4.5em;
+	line-height: 0.9em;
+	text-transform: none;
+	text-align: left;
+	border-bottom-width: 0px;
+	border-bottom-style: solid;
+	border-bottom-color: #000000;
+	font-style: normal;
+	margin-bottom: 36px;
+	padding-bottom: 0px;
+	font-weight: bold;
+	letter-spacing: -3px;
+}
+
+.title {
+	border-bottom: 1px solid silver;
+}
+
+h2 {
+	font-weight: bold;
+	font-size: 2em;
+	margin-bottom: 6px;
+	color: #000000;
+	text-align: left;
+	border-bottom-width: 0px;
+	border-bottom-style: dotted;
+	border-bottom-color: #000000;
+	font-style: normal;
+	letter-spacing: -1px;
+	margin-top: 10px;
+}
+h3 {
+	font-weight: bold;
+	font-size: 2em;
+	margin-bottom: 6px;
+	color: #000000;
+	text-align: left;
+	border-bottom-width: 0px;
+	border-bottom-style: dotted;
+	border-bottom-color: #000000;
+	font-style: normal;
+	letter-spacing: -1px;
+	margin-top: 10px;
+}
+
+h4 {
+	font-weight: bold;
+	font-size: 3em;
+	margin-bottom: 6px;
+	color: #000000;
+	text-align: left;
+	border-bottom-width: 0px;
+	border-bottom-style: dotted;
+	border-bottom-color: #000000;
+	font-style: normal;
+	letter-spacing: -1px;
+	margin-top: 10px;
+}
+
+h5 {
+	font-weight: bold;
+	font-size: 3em;
+	margin-bottom: 6px;
+	color: #000000;
+	text-align: left;
+	border-bottom-width: 0px;
+	border-bottom-style: dotted;
+	border-bottom-color: #000000;
+	font-style: normal;
+	letter-spacing: -1px;
+	margin-top: 36px;
+}
+
+h6 {
+	font-weight: bold;
+	font-size: 3em;
+	margin-bottom: 6px;
+	color: #000000;
+	text-align: left;
+	border-bottom-width: 0px;
+	border-bottom-style: dotted;
+	border-bottom-color: #000000;
+	font-style: normal;
+	letter-spacing: -1px;
+	margin-top: 36px;
+}
+/*
+.post h3 {
+	border-bottom: none;
+	letter-spacing: normal;
+	margin-bottom: -.5em;
+}
+*/
+.post h2,  .post h3, .post h4, .post h5, .post h6{
+	border-bottom: none;
+	letter-spacing: normal;
+	/*margin-bottom: -.5em;*/
+	font-size: 1.25em;
+}
+
+
+.quote, blockquote {
+	background-color: #FFFFC2;
+	/*font-size: 1.25em;*/
+	line-height: 1.5;
+	margin-top: 0px;
+	margin-right: 0;
+	margin-bottom: 0px;
+	margin-left: 0;
+	padding-top: 10px;
+	padding-right: 30px;
+	padding-bottom: 10px;
+	padding-left: 30px;
+}
+
+
+
+/* Begin Comments*/
+
+.comments_tiny {
+	color: #b8b8b8;
+	border-bottom: 1px solid silver;
+}
+
+.alt {
+	margin: 0;
+	padding: 0px;
+}
+
+.commentlist {
+	margin-top: 0px;
+
+}
+
+.commentlist li {
+	margin-top: 0px;
+	margin-right: 0;
+	margin-bottom: 0;
+	margin-left: 0px;
+}
+
+.commentlist p {
+	margin: 10px 5px 10px 0;
+}
+
+#commentform p {
+	margin: 5px 0;
+}
+
+.nocomments {
+	text-align: center;
+	margin: 0;
+	padding: 0;
+}
+
+.commentmetadata {
+	margin: 0;
+	display: block;
+}
+
+li.comment {
+	font-weight: bold;
+	padding: 10px;
+	list-style: none;
+}
+
+.commentlist p {
+	font-weight: normal;
+	text-transform: none;
+}
+
+#commentform {
+	margin-top: 30px;
+}
+
+.commentmetadata {
+	font-weight: normal;
+}
+
+small, #sidebar ul ul li, #sidebar ul ol li, .nocomments, .postmetadata, blockquote, strike {
+	color: #000000;
+}
+
+.content {
+	margin-bottom: 25px;
+	padding-left: 0px;
+	font-weight: normal;
+}
+
+.commentbox {
+	width: 100%;
+	height: 100px;
+}
+
+/* End Comments */
+
+pre, .code
+{
+	/*font-family: "Consolas", "Courier New", Courier, mono, serif;*/
+	font-size: 12px;
+	background-color: #F8F8F8;
+	width: 95%;
+	overflow: auto;
+	margin: 18px 0 18px 0 !important;
+	padding: 10px; /* adds a little border on top when controls are hidden */
+	border: 1px solid #E7E5DC;
+	color: black;
+    /*border-left: 3px solid #6CE26C;*/
+	border-left: 3px solid #444444;
+	font-family:'Bitstream Vera Sans Mono','Courier',monospace;
+}
+
+pre .code {
+    background-color: #f5f5f5;
+    padding: 0.5em;
+    font-size: 1.1em;
+	white-space: pre-wrap;       /* css-3 */
+	white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+	white-space: -pre-wrap;      /* Opera 4-6 */
+	white-space: -o-pre-wrap;    /* Opera 7 */
+	word-wrap: break-word;       /* Internet Explorer 5.5+ */
+}
+
+pre, .code{font:12px Monaco,"Courier New","DejaVu Sans Mono","Bitstream Vera Sans Mono",monospace;}
+
+.tagcloud {
+        font-family:'lucida grande',trebuchet,'trebuchet ms',verdana,arial,helvetica,sans-serif;
+        line-height:2.4em;
+        word-spacing:normal;
+        letter-spacing:normal;
+        text-decoration:none;
+        text-transform:none;
+        text-indent:0ex;
+        background-color:#eee;
+        margin:1em 1em 1em 1em;
+        border:2px dotted #ddd;
+        padding:0.5em 2em;
+}
+ul.tagcloud a {color:#2773a5;}
+ul.tagcloud a:link {text-decoration:none}
+ul.tagcloud a:visited {text-decoration:none}
+ul.tagcloud a:hover {text-decoration:none;color:white;background-color:#05f}
+ul.tagcloud a:active{text-decoration:none;color:white;background-color:#03d}
+ul.tagcloud {
+	list-style-type: none;
+	line-height: 2em;
+}
+ul.tagcloud li {
+	display: inline;
+	line-height: 3em;
+}
+ul.tagcloud li:after {
+	content: ",";
+	font-size: 0.72em;
+}
+ul.tagcloud li:last-child:after {
+	content: "";
+}
+ul.tagcloud .count {
+	font-size: 0.72em;
+	line-height: 1.5em;
+	color: #888;
+}
+
+a.adminTabs {
+	background:#2773a5;
+	color:#fff;
+	padding:5px 8px;
+	width:60px;
+	text-decoration:none;
+	font: bold 12px Arial, Helvetica, sans-serif;
+	border:1px solid silver; 
+}
+
+.myfooter {
+	padding-top: 20px;
+	margin-top: 20px;
+	border-top:2px solid silver;
+}	
+
+.ptext,.ptitle {
+	width:400px;
+}

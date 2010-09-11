@@ -13,6 +13,21 @@
        }
   }
 
+  function adminPageTabs() {
+	  global $config, $lang;
+	  $theme_admintabs['actionBasic']    = $config['blogPath'].$config['cleanIndex'].'/adminPageBasic';
+	  $theme_admintabs['basic'] 		 = $lang['tabsBasic'];
+	  $theme_admintabs['actionAdvanced'] = $config['blogPath'].$config['cleanIndex'].'/adminPageAdvanced';
+	  $theme_admintabs['advanced'] 		 = $lang['tabsAdvanced'];
+	  $theme_admintabs['actionAuthor'] 	 = $config['blogPath'].$config['cleanIndex'].'/adminPageAuthors';
+	  $theme_admintabs['manageAuthors']  = $lang['tabsAuthors'];
+	  $theme_admintabs['actionPlugins']  = $config['blogPath'].$config['cleanIndex'].'/adminPagePlugins';
+	  $theme_admintabs['managePlugins']  = $lang['tabsPlugins'];
+	  $theme_admintabs['actionModerate'] = $config['blogPath'].$config['cleanIndex'].'/adminPageModerate';
+	  $theme_admintabs['manageModerate'] = $lang['tabsModerate'];	
+	  return @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_admintabs["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/admintabs.tpl"));
+  }  
+  
   function adminPageBasic() {
       global $debugMode, $optionValue, $config, $lang, $theme_main, $theme_adminbasic;
       $theme_main['content'] = "";
@@ -33,26 +48,10 @@
           $theme_adminbasic['legend'] = $lang['pageBasicConfig'];
           $theme_adminbasic['titleLabel'] = $lang['pageBasicConfigTitle'];
           $theme_adminbasic['title'] = $config['blogTitle'];
-          $theme_adminbasic['titleValidate'] = '<script>';
-          $theme_adminbasic['titleValidate'].= 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
-          $theme_adminbasic['titleValidate'].= 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          $theme_adminbasic['titleValidate'].= '</script>';
           $theme_adminbasic['pass1']         = $lang['pageBasicConfigNewpass1'];
-          $theme_adminbasic['pass1Validate'] = '<script>';
-          $theme_adminbasic['pass1Validate'].= 'var pass1 = new LiveValidation( "newpass1", {onlyOnSubmit: true } );';
-          $theme_adminbasic['pass1Validate'].= '</script>';
           $theme_adminbasic['pass2'] = $lang['pageBasicConfigNewpass2'];
-          $theme_adminbasic['pass2Validate'] = '<script>';
-          $theme_adminbasic['pass2Validate'].= 'var pass2 = new LiveValidation( "newpass2", {onlyOnSubmit: true } );';
-          $theme_adminbasic['pass2Validate'].= 'pass2.add( Validate.Confirmation,{ match: "newpass1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
-          $theme_adminbasic['pass2Validate'].= '</script>';
           $theme_adminbasic['emailLabel'] = $lang['pageBasicConfigAdminEmail'];
           $theme_adminbasic['email'] = $config['sendMailWithNewCommentMail'];
-          $theme_adminbasic['emailValidate'] = '<script>';
-          $theme_adminbasic['emailValidate'].= 'var email = new LiveValidation( "adminEmail", {onlyOnSubmit: true } );';
-          $theme_adminbasic['emailValidate'].= 'email.add( Validate.Presence, { failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          $theme_adminbasic['emailValidate'].= 'email.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
-          $theme_adminbasic['emailValidate'].= '</script>';
           $theme_adminbasic['aboutLabel'] = $lang['pageBasicConfigAbout'];
           $theme_adminbasic['about'] = $config['about'];
           $theme_adminbasic['submit'] = $lang['pageBasicConfigSubmit'];
@@ -121,13 +120,9 @@
 		  if (isset($_POST['submitted'])) {
 			  $submit_result = adminPageAdvancedSubmit();
 			  if ($submit_result === true) {
-				  //$msgtext = $lang['msgConfigSaved'];
-				  //$msgclass= "success";
 				  $_SESSION['growlmsg'] = $lang['msgConfigSaved'];
 			  }
 			  else {
-				  //$msgtext = $submit_result;
-				  //$msgclass= "error"; 
 				  $_SESSION['growlmsg'] = $submit_result;
 			  }
 
@@ -160,6 +155,8 @@
           $theme_adminadvanced['timeoutDuration'] = $config['timeoutDuration'];
           $theme_adminadvanced['limitLoginsLabel'] = $lang['limitLogins'];
           $theme_adminadvanced['limitLogins'] = $config['limitLogins'];
+		  $theme_adminadvanced['excerptLabel']  = $lang['excerptLabel'];
+          $theme_adminadvanced['excerptLength'] = $config['excerptLength'];
 
           $theme_adminadvanced['language'] = '<p><label for="blogLanguage">'.$lang['pageAdvancedConfigLanguage'].'</label><br>';
           $theme_adminadvanced['language'].= '<select name="blogLanguage" id="blogLanguage">';
@@ -170,7 +167,6 @@
                   while (false !== ($file = readdir($handle))) {
                       if (substr($file,strlen($file)-4) == ".php") {
                           $language=substr($file,0,strlen($file)-4);
-                          //echo substr($file,0,strlen($file)-4).'<br>';
                           ($config['blogLanguage'] == $language)?$selected="selected":$selected="";
                           $theme_adminadvanced['language'] .= '<option value="'.$language.'" '.$selected.' >'.$language;
                       }
@@ -203,7 +199,6 @@
 
           $theme_adminadvanced['privacy'] = '<p><label for="privacy">'.$lang['pageAdvancedConfigPrivacy'].'</label><br>';
           $theme_adminadvanced['privacy'].= '<select name="privacy" id="privacy">';
-		  //$config['privacy'] = 2;
 		  $privacyArray = array(0, 1, 2);
 		  if (is_array($privacyArray)) {
               foreach ($privacyArray as $value) {
@@ -211,13 +206,13 @@
 				  ($config['privacy'] == $privacy)?$selected="selected":$selected="";
 				  switch ($privacy) {
 					case 0: 
-						$privacyText = "0 - Only the author can read the posts";
+						$privacyText = $lang['pageAdvancedConfigPrivacy0'];
 						break;
 					case 1:
-						$privacyText = "1 - All registered authors can read posts";
+						$privacyText = $lang['pageAdvancedConfigPrivacy1'];
 						break;
 					case 2:
-						$privacyText = "2 - Everybody can read all posts";
+						$privacyText = $lang['pageAdvancedConfigPrivacy2'];
 						break;
 				  } 
 				  $theme_adminadvanced['privacy'] .= '<option value="'.$privacy.'" '.$selected.' >'.$privacyText;
@@ -355,6 +350,9 @@
           if (isset($_POST['limitLogins']) && trim($_POST['limitLogins']) != "") {
                $config['limitLogins'] = $_POST['limitLogins'];
           }
+		  if (isset($_POST['excerptLength']) && trim($_POST['excerptLength']) != "") {
+               $config['excerptLength'] = $_POST['excerptLength'];
+          }
 
           if ($_POST['sendMailComments'] == 1) { $config['sendMailWithNewComment'] = 1; }
           else { $config['sendMailWithNewComment'] = 0; }
@@ -462,29 +460,9 @@
               $authorsList.='"'.$value.'" , ';
           }
           $authorsList.='"admin"';
-          $theme_authoradd['authorValidate'] = '<script>';
-          $theme_authoradd['authorValidate'].= 'var author = new LiveValidation( "addAuthor", {onlyOnSubmit: true } );';
-          $theme_authoradd['authorValidate'].= 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          $theme_authoradd['authorValidate'].= 'author.add( Validate.Exclusion, { within: [ '.$authorsList.' ] , failureMessage: "'.$lang['errorDuplicateAuthor'].'"  } );';
-          $theme_authoradd['authorValidate'].= '</script>';
           $theme_authoradd['pass1'] = $lang['pageBasicConfigNewpass1'];
-          $theme_authoradd['pass1Validate'] = '<script>';
-          $theme_authoradd['pass1Validate'].= 'var pass1 = new LiveValidation( "newpass1", {onlyOnSubmit: true } );';
-          $theme_authoradd['pass1Validate'].= 'pass1.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          $theme_authoradd['pass1Validate'].= 'pass1.add( Validate.Length, { minimum: 5 , failureMessage: "'.$lang['errorPassLength'].'" } );';
-          $theme_authoradd['pass1Validate'].= '</script>';
           $theme_authoradd['pass2'] = $lang['pageBasicConfigNewpass2'];
-          $theme_authoradd['pass2Validate'] = '<script>';
-          $theme_authoradd['pass2Validate'].= 'var pass2 = new LiveValidation( "newpass2", {onlyOnSubmit: true } );';
-          $theme_authoradd['pass2Validate'].= 'pass2.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          $theme_authoradd['pass2Validate'].= 'pass2.add( Validate.Confirmation,{ match: "newpass1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
-          $theme_authoradd['pass2Validate'].= '</script>';
           $theme_authoradd['email'] = $lang['pageAuthorsNewEmail'];
-          $theme_authoradd['emailValidate'] = '<script>';
-          $theme_authoradd['emailValidate'].= 'var email = new LiveValidation( "authorEmail", {onlyOnSubmit: true } );';
-          $theme_authoradd['emailValidate'].= 'email.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-          $theme_authoradd['emailValidate'].= 'email.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
-          $theme_authoradd['emailValidate'].= '</script>';
           $theme_authoradd['submit'] = $lang['pageAuthorsAdd'];
 		  
 		  $theme_main['content'].= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_authoradd["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/authoradd.tpl"));
@@ -501,16 +479,8 @@
                   $theme_authoredit['email'] = $authorsEmail[$value];
                   $theme_authoredit['pass1Label'] = $lang['pageBasicConfigNewpass1'];
                   $theme_authoredit['pass1']      = 'newpass'.$i.'1';
-                  $theme_authoredit['pass1Validate'] = '<script>';
-                  $theme_authoredit['pass1Validate'].= 'var pass'.$i.'1 = new LiveValidation( "newpass'.$i.'1", {onlyOnSubmit: true } );';
-                  $theme_authoredit['pass1Validate'].= 'pass'.$i.'1.add( Validate.Length, { minimum: 5 , failureMessage: "'.$lang['errorPassLength'].'" } );';
-                  $theme_authoredit['pass1Validate'].= '</script>';
                   $theme_authoredit['pass2Label'] = $lang['pageBasicConfigNewpass2'];
                   $theme_authoredit['pass2']      = 'newpass'.$i.'2';
-                  $theme_authoredit['pass2Validate'] = '<script>';
-                  $theme_authoredit['pass2Validate'].= 'var pass'.$i.'2 = new LiveValidation( "newpass'.$i.'2", {onlyOnSubmit: true } );';
-                  $theme_authoredit['pass2Validate'].= 'pass'.$i.'2.add( Validate.Confirmation,{ match: "newpass'.$i.'1", failureMessage: "'.$lang['errorNewPasswordsMatch'].'" } );';
-                  $theme_authoredit['pass2Validate'].= '</script>';
                   $theme_authoredit['submit'] = $lang['postFtEdit'];
                   $theme_authoredit['delete'] = $lang['pageAuthorsDelete'];
                   $theme_authoredit['authornum'] = $i;
@@ -650,6 +620,7 @@
 
   function list_plugins($plugin_folder = './plugins/') {
         global $SHP, $theme_main, $config;
+		$allplugins = "";
         if ($handle = @opendir($plugin_folder)) {
 		while (false !== ($file = readdir($handle))) {
 			if (is_file($plugin_folder . $file)) {
@@ -658,7 +629,6 @@
 					$plugin_array = $SHP->get_plugin_data($file);
 					$pluginid1 = explode(".",$plugin_array['file']);
 					$pluginid  = $pluginid1[0];
-					//echo '-> '.$pluginid.'  '.$_POST[$pluginid].'<br>';
 					$plugin_checked = false;
 					if (@$_POST[$pluginid] == 1) {$status = 1; }
 					else { $status = 0; }
@@ -675,26 +645,52 @@
                                         else {
                                             $checking='';
                                         }
-					$theme_main['content'] .= '<tr><td><input type="checkbox" name="'.$pluginid.'" value="1" '.$checking.'></td><td><a href="'.$plugin_array['url'].'">'.$plugin_array['name'].'</a></td><td>'.$plugin_array['author'].'</td><td>'.$plugin_array['desc'].'</td></tr>';
+					$allplugins .= '<tr><td><input type="checkbox" name="'.$pluginid.'" value="1" '.$checking.'></td><td><a href="'.$plugin_array['url'].'">'.$plugin_array['name'].'</a></td><td>'.$plugin_array['author'].'</td><td>'.$plugin_array['desc'].'</td></tr>';
 				}
 			}
 			else if ((is_dir($plugin_folder . $file)) && ($file != '.') && ($file != '..')) {
-				list_plugins($plugin_folder . $file . '/');
+				$allplugins .= list_plugins($plugin_folder . $file . '/');
 			}
 		}
 		closedir($handle);
         }
+		return $allplugins;
         plugin_cleanup();
   }
 
+  function adminPagePlugins() {
+      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail;
+      global $theme_main, $theme_adminplugins, $SHP;
+      //$theme_adminplugins['allplugins'] = "";
+      $theme_adminplugins['header']  = $lang['pagePlugins'];
+      $theme_adminplugins['tabs']    = adminPageTabs();
+	  if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
+          if (isset($_POST['notfirst'])) {
+			  $msgtext = $lang['msgConfigSaved'];
+			  //$msgclass= "success";
+			  $theme_adminplugins['script'] = '<script type="text/javascript">$.jGrowl("'.$lang['msgConfigSaved'].'");</script>';
+		  }	
+		  $theme_adminplugins['action'] = $config['blogPath'].$config['cleanIndex'].'/adminPluginsSubmit';
+		  $plugin_folder = './plugins/';
+          $theme_adminplugins['plugins'] = list_plugins($plugin_folder);
+          $theme_adminplugins['submit']  = $lang['pageAdvancedConfigSubmit'];
+		  $theme_main['content'] = @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_adminplugins["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/adminplugins.tpl"));
+       }
+       else {
+          $theme_main['content'].= $lang['errorPasswordIncorrect'].' .. <br/>';
+       }
+  }
+  
+  
   function list_comments_moderate() {
       global $SHP, $theme_main, $config, $optionValue, $lang;
       $message = "";
+	  $allcomments = "";
       $result = sqlite_query($config['db'], "select count(commentid) AS view from comments WHERE status = 'pending'");
       while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
           $commentCount  = $row['view'];
           if ($commentCount > 0) {
-              $theme_main['content'].= '<table><tr><th>Select</th><th>Comment Title</th><th>'.$lang['pageAllCommentsBy'].'</th></tr>';
+              //$theme_main['content'].= '<table><tr><th>Select</th><th>Comment Title</th><th>Posted By</th></tr>';
               $result = sqlite_query($config['db'], "select * from comments WHERE status = 'pending' ORDER BY date DESC");
               while ($row = sqlite_fetch_array($result, SQLITE_ASSOC)) {
                   $commentid     = $row['commentid'];
@@ -733,93 +729,46 @@
                   $url           = $row['url'];
                   $email         = $row['email'];
                   $titleModified=getTitleFromFilename($postid);
-                  $theme_main['content'].= '<tr><td><input type="checkbox" name="'.$commentid.'" value="1"></td><td><a style="font-style:normal" href="'.$config['blogPath'].$config['cleanIndex'].'/posts/'.$postid.'/'.$titleModified.'#'.$sequence.'">'.$title.'</a></td><td>'.$author.'</td></tr>';
+                  $allcomments.= '<tr><td><input type="checkbox" name="'.$commentid.'" value="1"></td><td><a style="font-style:normal" href="'.$config['blogPath'].$config['cleanIndex'].'/posts/'.$postid.'/'.$titleModified.'#'.$sequence.'">'.$title.'</a></td><td>'.$author.'</td></tr>';
               }
-             $theme_main['content'].= "</table>";
-             //$theme_main['content'].= "<br>".$message."<br>";
+             //$theme_main['content'].= "</table>";
           }
           else {
-              $theme_main['content'].= $lang['pageModerateEmpty'].'!<br>';
+              //$theme_main['content'].= $lang['pageModerateEmpty'].'!<br>';
           }
       }
+	  return $allcomments;
 
   }
 
-  function adminPageTabs() {
-	  global $config, $lang;
-	  $theme_admintabs['actionBasic']    = $config['blogPath'].$config['cleanIndex'].'/adminPageBasic';
-	  $theme_admintabs['basic'] 		 = $lang['tabsBasic'];
-	  $theme_admintabs['actionAdvanced'] = $config['blogPath'].$config['cleanIndex'].'/adminPageAdvanced';
-	  $theme_admintabs['advanced'] 		 = $lang['tabsAdvanced'];
-	  $theme_admintabs['actionAuthor'] 	 = $config['blogPath'].$config['cleanIndex'].'/adminPageAuthors';
-	  $theme_admintabs['manageAuthors']  = $lang['tabsAuthors'];
-	  $theme_admintabs['actionPlugins']  = $config['blogPath'].$config['cleanIndex'].'/adminPagePlugins';
-	  $theme_admintabs['managePlugins']  = $lang['tabsPlugins'];
-	  $theme_admintabs['actionModerate'] = $config['blogPath'].$config['cleanIndex'].'/adminPageModerate';
-	  $theme_admintabs['manageModerate'] = $lang['tabsModerate'];	
-	  return @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_admintabs["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/admintabs.tpl"));
-  }
-  
-  function adminPagePlugins() {
-      global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail;
-      global $theme_main, $SHP;
-      $theme_main['content'] = "";
-      $theme_main['content'].= '<h3>'.$lang['pagePlugins'].'</h3>';
-      $theme_main['content'].= adminPageTabs();
-	  if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
-		  $msgclass = "hide";
-		  $msgtext	= "";
-          if (isset($_POST['notfirst'])) {
-			  $msgtext = $lang['msgConfigSaved'];
-			  //$msgclass= "success";
-			  $theme_main['content'] .= '<script type="text/javascript">$.jGrowl("'.$lang['msgConfigSaved'].'");</script>';
-		  }	
-		  $theme_main['content'] .= "<div class='$msgclass'>$msgtext</div>";
-		  $theme_main['content'] .= '<br><form method="post" action="'.$config['blogPath'].$config['cleanIndex'].'/adminPluginsSubmit">';
-          $theme_main['content'] .= '<table>';
-          $theme_main['content'] .= '<tr><th>Active</th><th>Plugin</th><th>Author</th><th>Description</th></tr>';
-          $plugin_folder = './plugins/';
-          list_plugins($plugin_folder);
-          $theme_main['content'] .= '</table>';
-          $theme_main['content'] .= '<input type="hidden" id="notfirst" name="notfirst" value="notfirst">';
-          $theme_main['content'] .= '<br><input type="submit" id="submit" name="submit" value="'.$lang['pageAdvancedConfigSubmit'].'">';
-          $theme_main['content'] .= '</form>';
-       }
-       else {
-          $theme_main['content'].= $lang['errorPasswordIncorrect'].' .. <br/>';
-       }
-  }
-
-
+ 
   function adminPageModerate() {
       global $debugMode, $optionValue, $config, $lang, $authors, $authorsEmail;
       global $theme_main, $SHP;
       $theme_main['content'] = "";
-      $theme_main['content'].= '<h3>'.$lang['pageModerate'].'</h3>';
-	  $theme_main['content'].= adminPageTabs();
+      $theme_admincomments['header'] = $lang['pageModerate'];
+	  $theme_admincomments['tabs']   = adminPageTabs();
       if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
 	  	  $msgclass = "hide";
 		  $msgtext	= "";
-          if (isset($_POST['notfirst'])) {
-			  //header('Location:'.$config['blogPath'].$config['cleanIndex'].'/adminPageModerate');
-			  //die();
+          if (isset($_REQUEST['notfirst']) || isset($_SESSION['growler'])) {
 			  $msgtext = $lang['pageModerateMessage'];
 			  //$msgclass= "success";
-			  $theme_main['content'] .= '<script type="text/javascript">$.jGrowl("'.$lang['pageModerateMessage'].'");</script>';
+			  $theme_admincomments['script'] = '<script type="text/javascript">$.jGrowl("'.$lang['pageModerateMessage'].'");</script>';
+			  unset($_SESSION['growler']);
 		  }	
-		  $theme_main['content'] .= "<div class='$msgclass'>$msgtext</div>"; 
-	      $theme_main['content'] .= '<br><form method="post" action="'.$config['blogPath'].$config['cleanIndex'].'/adminModerateSubmit">';
-          $theme_main['content'] .= '<table>';
-		  list_comments_moderate();
-          $theme_main['content'] .= '</table>';
-          $theme_main['content'] .= '<input type="hidden" id="notfirst" name="notfirst" value="notfirst">';
-          $theme_main['content'] .= '<br><input type="submit" id="submit" name="submit" value="'.$lang['pageModerateApprove'].'">&nbsp;&nbsp;<a href="'.$config['blogPath'].$config['cleanIndex'].'/adminModerateSubmit/delete"><input type="button" value="'.$lang['pageModerateDelete'].'"></a>';
-          $theme_main['content'] .= '</form>';
+	      $theme_admincomments['action'] = $config['blogPath'].$config['cleanIndex'].'/adminModerateSubmit';
+		  $comments = list_comments_moderate();
+		  $theme_admincomments['comments']   = (trim($comments) == "")?$lang['pageModerateEmpty']:$comments;
+          $theme_admincomments['approve']    = $lang['pageModerateApprove'];
+		  //$_SESSION['growler'] = '<script type="text/javascript">$.jGrowl("'.$lang['pageModerateMessage'].'");</script>';
+		  $theme_admincomments['deletelink'] = $config['blogPath'].$config['cleanIndex'].'/adminModerateSubmit/delete';
+		  $theme_admincomments['delete']     = $lang['pageModerateDelete'];
+          $theme_main['content'] = @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_admincomments["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/admincomments.tpl"));
        }
        else {
           $theme_main['content'].= $lang['errorPasswordIncorrect'].' .. <br/>';
        }
-	   //$_SESSION['growlmsg'] = $msgtext;
   }
 
 
@@ -848,7 +797,6 @@
 	global $priv, $config, $morepriv;
 	
 	$author = @$_SESSION['username'];
-	//echo $config['privacy']."<br>";
 	switch ($config['privacy']) {
 		case 0:
 			if ($author == 'admin')
@@ -922,6 +870,7 @@
                   'commentModerate',
                   'limitLogins',
                   'privacy',
+				  'excerptLength',
                   'cleanUrl');
 
       for ( $i = 0; $i < count( $tempConfigs ); $i++ ) {
@@ -979,6 +928,7 @@
         if ( !isset( $config[ 'cleanUrl' ] ) )                   { $config[ 'cleanUrl' ]                   = 0; }
         if ( !isset( $config[ 'timeoutDuration' ] ) )            { $config[ 'timeoutDuration' ]            = 0; }
         if ( !isset( $config[ 'limitLogins' ] ) )                { $config[ 'limitLogins' ]                = 10; }
+		if ( !isset( $config[ 'excerptLength' ] ) )              { $config[ 'excerptLength' ]              = 250; }
         $config['menuLinksOrig']=$config['menuLinks'];
         $config['menuLinksArray']=explode(';',$config['menuLinks']);
 
@@ -1028,15 +978,14 @@
                           $config['commentModerate'].'|'.
                           $config['limitLogins'].'|'.
                           $config['privacy'].'|'.
+						  $config['excerptLength'].'|'.
                           $config['cleanUrl'];
-            //echo $configContent.'<br/>';
 			$configContent='<?php /* '.$configContent.' */ ?>';
             $fp=fopen($configFile,"w");
 			$fwrite = fwrite($fp,$configContent);
             if ($fwrite === false) {echo 'Error updating config<br/>';}
             fclose($fp);
             if ($message) {echo '<br>'.$lang['msgConfigSaved'].'<br>';}
-			//die('dying');
         }
   }
 

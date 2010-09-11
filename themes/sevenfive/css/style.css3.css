@@ -1,0 +1,25 @@
+/********************************************************************************************* 
+
+CSS3 Elements Seperated to Maintain Validation
+
+*********************************************************************************************/
+#fmenu a, #menu a, .widget img, #preview img, .entry img, #comment, .ptext, .ptextarea, .ptitle, #author, #email, #url, #submit {
+-moz-border-radius: 6px;
+-webkit-border-radius: 6px;
+}
+
+#twitter-feed img, img.avatar, ul.commentlist li div.reply a {
+-moz-border-radius: 4px;
+-webkit-border-radius: 4px;
+}
+
+.entry a {
+-moz-border-radius: 2px;
+-webkit-border-radius: 2px;
+}
+
+#preview img  {
+-webkit-box-shadow: 0px 0px 4px #000000;
+-moz-box-shadow: 0px 0px 4px #000000;
+box-shadow: 0px 0px 4px #000000;
+}

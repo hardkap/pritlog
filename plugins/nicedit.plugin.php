@@ -43,16 +43,16 @@ function nicedit_function2() {
       case "nicFile":
           $theme_new['loc_top'] .= $nicEditUrl;
           $_SESSION['auth'] = "allow";
-          $nicPanel="          editor1 = new nicEditor({fullPanel : true, iconsPath : '".$blogPath."/plugins/nicFile/nicEditorIcons.gif'}).panelInstance('posts');";
+          $nicPanel="          editor1 = new nicEditor({fullPanel : true,  iconsPath : '".$blogPath."/plugins/nicFile/nicEditorIcons.gif'}).panelInstance('posts');";
           break;
       case "nicUpload":
           $theme_new['loc_top'] .= $nicEditUrl;
           $_SESSION['auth'] = "allow";
-          $nicPanel="          editor1 = new nicEditor({fullPanel : true, iconsPath : '".$blogPath."/images/nicEditorIcons.gif', uploadURI : '".$blogPath."/plugins/nicUpload.php?".SID."'}).panelInstance('posts');";
+          $nicPanel="          editor1 = new nicEditor({fullPanel : true,  iconsPath : '".$blogPath."/images/nicEditorIcons.gif', uploadURI : '".$blogPath."/plugins/nicUpload.php?".SID."'}).panelInstance('posts');";
           break;
       case "default":
           $theme_new['loc_top'] .= $nicEditUrl;
-          $nicPanel="          editor1 = new nicEditor({fullPanel : true, iconsPath : '".$blogPath."/images/nicEditorIcons.gif'}).panelInstance('posts');";
+          $nicPanel="          editor1 = new nicEditor({fullPanel : true,  iconsPath : '".$blogPath."/images/nicEditorIcons.gif'}).panelInstance('posts');";
           break;
     }
     $theme_new['loc_top'] .= '<script type="text/javascript">';
@@ -95,11 +95,11 @@ function nicedit_function4() {
       case "nicUpload":
           $theme_edit['loc_top'] .= $nicEditUrl;
           $_SESSION['auth'] = "allow";
-          $nicPanel="          editor1 = new nicEditor({fullPanel : true, iconsPath : '".$blogPath."/images/nicEditorIcons.gif', uploadURI : '".$blogPath."/plugins/nicUpload.php?".SID."'}).panelInstance('posts');";
+          $nicPanel="          editor1 = new nicEditor({fullPanel : true,  iconsPath : '".$blogPath."/images/nicEditorIcons.gif', uploadURI : '".$blogPath."/plugins/nicUpload.php?".SID."'}).panelInstance('posts');";
           break;
       case "default":
           $theme_edit['loc_top'] .= $nicEditUrl;
-          $nicPanel="          editor1 = new nicEditor({fullPanel : true, iconsPath : '".$blogPath."/images/nicEditorIcons.gif'}).panelInstance('posts');";
+          $nicPanel="          editor1 = new nicEditor({fullPanel : true,  iconsPath : '".$blogPath."/images/nicEditorIcons.gif'}).panelInstance('posts');";
           break;
     }
     $theme_edit['loc_top'] .= '<script type="text/javascript">';

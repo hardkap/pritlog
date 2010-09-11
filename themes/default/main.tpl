@@ -12,6 +12,7 @@
 {loc_main_top}
 {content}
 {loc_main_bottom}
+<center>{pagenav}</center>
 </div>
 
 <!-- Right sidebar -->
@@ -72,7 +73,7 @@
 {stats}
 </div>
 
-<div class="span-6  last">
+<div class="span-6  last sidelast">
 <br>
 {loc_sidebar_bottom}
 </div>

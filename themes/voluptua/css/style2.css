@@ -1,0 +1,322 @@
+/*   
+Theme Name: Upstart Blogger Moleskine
+Theme URI: http://www.upstartblogger.com
+Description: A minimalist, Moleskine inspired theme from <a href="http://www.upstartblogger.com/" title="Upstart Blogger">Upstart Blogger</a>. 
+Author: Ashley Morgan
+Author URI: http://www.upstartblogger.com
+Version: 0.1
+License: Creative Commons Attribution-Share Alike 3.0 (http://creativecommons.org/licenses/by-sa/3.0/). Feel free to make any changes, but please keep a link back to Upstart Blogger in your sidebar or footer.
+*/
+
+body {
+	background-color: #F9F8F4;
+	font-family: Palatino, "Palatino Linotype", Georgia, Times, Times New Roman, Serif;
+	font-size: 0.92em;
+	line-height: 1.88em;
+	color: #444444;
+	background-image: url(../images/paper.jpg);
+	background-repeat: repeat-x;
+	background-position: top;
+	margin-bottom: 0px;
+	padding-top: 0px;
+	padding-right: 20px;
+	padding-bottom: 20px;
+	padding-left: 20px;
+}
+
+#container {
+	width: 980px;
+	margin-top: 0;
+	margin-right: auto;
+	margin-bottom: 0;
+	margin-left: auto;
+}
+
+#entrypage {
+	width: 800px;
+	margin: 0 auto;
+	font-size: .9em;
+	line-height: 1.4em;
+	padding: 0 10px 25px 0;
+	}
+
+#sidebar {
+	width: 360px;
+	float: right;
+	font-size: 0.91em;
+	line-height: 1.7em;
+	text-align: center;
+	padding-right: 10px;
+	padding-bottom: 25px;
+	padding-left: 0;
+	margin-top: 19px;
+	}
+
+#sidebarleft {
+	width:150px;
+	float: left;
+}
+
+#sidebarright {
+	width: 150px;
+	float: right;
+}
+
+#footer {
+	width:960px;
+	float: none;
+	clear: both;
+	font-size: 0.88em;
+}
+
+#entries {
+	width: 540px;
+	float: left;
+	margin-left: 10px;
+	}
+
+.linktext {
+	font-size:9px;
+	margin-left:5%;
+	margin-right:5%;
+}
+.linktextarea {
+	font-size:9px;
+	font-family:verdana;
+	overflow:hidden;
+}
+
+.post ul li {list-style-type: disc; margin-left:37px; }
+
+.post {
+	margin-bottom: 1em;
+}
+
+a {
+	color: #000000;
+	text-decoration: none;
+	font-weight: bold;
+}
+
+a:hover {
+	color: #000000;
+	text-decoration: underline;
+	font-weight: bold;
+}
+
+a:link h3 {
+	color: #000000;
+	border: none;
+}
+
+a:link img {
+	border: none;
+}
+
+ul {
+	list-style: none;
+	margin-left: 0px;
+	padding-left: 0px;
+	margin-top: 0px;
+}
+
+li.linkcat {
+	list-style-type: none;
+}
+
+img {
+	border: none;
+}
+
+.imgleft {
+	float:left;
+	margin-right: 10px;
+	margin-bottom: 10px;
+}
+
+.imgright {
+	float: right;
+	margin-left: 10px;
+	margin-bottom: 10px;
+}
+
+img.frame {
+	padding: 2px;
+	border: solid 1px #DEE4E5;
+}
+
+
+
+h1 {
+	font-size: 2em;
+	line-height: 1em;
+	text-transform: capitalize;
+	text-align: center;
+	border-bottom-width: 1px;
+	border-bottom-style: dotted;
+	border-bottom-color: #000000;
+	font-variant: small-caps;
+	font-style: normal;
+	margin-bottom: 0px;
+}
+
+.title {
+	border-bottom: 1px solid silver;
+}
+
+
+h3 {
+	font-weight: bold;
+	font-size: 1.2em;
+	text-transform: capitalize;
+	margin-bottom: 0.2em;
+	margin-top: 1.5em;
+	color: #000000;
+	text-align: center;
+	border-bottom-width: 1px;
+	border-bottom-style: dotted;
+	border-bottom-color: #000000;
+	font-style: normal;
+	font-variant: small-caps;
+}
+
+h4 {
+	font-weight: bold;
+	text-transform: capitalize;
+	margin-bottom: 0.2em;
+	margin-top: 2em;
+	color: #000000;
+	text-align: center;
+	border-bottom-width: 1px;
+	border-bottom-style: dotted;
+	border-bottom-color: #000000;
+	font-style: normal;
+	font-variant: small-caps;
+}
+
+h5 {
+	font-weight: bold;
+	text-transform: capitalize;
+	margin-bottom: 0.2em;
+	margin-top: 2em;
+	color: #000000;
+	text-align: center;
+	border-bottom-width: 1px;
+	border-bottom-style: dotted;
+	border-bottom-color: #000000;
+	font-style: normal;
+	font-variant: small-caps;
+}
+
+h6 {
+	font-weight: bold;
+	text-transform: capitalize;
+	margin-bottom: 0.2em;
+	margin-top: 2em;
+	color: #000000;
+	text-align: center;
+	border-bottom-width: 1px;
+	border-bottom-style: dotted;
+	border-bottom-color: #000000;
+	font-style: normal;
+	font-variant: small-caps;
+}
+
+.post h3 {
+	border-bottom: none;
+	letter-spacing: normal;
+	margin-bottom: -.5em;
+}
+
+
+blockquote {
+	background-color: #FFFFFC;
+	margin-top: 0px;
+	margin-right: 0;
+	margin-bottom: 0px;
+	margin-left: 0;
+	padding-top: 10px;
+	padding-right: 10px;
+	padding-bottom: 10px;
+	padding-left: 10px;
+}
+
+
+
+/* Begin Comments*/
+
+.comments_tiny {
+	color: #b8b8b8;
+	border-bottom: 1px solid silver;
+}
+
+.alt {
+	margin: 0;
+	padding: 0px;
+}
+
+.commentlist {
+	margin-top: 0px;
+
+}
+
+.commentlist li {
+	margin: 5px 0 0 0px;
+
+}
+
+.commentlist p {
+	margin: 10px 5px 10px 0;
+}
+
+#commentform p {
+	margin: 5px 0;
+}
+
+.nocomments {
+	text-align: center;
+	margin: 0;
+	padding: 0;
+}
+
+.commentmetadata {
+	margin: 0;
+	display: block;
+}
+
+li.comment {
+	font-weight: bold;
+	padding: 10px;
+	list-style: none;
+}
+
+.commentlist p {
+	font-weight: normal;
+	line-height: 1.88em;
+	text-transform: none;
+}
+
+#commentform {
+	margin-top: 30px;
+}
+
+.commentmetadata {
+	font-weight: normal;
+}
+
+small, #sidebar ul ul li, #sidebar ul ol li, .nocomments, .postmetadata, blockquote, strike {
+	color: #181818;
+}
+
+.content {
+	margin-bottom: 25px;
+	padding-left: 5px;
+	font-weight: normal;
+}
+
+.commentbox {
+	width: 100%;
+	height: 100px;
+}
+
+/* End Comments */

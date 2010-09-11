@@ -150,7 +150,7 @@ else $user="user";
   $baseScript=basename($scriptName);
   //echo $blogPath.'1<br>';
   $i=0;
-
+  
   $option = isset($data[$optionIndex])?$data[$optionIndex]:"mainPage";
   @$option = (trim($data[$optionIndex]) == "")?"mainPage":$data[$optionIndex];
   $option = str_replace("index.php","",$option); // PritlogMU
@@ -263,6 +263,8 @@ $theme_new['test']  = "";
 $public_data['test'] = "";
 $theme_edit['test'] = "";
 $theme_adminbasic['test'] = "";
+$theme_adminplugins['test'] = "";
+$theme_adminauthors['test'] = "";
 $theme_main['blogPath']    = $blogPath;
 $theme_main['tagCloud'] = "";
 if (is_array($tags) && count($tags) > 0 && $config['showCategoryCloud'] == 1) {
@@ -365,7 +367,7 @@ $theme_listcomments['linktext'] = $lang['sidebarLinkListComments'];
 $theme_main['comments']      .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_listcomments["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/listcomments.tpl"));
 $theme_main['aboutHeader']    = $lang['pageBasicConfigAbout'];
 $theme_main['about']          = $config['about'];
-$theme_main['footer']    = $lang['footerCopyright'].' '.$config['blogTitle'].' '.date('Y').' - '.$lang['footerRightsReserved'].' - Powered by <a href="http://hardkap.net/pritlog/">Pritlog</a></div>';
+$theme_main['footer']    = $lang['footerCopyright'].' '.$config['blogTitle'].' '.date('Y').' - '.$lang['footerRightsReserved'].' - Powered by <a href="http://pritlog.com/">Pritlog</a>';
 if (!isset($_REQUEST["func"])) {
    print @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_header["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/header.tpl"));
    print @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_main["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/main.tpl"));
@@ -402,7 +404,7 @@ sqlite_close($config['db']);
           listPosts();
 		  $referrer=$serverName.$_SERVER['REQUEST_URI'];
 	      $_SESSION['referrer'] = $referrer;
-          break; 
+          break;
       case "deleteEntry":
           if ($debugMode=="on") {echo "deleteEntry  ".$_POST['process']."<br>";}
           //deleteEntrySubmit();

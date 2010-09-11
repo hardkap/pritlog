@@ -1,0 +1,880 @@
+/*********************************************************************************************
+
+Theme Name: Seven Five
+Theme URI: http://www.press75.com/
+Description: Designed by Jason Schuller
+Version: 1.6
+Author: Press75.com
+Author URI: http://www.press75.com/
+
+**********************************************************************************************
+
+Designed and Built by Jason Schuller - theSevenFive.com
+
+CSS, XHTML and Design Files are all Copyright 2007-2010 Circa75 Media, LLC
+
+Be inspired, but please don't steal :)
+
+**********************************************************************************************
+
+0.  CSS Reset  -------------------------  All Theme Files
+1.  Basic Setup  -----------------------  All Theme Files
+2.  Header Styles  ---------------------  header.php
+3.  Navigation and Menu Styles  --------  header.php
+4.  Main Content Styles  ---------------  index.php, single.php, page.php
+5.  Flickr Specific Styles  ------------  home.php
+6.  Twitter Specific Styles  -----------  home.php
+7.  Delicious Specific Styles  ---------  home.php
+8.  Last.FM Specific Styles  -----------  home.php
+9.  Feed Specific Styles  --------------  home.php
+10. Post Comment Styles  ---------------  comments.php
+11. Footer Styles  ---------------------  footer.php
+12. WordPress Specific Styles  ---------  home.php, index.php, single.php, page.php
+
+**********************************************************************************************/
+
+
+/********************************************************************************************* 
+
+0.  CSS Reset  -------------------------  All Theme Files
+
+*********************************************************************************************/
+body, div, dl, dt, dd, ul, ol, li, h1, h2, h3, h4, h5, h6, pre, form, fieldset, input, textarea, p, blockquote, th, td {
+margin: 0;
+padding: 0;
+}
+
+table {
+border-collapse: collapse;
+border-spacing: 0;
+}
+
+th, td {padding:5px 10px;}
+
+fieldset, img {border: 0;}
+
+address, caption, cite, code, dfn, em, strong, th, var {
+font-style: normal;
+font-weight: normal;
+}
+
+ol, ul {list-style: none;}
+caption, th {text-align: left;}
+
+h1, h2, h3, h4, h5, h6 {
+font-size: 100%;
+font-weight: normal;
+}
+
+q:before, q:after {content: '';}
+abbr, acronym {border: 0;}
+
+
+/*********************************************************************************************
+
+1.  Basic Setup  -----------------------  All Theme Files
+
+*********************************************************************************************/
+body {
+width: auto;
+height: auto;
+font-family: 'Lucida Sans', 'Lucida Grande', 'Lucida Sans Unicode', sans-serif;
+font-size: 12px;
+line-height: 20px;
+color: #555555;
+}
+
+h1 {
+font-size: 36px;
+font-weight: bold;
+}
+
+h2, h3 {
+font-size: 16px;
+font-weight: bold;
+margin: 0 0 5px 0;
+}
+
+strong {font-weight: bold;}
+
+a:link, a:visited {
+color: #444444;
+}
+
+a:hover {
+color: #808080;
+}
+
+abbr,acronym {
+border-bottom: 1px dotted;
+cursor: help;
+} 
+
+em {font-style: italic;}
+ol,ul {margin: 0;}
+ol li {list-style: decimal outside;}
+ul li {list-style: none;}
+
+caption {
+margin-bottom: 8px;
+text-align: center;
+}
+
+p,fieldset,table {margin-bottom: 10px;}
+a:link, a:visited {text-decoration: none;}
+
+:focus {
+outline: 0;
+}
+
+.alignleft {
+float: left;
+}
+
+.alignright {
+float: right;
+}
+
+
+/*********************************************************************************************
+
+2.  Header Styles  ---------------------  header.php
+
+*********************************************************************************************/
+#header {
+border-bottom: 1px solid #CACACA;
+width: 900px;
+float: left;
+padding: 30px 0 30px 80px;
+margin: 0 0 20px 0;
+}
+
+#header a {
+background: none;
+}
+
+#logo {
+width: 350px;
+float: left;
+}
+
+
+/*********************************************************************************************
+
+3.  Navigation and Menu Styles  --------  header.php
+
+*********************************************************************************************/
+#menu {
+width: 550px;
+float: left;
+}
+
+#menu ul {
+list-style: none;
+/*width: 485px;*/
+width: 545px;
+float: left;
+padding: 0 15px 0 0;
+}
+
+#menu a {
+background: #323232;
+font-size: 16px;
+font-weight: bold;
+color: #FFFFFF;
+float: right;
+margin: 0 0 0 15px;
+padding: 9px 12px 8px 12px;
+}
+
+
+/*********************************************************************************************
+
+4.  Main Content Styles  ---------------  index.php, single.php, page.php
+
+*********************************************************************************************/
+#content {
+float: left;
+}
+
+.content-item {
+width: 900px;
+float: left;
+margin: 0 0 20px 0;
+padding: 0 0 5px 80px;
+border-bottom: 1px solid #CACACA;
+}
+
+.last-item {
+border-bottom: none;
+}
+
+.content-body {
+width: 660px;
+margin: 0 0 0 30px;
+float: left;
+}
+
+.content-body h2 {
+text-transform:capitalize;
+}
+
+.entry {
+padding-right: 15px;
+}
+
+.entry a {
+background: #E9E9E9;
+padding: 0 2px 0 2px;
+}
+
+.entry img {
+background: #323232;
+padding: 10px;
+}
+
+.entry h3 {
+margin-top: 15px;
+}
+
+.content-dets {
+width: 210px;
+float: left;
+}
+
+.content-dets a, .content-dets-alt a {
+font-weight: normal;
+}
+
+.content-dets-alt {
+width: 210px;
+float: left;
+}
+
+ul.dets {
+list-style: none;
+font-size: 10px;
+}
+
+.dets li {
+margin: 0 0 -5px 0;
+}
+
+.subscribe-link {
+background: url(../images/rss.png) left no-repeat;
+padding: 0 0 0 25px;
+}
+
+.comments-link {
+background: url(../images/comments.png) left no-repeat;
+padding: 0 0 0 25px;
+}
+
+.pagination {
+padding-bottom: 15px;
+font-size: 16px;
+font-weight: bold;
+}
+
+
+/*********************************************************************************************
+
+5.  Flickr Specific Styles  ------------  home.php
+
+*********************************************************************************************/
+#flickr-feed img {
+background: #323232;
+width: 75px;
+height: 75px;
+padding: 10px;
+margin: 0 11px 11px 0;
+}
+
+.flickr-link {
+background: url(../images/flickr.png) left no-repeat;
+padding: 0 0 0 25px;
+}
+
+#preview{
+position:absolute;
+display:none;
+}
+
+#preview img {
+background: #323232;
+padding: 10px;
+}
+
+
+/*********************************************************************************************
+
+6.  Twitter Specific Styles  ------------  home.php
+
+*********************************************************************************************/
+#twitter-feed {
+padding-bottom: 0;
+}
+
+#twitter-feed img {
+background: #323232;
+width: 42px;
+height: 42px;
+float: left;
+padding: 8px;
+margin: 0 10px 0 0;
+}
+
+.tweet {
+border-bottom: 1px solid #EFEFEF;
+width: 660px;
+float: left;
+margin: 0 0 10px 0;
+padding: 0 0 10px 0;
+}
+
+.twitter-link {
+background: url(../images/twitter.png) left no-repeat;
+padding: 0 0 0 25px;
+}
+
+#twitter-last-item {
+background: #FFFFFF;
+width: 660px;
+height: 1px;
+float: left;
+margin: -11px 0 0 0;
+}
+
+.time {
+color: #CCCCCC;
+font-size: 10px;
+width: 575px;
+float: left;
+margin: -2px 0 0 0;
+}
+
+p.text {
+padding-right: 15px;
+}
+
+
+/*********************************************************************************************
+
+7.  Delicious Specific Styles  ---------  home.php
+
+*********************************************************************************************/
+#delicious-feed {
+padding-bottom: 0;
+}
+
+.delicious-link {
+background: url(../images/delicious.png) left no-repeat;
+padding: 0 0 0 25px;
+}
+
+#delicious li {
+border-bottom: 1px solid #EFEFEF;
+width: 660px;
+float: left;
+margin: 0 0 10px 0;
+padding: 0 0 0 0;
+}
+
+#delicious-last-item {
+background: #FFFFFF;
+width: 660px;
+height: 1px;
+float: left;
+margin: -11px 0 0 0;
+}
+
+#delicious h2 {
+margin-top: 4px;
+}
+
+#delicious p {
+padding-right: 15px;
+}
+
+
+/*********************************************************************************************
+
+8.  Vimeo Specific Styles  -----------  home.php
+
+*********************************************************************************************/
+.vimeo-vid {
+width: 205px;
+height: 160px;
+float: left;
+margin: 0 15px 15px 0;
+overflow: hidden;
+}
+
+.vimeo-vid img {
+background: #323232;
+padding: 10px;
+width: 185px;
+height: 140px;
+}
+
+.vimeo-link {
+background: url(../images/vimeo.png) left no-repeat;
+padding: 0 0 0 25px;
+}
+
+
+/*********************************************************************************************
+
+9.  YouTube Specific Styles  -----------  home.php
+
+*********************************************************************************************/
+.youtube-vid {
+border: none;
+width: 95px;
+height: 76px;
+float: left;
+margin: 0 15px 15px 0;
+overflow: hidden;
+}
+
+.youtube-vid img {
+background: #323232;
+width: 75px;
+height: 56px;
+padding: 10px;
+}
+
+.youtube-link {
+background: url(../images/youtube.png) left no-repeat;
+padding: 0 0 0 25px;
+}
+
+
+/*********************************************************************************************
+
+10. Last.FM Specific Styles  -----------  home.php
+
+*********************************************************************************************/
+#lastfm-feed img {
+background: #323232;
+width: 75px;
+height: 75px;
+padding: 10px;
+margin: 0 15px 15px 0;
+}
+
+.lastfm-link {
+background: url(../images/lastfm.png) left no-repeat;
+padding: 0 0 0 25px;
+}
+
+
+/*********************************************************************************************
+
+11. Feed Specific Styles  --------------  home.php
+
+*********************************************************************************************/
+#rss-feed {
+padding-bottom: 0;
+}
+
+.rss-feed-link {
+background: url(../images/sevenfive.png) left no-repeat;
+padding: 0 0 0 25px;
+}
+
+#feed li {
+border-bottom: 1px solid #EFEFEF;
+width: 660px;
+float: left;
+margin: 0 0 10px 0;
+padding: 0 0 0 0;
+}
+
+#feed-last-item {
+background: #FFFFFF;
+width: 660px;
+height: 1px;
+float: left;
+margin: -11px 0 0 0;
+}
+
+#rss-feed h2 {
+margin-top: 4px;
+}
+
+#rss-feed p {
+padding-right: 15px;
+}
+
+
+/*********************************************************************************************
+
+12. Post Comment Styles  ---------------  comments.php
+
+*********************************************************************************************/
+#reply_form {
+width: 604px;
+margin: 0 0 0 0;
+padding: 8px;
+float: left;
+}
+
+.comment-author {
+font-weight: normal;
+}
+
+.comment-meta {
+font-size: 10px;
+font-weight: normal;
+margin: 0 0 10px 0;
+}
+
+img.avatar {
+float: right;
+margin: 2px 0 15px 15px;
+padding: 8px;
+background: #323232;
+}
+
+ul.commentlist {
+margin: -22px 0 0 0;
+padding: 0;
+}
+
+ul.commentlist a:link, ul.commentlist a:visited {
+color: #4A4A4A;
+}
+
+ul.commentlist a:hover {
+color: #4A4A4A;
+text-decoration: underline;
+}
+
+ul.commentlist cite {
+font: 15px 'Lucida Sans', 'Lucida Grande', 'Lucida Sans Unicode', sans-serif;
+font-weight: bold;
+}
+
+ul.commentlist li.alt {
+padding: 20px 0 20px 0;
+border-bottom: 1px solid #E3E4E7;
+}
+
+ul.commentlist li {
+padding: 20px 0 20px 0;
+border-bottom: 1px solid #E3E4E7;
+}
+
+ul.commentlist li div.reply {
+cursor: pointer;
+background: url(../images/reply.jpg) top left no-repeat;
+border: none;
+width: 39px;
+height: 20px;
+padding: 0 0 0 7px;
+}
+
+* + html ul.commentlist li div.reply {
+line-height: 1.3em;
+}
+
+ul.commentlist li div.reply a {
+background: #323232;
+color: #FFFFFF;
+font-weight: normal;
+text-decoration: none;
+font-size: 10px;
+float: left;
+padding: 2px 8px 2px 8px;
+margin: 0 0 0 -8px;
+}
+
+ul.commentlist li ul.children { 
+list-style: none; 
+margin: 0;
+padding: 0;
+text-indent: 0; 
+}
+
+ul.commentlist li ul.children li {
+padding: 20px 0 0px 20px;
+border-bottom: none;
+}
+
+ul.commentlist li ul.children li.alt {
+padding: 20px 0 0px 20px;
+border-bottom: none;
+}
+
+ul.commentlist li ul.children li.depth-2 { margin:0; }
+ul.commentlist li ul.children li.depth-3 { margin:0; }
+ul.commentlist li ul.children li.depth-4 { margin:0; }
+ul.commentlist li ul.children li.depth-5 { margin:0; }
+
+#comments-last-item {
+float: left;
+margin: -1px 0 0 0;
+background: #FFFFFF;
+width: 660px;
+height:1px;
+}
+
+input#submit {
+background: url(../images/submit.png) top left no-repeat;
+border: none;
+cursor: pointer;
+color: #FFFFFF;
+width: 82px;
+height: 34px;
+margin: 0 0 5px 0;
+}
+
+#comment {
+background: url(../images/fields.jpg) top left repeat-x;
+border: 1px solid #CACACA;
+font-family: 'Lucida Sans', 'Lucida Grande', 'Lucida Sans Unicode', sans-serif;
+font-size: 12px;
+line-height: 20px;
+color: #666666;
+width: 648px;
+height: 215px;
+padding: 5px;
+}
+
+input.ptext, input.ptitle, #author, #email, #url {
+background: url(../images/fields.jpg) top left repeat-x;
+border: 1px solid #CACACA;
+font-family: 'Lucida Sans', 'Lucida Grande', 'Lucida Sans Unicode', sans-serif;
+font-size: 12px;
+color: #666666;
+/*width: 200px;*/
+height: 20px;
+padding: 5px;
+}
+
+.ptextarea, #menuLinks, #ipBan, select {
+background: url(../images/fields.jpg) top left repeat-x;
+border: 1px solid #CACACA;
+font-family: 'Lucida Sans', 'Lucida Grande', 'Lucida Sans Unicode', sans-serif;
+font-size: 12px;
+color: #666666;
+width: 400px;
+padding: 5px;
+}
+
+label {font-weight: bold; }
+input[type="checkbox"]{
+  padding: 0 5px 0 0;
+  margin-right: 10px;
+}
+
+.fieldset {
+list-style: none;
+margin: 0;
+padding: 0;
+}
+
+.fieldset li {
+margin: 0 0 10px 0;
+padding: 0;
+}
+
+.says {display:none;}
+
+
+/*********************************************************************************************
+
+13. Footer Styles  ---------------------  footer.php
+
+*********************************************************************************************/
+#footer {
+width: 900px;
+float: left;
+margin: 0 0 20px 0;
+padding: 0 0 20px 80px;
+}
+
+
+/*********************************************************************************************
+
+14. WordPress Specific Styles  ---------  home.php, index.php, single.php, page.php
+
+*********************************************************************************************/
+.wp-caption img {
+margin-bottom: 5px;
+padding:5px;
+background-color:#FFFFFF;
+}
+
+.wp-caption-text {
+color:#FFFFFF;
+text-align:center;
+padding-top: 5px;
+padding-bottom: 5px;
+width: auto;
+font-weight: bold;
+text-transform: uppercase;
+}
+
+code {
+font: 1.1em 'Courier New', Courier, Fixed;
+}
+
+img.centered {
+display: block;
+margin-left: auto;
+margin-right: auto;
+}
+
+img.alignright {
+margin: 5px 0 15px 20px;
+display: inline;
+}
+
+img.alignleft {
+margin: 5px 20px 15px 0;
+display: inline;
+}
+
+.alignright {
+float: right;
+margin-left: 15px;
+}
+
+.alignleft {
+float: left;
+margin-right: 15px;
+}
+
+acronym, abbr, span.caps {
+cursor: help;
+}
+
+acronym, abbr {
+border-bottom: 1px dashed #999;
+}
+
+blockquote {
+margin: 15px 30px 0 10px;
+padding-left: 20px;
+border-left: 5px solid #EFEFEF
+}
+
+blockquote cite {
+margin: 5px 0 0;
+display: block;
+}
+
+.center {
+text-align: center;
+}
+
+.hidden {
+display: none;
+}
+
+hr {
+display: none;
+}
+
+a img {
+border: none;
+}
+
+.aligncenter,
+div.aligncenter {
+display: block;
+margin-left: auto;
+margin-right: auto;
+}
+
+.wp-caption {
+text-align: center;
+background-color: #FFF;
+padding: 10px 5px 0 5px;
+margin-bottom: 5px;
+}
+
+.wp-caption img {
+margin: 0;
+padding: 0;
+border: 0 none;
+}
+
+.wp-caption p.wp-caption-text {
+font-size: 11px;
+line-height: 17px;
+padding: 4px 4px 5px;
+margin: 0;
+background: none;
+color: #333;
+}
+
+#fmenu {
+width: 600px;
+float: left;
+}
+
+#fmenu ul {
+list-style: none;
+width: 585px;
+float: left;
+padding: 0 15px 0 0;
+}
+
+#fmenu a {
+background: #323232;
+font-size: 16px;
+font-weight: bold;
+color: #FFFFFF;
+float: left;
+margin: 0 0 0 15px;
+padding: 9px 12px 8px 12px;
+}
+
+.ptext, .ptitle {
+       width: 400px;
+}
+
+input.ptitle { font-size:1.5em; padding: 4px 5px 4px 5px; border:1px solid #bbb;}
+input.ptitle:focus, input.ptext:focus { border:1px solid #2773a5; }
+/*input.ptext  { height: 22px; padding: 4px 5px 0px 5px; border:1px solid #bbb; }*/
+
+pre, .code
+{
+	/*font-family: "Consolas", "Courier New", Courier, mono, serif;*/
+	font-size: 12px;
+	background-color: #F8F8F8;
+	width: 95%;
+	overflow: auto;
+	margin: 18px 0 18px 0 !important;
+	padding: 10px; /* adds a little border on top when controls are hidden */
+	border: 1px solid #E7E5DC;
+	color: black;
+    /*border-left: 3px solid #6CE26C;*/
+	border-left: 3px solid #444444;
+	font-family:'Bitstream Vera Sans Mono','Courier',monospace;
+}
+
+pre .code {
+    background-color: #f5f5f5;
+    padding: 0.5em;
+    font-size: 1.1em;
+	white-space: pre-wrap;       /* css-3 */
+	white-space: -moz-pre-wrap;  /* Mozilla, since 1999 */
+	white-space: -pre-wrap;      /* Opera 4-6 */
+	white-space: -o-pre-wrap;    /* Opera 7 */
+	word-wrap: break-word;       /* Internet Explorer 5.5+ */
+}
+
+pre, .code{font:12px Monaco,"Courier New","DejaVu Sans Mono","Bitstream Vera Sans Mono",monospace;}
+
+.quote {
+	/*border: 1px solid silver;
+	padding: 2px;
+	margin: 2px;*/
+	margin: 15px 30px 0 10px;
+	padding-left: 20px;
+	border-left: 5px solid #EFEFEF
+}

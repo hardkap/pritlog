@@ -33,19 +33,11 @@
                         $theme_new['script']           = $config['blogPath'].$config['cleanIndex'];
                         $theme_new['pageLegend']       = $lang['pageNewForm'];
                         $theme_new['title']            = $lang['pageNewTitle'];
-						$theme_new['titleValidate']    = '<script>';
-                        //$theme_new['titleValidate']   .= 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
-                        //$theme_new['titleValidate']   .= 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-                        $theme_new['titleValidate']   .= '</script>';
                         $theme_new['content']          = $lang['pageNewContent'];
                         $theme_new['readmore']         = $lang['pageNewReadmore'];
                         $theme_new['textAreaCols']     = $config['textAreaCols'];
                         $theme_new['textAreaRows']     = $config['textAreaRows'];
                         $theme_new['category']         = $lang['pageNewCategory'];
-                        $theme_new['categoryValidate'] = '<script>';
-                        //$theme_new['categoryValidate'].= 'var category = new LiveValidation( "category", {onlyOnSubmit: true } );';
-                        //$theme_new['categoryValidate'].= 'category.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-                        $theme_new['categoryValidate'].= '</script>';
                         $theme_new['options']          = $lang['pageNewOptions'];
                         $theme_new['allowComments']    = $lang['pageNewAllowComments'];
                         $theme_new['isPage']           = $lang['pageNewIsPage'];
@@ -111,7 +103,7 @@
       $thisAuthor    = $public_data['thisAuthor'];
 	  $msglog		 = "";
 
-      if(trim($postTitle) == '' || trim($postContent) == '' || trim($postCategory) == '' || strstr($postCategory,'.'))
+      if(trim($postTitle) == '' || trim($postContent) == '' || trim($postCategory) == '' || strstr($postCategory,'.') || strlen(trim($postContent)) <= 15 )
       {
       	   $msglog .= $lang['errorAllFields'].'.<br>';
       	   $msglog .= $lang['errorCatName'].'<br>';
@@ -269,7 +261,7 @@
             (($config['authorEditPost'] == 0) && ($_SESSION['isAdmin'] || $thisAuthor == $author) && ($_SESSION['logged_in']))) {
             if ($thisAuthor == 'admin' && $thisAuthor != $author && trim($author) != "") {
                 $thisAuthor = $author;
-                $thisPass   = $authorsPass[$thisAuthor];
+                $thisPass   = @$authorsPass[$thisAuthor];
             }
 
             $theme_edit['loc_top']            = "";
@@ -286,10 +278,6 @@
             $theme_edit['pageLegend'] = $lang['pageEditForm'];
             $theme_edit['labelTitle'] = $lang['pageNewTitle'];
             $theme_edit['title'] = $title;
-            $theme_edit['titleValidate']    = '<script>';
-            //$theme_edit['titleValidate']   .= 'var title = new LiveValidation( "title", {onlyOnSubmit: true } );';
-            //$theme_edit['titleValidate']   .= 'title.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-            $theme_edit['titleValidate']   .= '</script>';
             $theme_edit['labelContent'] = $lang['pageNewContent'];
             $theme_edit['readmore']     = $lang['pageNewReadmore'];
             $theme_edit['textAreaCols']     = $config['textAreaCols'];
@@ -298,10 +286,6 @@
             $theme_edit['labelCategory']     = $lang['pageNewCategory'];
             $category=str_replace("_"," ",$category);
             $theme_edit['category']     = $category;
-            $theme_edit['categoryValidate'] = '<script>';
-            //$theme_edit['categoryValidate'].= 'var category = new LiveValidation( "category", {onlyOnSubmit: true } );';
-            //$theme_edit['categoryValidate'].= 'category.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-            $theme_edit['categoryValidate'].= '</script>';
             $theme_edit['options'] = $lang['pageNewOptions'];
             $theme_edit['checkAllowComments'] = $checkAllowComments;
             $theme_edit['allowComments'] = $lang['pageNewAllowComments'];
@@ -359,7 +343,7 @@
       if ($SHP->hooks_exist('hook-editsubmit-before')) {
          $SHP->execute_hooks('hook-editsubmit-before');
       }
-      if(trim($postTitle) == '' || trim($postContent) == '' || trim($postCategory) == '' || strstr($postCategory,'.'))
+      if(trim($postTitle) == '' || trim($postContent) == '' || trim($postCategory) == '' || strstr($postCategory,'.') || strlen(trim($postContent)) <= 15 )
       {
       	   $msglog = $lang['errorAllFields'].'.<br>';
       	   $msglog .= $lang['errorCatName'].'<br>';
@@ -490,7 +474,7 @@
           if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
               $theme_post['edit'] = "<a href=".$config['blogPath'].$config['cleanIndex']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
               //$theme_post['delete'] = "&nbsp;-&nbsp;<a href=".$config['blogPath'].$config['cleanIndex']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a>";
-			  $theme_post['delete'] = '&nbsp;-&nbsp;<a href="#" onclick="'.'confirm_delete(\''.$config['blogPath'].$config['cleanIndex']."/deleteEntrySubmit/".$fileName.'\')'.'">'.$lang['postFtDelete']."</a>";
+			  $theme_post['delete'] = '&nbsp;-&nbsp;<a href="javascript:void(null)" onclick="'.'confirm_delete(\''.$config['blogPath'].$config['cleanIndex']."/deleteEntrySubmit/".$fileName.'\')'.'">'.$lang['postFtDelete']."</a>";
           }
 
           if ($postType == "page") {
@@ -500,8 +484,8 @@
 			  $theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_post["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/post.tpl"));
 			  $commentFullName=$config['commentDir'].$fileName.$config['dbFilesExtension'];
 			  $i=0;
-			  $theme_main['content'] .= "<a name='Comments'></a><h3>".$lang['pageViewComments'].":</h3>";
-
+			  $theme_commentlist['header'] = $lang['pageViewComments'];
+			  $theme_commentlist['comments'] = "";
 			  if($allowComments == "yes")
 			  {
 					unset($GLOBALS['$public_data']);
@@ -533,16 +517,17 @@
 							$theme_comment['content'] = $content;
 							if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
 								//$theme_comment['delete'] = '<a href="'.$config['blogPath'].$config['cleanIndex'].'/deleteComment/'.$fileName.'/'.$sequence.'">'.$lang['postFtDelete'].'</a>';
-								$theme_comment['delete']    = '<a href="#" onclick="'.'confirm_delete(\''.$config['blogPath'].$config['cleanIndex'].'/deleteCommentSubmit/'.$fileName.'/'.$sequence.'\')'.'">'.$lang['postFtDelete']."</a>";
+								$theme_comment['delete']    = '<a href="javascript:void(null)" onclick="'.'confirm_delete(\''.$config['blogPath'].$config['cleanIndex'].'/deleteCommentSubmit/'.$fileName.'/'.$sequence.'\')'.'">'.$lang['postFtDelete']."</a>";
 								if (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false) {
 									$theme_comment['ip'] =  '&nbsp;&nbsp;-&nbsp;&nbsp;'.$ip;
 								}
 							}
-							$theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_comment["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/comment.tpl"));
+							$theme_commentlist['comments'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_comment["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/comment.tpl"));
 							$i++;
 						}
-						if ($i == 0) {$theme_main['content'] .= $lang['pageViewCommentsNo']."<br>";}
+						if ($i == 0) {$theme_commentlist['comments'] .= $lang['pageViewCommentsNo']."<br>";}
 					}
+					$theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_commentlist["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/commentlist.tpl"));
 
 					if ($SHP->hooks_exist('hook-commentform-replace')) {
 						$SHP->execute_hooks('hook-commentform-replace');
@@ -562,22 +547,10 @@
 						$theme_commentform['legend']        = $lang['pageCommentsForm'];
 						$theme_commentform['authorLabel']   = $lang['pageCommentsAuthor'];
 						$theme_commentform['required']      = $lang['pageCommentsRequired'];
-						$theme_commentform['authorValidate'] = '<script>';
-						//$theme_commentform['authorValidate'].= 'var author = new LiveValidation( "author", {onlyOnSubmit: true } );';
-						//$theme_commentform['authorValidate'].= 'author.add( Validate.Presence,{ failureMessage: "'.$lang['errorRequiredField'].'" } );';
-						$theme_commentform['authorValidate'].= '</script>';
 						$theme_commentform['emailLabel']     = $lang['pageAuthorsNewEmail'];
 						$theme_commentform['optional']       = $lang['pageCommentsOptionalEmail'];
-						$theme_commentform['emailValidate'] = '<script>';
-						//$theme_commentform['emailValidate'].= 'var commentEmail = new LiveValidation( "commentEmail", {onlyOnSubmit: true } );';
-						//$theme_commentform['emailValidate'].= 'commentEmail.add( Validate.Email, { failureMessage: "'.$lang['errorInvalidAdminEmail'].'" } );';
-						$theme_commentform['emailValidate'].= '</script>';
 						$theme_commentform['url']           = $lang['pageCommentsUrl'];
 						$theme_commentform['optionalUrl']   = $lang['pageCommentsOptionalUrl'];
-						$theme_commentform['urlValidate'] = '<script>';
-						//$theme_commentform['urlValidate'].= 'var commentUrl = new LiveValidation( "commentUrl", {onlyOnSubmit: true } );';
-						//$theme_commentform['urlValidate'].= 'commentUrl.add( Validate.Format, { pattern: /(http|https):\/\/(\w+:{0,1}\w*@)?(\S+)(:[0-9]+)?(\/|\/([\w#!:.?+=&%@!\-\/]))?/i,  failureMessage: "'.$lang['errorInvalidUrl'].'" } );';
-						$theme_commentform['urlValidate'].= '</script>';
 						$theme_commentform['contentLabel'] = $lang['pageCommentsContent'];
 						$theme_commentform['textAreaCols'] = $config['textAreaCols'];
 						$theme_commentform['textAreaRows'] = $config['textAreaRows'];
@@ -594,7 +567,7 @@
 						$code = genRandomString($config['CAPTCHALength']);
 					}
 					$theme_commentform['securityCode'] = '<p><label for="code">'.$lang['pageCommentsCode'].'</label><font face="Verdana, Arial, Helvetica, sans-serif" size="2">&nbsp;('.$code.')</font><br>';
-					$theme_commentform['securityCode'].= '<input name="code" class="s" type="text" id="code"><p>';
+					$theme_commentform['securityCode'].= '<input name="code" class="ptext" type="text" id="code"><p>';
 								$theme_commentform['securityCode'].= '<input name="originalCode" value="'.$code.'" type="hidden" id="originalCode">';
 					}
 
@@ -643,7 +616,7 @@
 
 	if (!$SHP->hooks_exist('hook-commentform-replace')) {
 
-			if(trim($commentTitle) == '' || trim($author) == '' || trim($comment) == '')
+			if(trim($commentTitle) == '' || trim($author) == '' || trim($comment) == '' || strlen(trim($comment)) <=10 )
     	    {
 				$theme_main['content'] .= $lang['errorAllFields'].'<br>';
 				$msglog .= $lang['errorAllFields'].'<br>';
@@ -652,7 +625,6 @@
 
     	    if($config['commentsSecurityCode'] == 1)
     	    {
-				//$code = $_POST['code'];
 				$originalCode = @$_POST['originalCode'];
 				if ($code !== $originalCode)
 				{
@@ -675,10 +647,11 @@
     	 	}
     	    }
 	}
-        $public_data['do'] = $do;
-        if ($SHP->hooks_exist('hook-comment-validate')) {
-            $SHP->execute_hooks('hook-comment-validate', $public_data);
-        }
+	
+	$public_data['do'] = $do;
+	if ($SHP->hooks_exist('hook-comment-validate')) {
+		$SHP->execute_hooks('hook-comment-validate', $public_data);
+	}
         $do = $public_data['do'];
 
 	if($do == 1)
@@ -686,6 +659,7 @@
 		if(strlen($comment) > $config['commentsMaxLength'])
 		{
 		     $theme_main['content'] .= $lang['errorLongComment1'].' '.$config['commentsMaxLength'].' '.$lang['errorLongComment2'].' '.strlen($comment);
+			 $msglog .= $lang['errorLongComment1'].' '.$config['commentsMaxLength'].' '.$lang['errorLongComment2'].' '.strlen($comment);
 		}
         else
 		{
@@ -734,25 +708,19 @@
 				@mail($config['sendMailWithNewCommentMail'], $subject, $message, $headers);
 			}
 			$msgstat = "success";
-			//fwrite(fopen("debug.txt","w"),"Successful addition of comment".$msgstat.$_SESSION['message']."\n");
 			$msglog = $_SESSION['growlmsg'] = $_SESSION['message'];
-			//$msglog  = $msgstat;
-			//header('Location: '.$config['blogPath'].$config['cleanIndex'].'/sendCommentSuccess');
 		}
-		//unset($_POST);
 		if ($SHP->hooks_exist('hook-comment-success')) {
             $SHP->execute_hooks('hook-comment-success');
         }
 	}
 	else {
             $theme_main['content'] .= $lang['errorPleaseGoBack'];
-			//$msglog .= $lang['errorPleaseGoBack'];
             if ($SHP->hooks_exist('hook-comment-fail')) {
                 $SHP->execute_hooks('hook-comment-fail');
             }
         }
 	$data = array ("status" => $msgstat, "out" => $msglog, "func" => "addcomment");
-	//$data = array ("status" => "success", "out" => "Something", "func" => "addcomment");
     echo json_encode($data);	   	
   }
   

@@ -11,7 +11,8 @@ function dummy() {
 $(document).ready(function() {
 	$('#myform').submit(function() {
 	  //alert($(this).serialize());
-	  for(var i=0;i<editor1.nicInstances.length;i++){editor1.nicInstances[i].saveContent();}
+	  if (typeof(editor1.nicInstances) != 'undefined')
+			for(var i=0;i<editor1.nicInstances.length;i++){editor1.nicInstances[i].saveContent();}
 	  //alert($("#posts").val());
 	  $.ajax({
 		  type: "POST",
@@ -29,12 +30,12 @@ $(document).ready(function() {
 			 $('.loader').remove();
 			 if ( (msg.func == "newentry") && (msg.status == "success") ) window.location.replace(blogPath);
 			 if ( (msg.func == "addcomment") && (msg.status == "success") ) window.location.reload();
-			 return false;
 		   },
 		   error: function(xhr) {
 			  //alert("Error "+xhr.statusText);
 		   }
 		});
+		//alert(msg.status);
 		return false;
 	});
 });
