@@ -949,7 +949,7 @@
         if ( !isset( $config[ 'cleanUrl' ] ) )                   { $config[ 'cleanUrl' ]                   = 0; }
         if ( !isset( $config[ 'timeoutDuration' ] ) )            { $config[ 'timeoutDuration' ]            = 0; }
         if ( !isset( $config[ 'limitLogins' ] ) )                { $config[ 'limitLogins' ]                = 10; }
-		if ( !isset( $config[ 'excerptLength' ] ) )              { $config[ 'excerptLength' ]              = 250; }
+		if ( !isset( $config[ 'excerptLength' ] ) )              { $config[ 'excerptLength' ]              = 0; }
 		if ( !isset( $config[ 'autosaveFrequency' ] ) )          { $config[ 'autosaveFrequency' ]          = 10; }
         $config['menuLinksOrig']=$config['menuLinks'];
         $config['menuLinksArray']=explode(';',$config['menuLinks']);
