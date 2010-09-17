@@ -115,5 +115,11 @@
 
 </div>
 
+<script type="text/javascript" src="{blogPath}/javascripts/jquery.min.js"></script>
+<script type="text/javascript" src="{blogPath}/javascripts/jquery.jgrowl.min.js"></script>
+<script src="{blogPath}/javascripts/main.js" type="text/javascript"></script>
+
+<script>{growlmsg}</script>
+
 </body>
 </html>

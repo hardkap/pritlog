@@ -1,1 +1,1 @@
-<a href="{link}">{linktext}</a>
+<li><a href="{link}">{linktext}</a></li>

@@ -46,6 +46,7 @@
 						$theme_new['isDraft']          = $lang['pageNewIsDraft'];
                         $theme_new['hidden']           = '<input name="process" type="hidden" id="process" value="newEntry">';
                         $theme_new['hidden']          .= '<input name="author" type="hidden" id="author" value="'.$thisAuthor.'">';
+						$theme_new['hidden']	      .= '<script>var unsavedChanges = "'.$lang['msgUnsavedChanges'].'"; var unloadwarning = "'.$lang['msgUnsavedChanges'].'";</script>';
                         $theme_new['submit']           = $lang['pageNewSubmit'];
                         $theme_main['content']        .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_new["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/newentry.tpl"));
                    }
@@ -301,6 +302,12 @@
             $theme_edit['hidden'].= '<input name="process" type="hidden" id="process" value="editEntrySubmit">';
             $theme_edit['hidden'].= '<input name="author" type="hidden" id="author" value="'.$thisAuthor.'">';
             $theme_edit['hidden'].= '<input name="pass" type="hidden" id="pass" value="'.@$thisPass.'">';
+			if ($config['autosaveFrequency'] > 0) {
+				$autosaveFreq_seconds = (int)$config['autosaveFrequency'] * 1000;
+				$theme_edit['hidden'].= '<script>var autosaving = "'.$lang['msgautosaving'].'"; var autosave_error = "'.$lang['msgautosaveError'].'"; var autosave_success = "'.$lang['msgautosaveSuccess']	.'";</script>';
+				$theme_edit['hidden'].= '<script>var autosave_frequency = '.$autosaveFreq_seconds.'; </script>';
+				$theme_edit['hidden'].= '<script>var unsavedChanges = "'.$lang['msgUnsavedChanges'].'"; var unloadwarning = "'.$lang['msgUnsavedChanges'].'";</script>';
+			}	
             $theme_edit['submit'] = $lang['pageEditSubmit'];
             $theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_edit["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/editentry.tpl"));
         }
@@ -383,7 +390,7 @@
       }
 	  //$_SESSION['growlmsg'] = $msglog;
 	  //header('Location: '.$_SESSION['referrer']);
-	  $data = array ("status" => $msgstat, "out" => $msglog, "func" => "editentry");
+	  $data = array ("status" => $msgstat, "out" => $msglog, "func" => "editentry", "timestamp" => date('h:i:s a'));
 	  //fwrite(fopen("debug.txt","w"),json_encode($data)."\nEdit entry"."\n");
 	  echo json_encode($data);	  
   }
@@ -474,7 +481,7 @@
           if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
               $theme_post['edit'] = "<a href=".$config['blogPath'].$config['cleanIndex']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
               //$theme_post['delete'] = "&nbsp;-&nbsp;<a href=".$config['blogPath'].$config['cleanIndex']."/deleteEntry/".$fileName.">".$lang['postFtDelete']."</a>";
-			  $theme_post['delete'] = '&nbsp;-&nbsp;<a href="javascript:void(null)" onclick="'.'confirm_delete(\''.$config['blogPath'].$config['cleanIndex']."/deleteEntrySubmit/".$fileName.'\')'.'">'.$lang['postFtDelete']."</a>";
+			  $theme_post['delete'] = '&nbsp;-&nbsp;<a href="javascript:void(null)" onclick="'.'confirm_delete(\''.$lang['msgSure'].'\',\''.$config['blogPath'].$config['cleanIndex']."/deleteEntrySubmit/".$fileName.'\')'.'">'.$lang['postFtDelete']."</a>";
           }
 
           if ($postType == "page") {
@@ -517,7 +524,7 @@
 							$theme_comment['content'] = $content;
 							if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
 								//$theme_comment['delete'] = '<a href="'.$config['blogPath'].$config['cleanIndex'].'/deleteComment/'.$fileName.'/'.$sequence.'">'.$lang['postFtDelete'].'</a>';
-								$theme_comment['delete']    = '<a href="javascript:void(null)" onclick="'.'confirm_delete(\''.$config['blogPath'].$config['cleanIndex'].'/deleteCommentSubmit/'.$fileName.'/'.$sequence.'\')'.'">'.$lang['postFtDelete']."</a>";
+								$theme_comment['delete']    = '<a href="javascript:void(null)" onclick="'.'confirm_delete(\''.$lang['msgSure'].'\',\''.$config['blogPath'].$config['cleanIndex'].'/deleteCommentSubmit/'.$fileName.'/'.$sequence.'\')'.'">'.$lang['postFtDelete']."</a>";
 								if (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false) {
 									$theme_comment['ip'] =  '&nbsp;&nbsp;-&nbsp;&nbsp;'.$ip;
 								}

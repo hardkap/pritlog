@@ -3,6 +3,7 @@
 {loc_title_after}
 {content}
 {loc_content_after}
-<br><center>{edit}{delete}</center>
+<br/><br/><i style="text-transform: capitalize">{authorLabel}: {author}&nbsp;-&nbsp; {dateLabel}: {date}&nbsp;-&nbsp; {categoryLabel}: {category}&nbsp;-&nbsp; {visitsLabel}: {visits}&nbsp;-&nbsp; {comments}{loc_footer}</i>
+<br/>{edit}{delete}
 {loc_bottom}
 <br/><br/><br/>

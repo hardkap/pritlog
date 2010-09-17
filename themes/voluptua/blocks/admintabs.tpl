@@ -1,3 +1,4 @@
+<a href="{actionNewpost}"    class="adminTabs" style="color:#fff;text-decoration:none;">{newpost}</a>
 <a href="{actionBasic}"    class="adminTabs" style="color:#fff;text-decoration:none;">{basic}</a>
 <a href="{actionAdvanced}" class="adminTabs" style="color:#fff;text-decoration:none;">{advanced}</a>
 <a href="{actionAuthor}"   class="adminTabs" style="color:#fff;text-decoration:none;">{manageAuthors}</a>

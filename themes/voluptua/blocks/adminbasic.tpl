@@ -14,7 +14,7 @@
 <input type="text" class="ptext" name="adminEmail" id="adminEmail" value="{email}"></p>
 <br><label for="posts">{aboutLabel}</label><br>
 {nicEdit}
-<textarea name="posts" id="posts">{about}</textarea><br><br>
+<textarea class="ptextarea" name="posts" id="posts">{about}</textarea><br><br>
 <input type="hidden" id="submitted" name="submitted" value="yes">
 <p><input type="submit" class="submit" value="{submit}"></p>
 </fieldset>

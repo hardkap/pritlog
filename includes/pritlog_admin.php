@@ -1,6 +1,6 @@
 <?php
   function adminPage() {
-      global $debugMode, $optionValue, $config, $lang, $theme_main, $SHP;
+      global $debugMode, $optionValue, $config, $lang, $theme_main, $SHP, $blogPath;
       $theme_main['content'] = "";
       $theme_admin['header'] = $lang['titleAdminPage'];
 
@@ -14,7 +14,9 @@
   }
 
   function adminPageTabs() {
-	  global $config, $lang;
+	  global $config, $lang, $blogPath;
+	  $theme_admintabs['actionNewpost']  = $config['blogPath'].$config['cleanIndex'].'/newEntry';
+	  $theme_admintabs['newpost'] 		 = $lang['sidebarLinkNewEntry'];
 	  $theme_admintabs['actionBasic']    = $config['blogPath'].$config['cleanIndex'].'/adminPageBasic';
 	  $theme_admintabs['basic'] 		 = $lang['tabsBasic'];
 	  $theme_admintabs['actionAdvanced'] = $config['blogPath'].$config['cleanIndex'].'/adminPageAdvanced';
@@ -37,8 +39,12 @@
 		  $msgtext    = "";
 		  $msgclass   = "hide";
 		  if (isset($_POST['submitted'])) {
-			  $submit_result = adminPageBasicSubmit();
-			  $_SESSION['growlmsg'] = $lang['msgConfigSaved'];
+			  $submit_error = adminPageBasicSubmit();
+			  //$_SESSION['growlmsg'] = $lang['msgConfigSaved'];
+			  if (!$submit_error) 
+				  $_SESSION['growlmsg'] = $lang['msgConfigSaved'];
+			  else	 	
+				  $_SESSION['growlmsg'] = adminPageBasicSubmit();
 			  header('Location: '.$config['blogPath'].$config['cleanIndex'].'/adminPageBasic');
 			  die();
 		  }		
@@ -70,9 +76,11 @@
       if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && isset($_SESSION['isAdmin']) && $_SESSION['isAdmin']) {
           if (trim($_POST['title']) == "" || trim($_POST['adminEmail']) == "" || trim($_POST['posts']) == "") {
               $msgtext .= $lang['errorCannotBeSpaces'].'<br>';
-              $msgtext.= '<li>'.$lang['pageBasicConfigTitle'].'</li>';
-              $msgtext.= '<li>'.$lang['pageBasicConfigAdminEmail'].'</li>';
-              $msgtext.= '<li>'.$lang['pageBasicConfigAbout'].'</li>';
+			  $msgtext .= '<ul>';
+              $msgtext.= '<li>- '.$lang['pageBasicConfigTitle'].'</li>';
+              $msgtext.= '<li>- '.$lang['pageBasicConfigAdminEmail'].'</li>';
+              $msgtext.= '<li>- '.$lang['pageBasicConfigAbout'].'</li>';
+			  $msgtext .= '</ul>';
               $do=0;
           }
           if (!eregi("^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,3})$", trim($_POST['adminEmail']))) {
@@ -85,6 +93,11 @@
                   $do=0;
               }
               else {
+				  //echo strlen($_POST['newpass1']).' is the Length<br>';
+				  if (strlen($_POST['newpass1']) < 5) {
+					  $msgtext.= $lang['errorPassLength'].'<br>';
+					  $do = 0;
+				  }
                   $config['Password']=md5($config['randomString'].$_POST['newpass1']);
               }
           }
@@ -98,7 +111,7 @@
               $config['about']=str_replace("\n","<br/>",str_replace("\\","",trim($_POST['posts'])));
               writeConfig(false);
 			  $_SESSION['growlmsg'] = $lang['msgConfigSaved'];
-			  return true;
+			  return false;
           }
        }
        else {
@@ -157,6 +170,8 @@
           $theme_adminadvanced['limitLogins'] = $config['limitLogins'];
 		  $theme_adminadvanced['excerptLabel']  = $lang['excerptLabel'];
           $theme_adminadvanced['excerptLength'] = $config['excerptLength'];
+		  $theme_adminadvanced['autosaveLabel']  = $lang['autosaveLabel'];
+          $theme_adminadvanced['autosaveFrequency'] = $config['autosaveFrequency'];
 
           $theme_adminadvanced['language'] = '<p><label for="blogLanguage">'.$lang['pageAdvancedConfigLanguage'].'</label><br>';
           $theme_adminadvanced['language'].= '<select name="blogLanguage" id="blogLanguage">';
@@ -352,6 +367,9 @@
           }
 		  if (isset($_POST['excerptLength']) && trim($_POST['excerptLength']) != "") {
                $config['excerptLength'] = $_POST['excerptLength'];
+          }
+		  if (isset($_POST['autosaveFrequency']) && trim($_POST['autosaveFrequency']) != "") {
+               $config['autosaveFrequency'] = $_POST['autosaveFrequency'];
           }
 
           if ($_POST['sendMailComments'] == 1) { $config['sendMailWithNewComment'] = 1; }
@@ -668,7 +686,8 @@
           if (isset($_POST['notfirst'])) {
 			  $msgtext = $lang['msgConfigSaved'];
 			  //$msgclass= "success";
-			  $theme_adminplugins['script'] = '<script type="text/javascript">$.jGrowl("'.$lang['msgConfigSaved'].'");</script>';
+			  //$theme_adminplugins['script'] = '<script type="text/javascript">$.jGrowl("'.$lang['msgConfigSaved'].'");</script>';
+			  $theme_adminplugins['script'] = '<script type="text/javascript">var jgrowl = "'.$lang['msgConfigSaved'].'";</script>';
 		  }	
 		  $theme_adminplugins['action'] = $config['blogPath'].$config['cleanIndex'].'/adminPluginsSubmit';
 		  $plugin_folder = './plugins/';
@@ -754,7 +773,8 @@
           if (isset($_REQUEST['notfirst']) || isset($_SESSION['growler'])) {
 			  $msgtext = $lang['pageModerateMessage'];
 			  //$msgclass= "success";
-			  $theme_admincomments['script'] = '<script type="text/javascript">$.jGrowl("'.$lang['pageModerateMessage'].'");</script>';
+			  //$theme_admincomments['script'] = '<script type="text/javascript">$.jGrowl("'.$lang['pageModerateMessage'].'");</script>';
+			  $theme_admincomments['script'] = '<script type="text/javascript">var jgrowl = "'.$lang['pageModerateMessage'].'";</script>';
 			  unset($_SESSION['growler']);
 		  }	
 	      $theme_admincomments['action'] = $config['blogPath'].$config['cleanIndex'].'/adminModerateSubmit';
@@ -870,8 +890,9 @@
                   'commentModerate',
                   'limitLogins',
                   'privacy',
+				  'cleanUrl',
 				  'excerptLength',
-                  'cleanUrl');
+				  'autosaveFrequency');
 
       for ( $i = 0; $i < count( $tempConfigs ); $i++ ) {
         $key = $configKeys[ $i ];
@@ -929,6 +950,7 @@
         if ( !isset( $config[ 'timeoutDuration' ] ) )            { $config[ 'timeoutDuration' ]            = 0; }
         if ( !isset( $config[ 'limitLogins' ] ) )                { $config[ 'limitLogins' ]                = 10; }
 		if ( !isset( $config[ 'excerptLength' ] ) )              { $config[ 'excerptLength' ]              = 250; }
+		if ( !isset( $config[ 'autosaveFrequency' ] ) )          { $config[ 'autosaveFrequency' ]          = 10; }
         $config['menuLinksOrig']=$config['menuLinks'];
         $config['menuLinksArray']=explode(';',$config['menuLinks']);
 
@@ -978,8 +1000,9 @@
                           $config['commentModerate'].'|'.
                           $config['limitLogins'].'|'.
                           $config['privacy'].'|'.
-						  $config['excerptLength'].'|'.
-                          $config['cleanUrl'];
+						  $config['cleanUrl'].'|'.
+                          $config['excerptLength'].'|'.
+						  $config['autosaveFrequency'];
 			$configContent='<?php /* '.$configContent.' */ ?>';
             $fp=fopen($configFile,"w");
 			$fwrite = fwrite($fp,$configContent);

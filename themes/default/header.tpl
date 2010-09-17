@@ -12,13 +12,13 @@
 	<link rel="stylesheet" href="{blogPath}/themes/default/css/print.css" type="text/css" media="print">
 <!--[if IE]><link rel="stylesheet" href="{blogPath}/themes/default/css/ie.css" type="text/css" media="screen, projection"><![endif]-->
 
-<link rel="stylesheet" href="{blogPath}/css/jquery.jgrowl.css" type="text/css" />
-<script type="text/javascript" src="{blogPath}/javascripts/jquery.min.js"></script>
-<script type="text/javascript" src="{blogPath}/javascripts/jquery.jgrowl.min.js"></script>
+<link rel="shortcut icon" href="{blogPath}/images/favicon.ico" />
 
+<link rel="stylesheet" href="{blogPath}/css/jquery.jgrowl.css" type="text/css" />
 <link href="{blogPath}/themes/default/css/style.css" rel=stylesheet type=text/css>
+
 <script type="text/javascript">var blogPath="{blogPath}"; var editor1 = ""; var errorGeneral="{errorGeneral}";</script>
-<script src="{blogPath}/javascripts/main.js" type="text/javascript"></script>
+
 
 {loc_head}
 
@@ -26,13 +26,20 @@
 
 <body id="noticebd">
 
+<div id="headbar">
+<span id="mytimestamp">
+<noscript>
+	<em id="jserror">Please enable Javascript for full functionality.</em>
+</noscript>     
+</span>
+{menu}
+</div>
+
 {loc_top}
 
 <div class="container">
 
 <!-- Below is the header portion of the blog -->
-
-<script>{growlmsg}</script>
 
 <div id="myhead" class="span-24">
 <h1><a href={script}/>{blogTitle}</a></h1>

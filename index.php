@@ -5,7 +5,7 @@
 	prit@pritlog.com
 	PRITLOG now uses the MIT License
 	http://www.opensource.org/licenses/mit-license.php
-	Version: 0.813
+	Version: 0.82
 #######################################################################*/
 /* Enable error logging if required to display notices and warnings */
 //error_reporting(E_ALL);
@@ -66,7 +66,7 @@ else $user="user";
   $_SESSION['user'] = $user;
   //$config['theme']      = "skyblue";
   if (!file_exists(getcwd().'/themes/'.$config['theme'])) {
-      $config['theme'] = 'default';
+      $config['theme'] = 'voluptua';
       if (!file_exists(getcwd().'/themes/'.$config['theme'])) {
           die('Error in the themes directory');
       }
@@ -243,7 +243,67 @@ $theme_header['metaDesc']    = $config['metaDescription'];
 $theme_header['loc_head']   = "";
 $theme_header['loc_top']    = "";
 $theme_header['loc_title_after'] = "";
-$theme_header['growlmsg']     = $growlmsg;
+//$theme_header['growlmsg']     = $growlmsg;
+
+$theme_header['menu']	 = "";
+
+$theme_menu['link']     = $blogPath; //$_SERVER["SCRIPT_NAME"].'/mainPage';
+$theme_menu['linktext'] = $lang['sidebarLinkHome'];
+$mainmenu	    = "";
+$mainmenu    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/archives';
+$theme_menu['linktext'] = $lang['sidebarLinkArchive'];
+$mainmenu    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/RSS';
+$theme_menu['linktext'] = $lang['sidebarLinkRSSFeeds'];
+$mainmenu    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false)) {
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/adminPage';
+$theme_menu['linktext'] = $lang['sidebarLinkAdmin'];
+$mainmenu    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/newEntry';
+$theme_menu['linktext'] = $lang['sidebarLinkNewEntry'];
+$mainmenu    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/logoutPage';
+$theme_menu['linktext'] = $lang['sidebarLinkLogout'];
+$mainmenu    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+} else {
+if (isset($_SESSION['logged_in']) && $_SESSION['logged_in']) {
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/newEntry';
+$theme_menu['linktext'] = $lang['sidebarLinkNewEntry'];
+$mainmenu    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/myProfile';
+$theme_menu['linktext'] = $lang['pageMyProfile'];
+$mainmenu    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/logoutPage';
+$theme_menu['linktext'] = $lang['sidebarLinkLogout'];
+$mainmenu    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+} else {
+$theme_menu['link']     = $theme_menu['linktext'] = "";
+$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/loginPage';
+$theme_menu['linktext'] = $lang['sidebarLinkLogin'];
+$mainmenu    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
+}
+}
+
+$theme_header['menu'] .= $mainmenu;
+
+/*
+if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false)) 
+	$theme_header['headbar'] .= '<div id="headbar"><a href="#">New Post</a>&nbsp;|&nbsp;<a href="#">Admin</a>&nbsp;|&nbsp;<a href="#">Logout</a></div>';
+else if (isset($_SESSION['logged_in']) && $_SESSION['logged_in']) 
+	$theme_header['headbar'] .= '<div id="headbar"><a href="#">New Post</a>&nbsp;|&nbsp;<a href="#">My Profile</a>&nbsp;|&nbsp;<a href="#">Logout</a></div>';
+else
+	$theme_header['headbar'] .= '<div id="headbar"><a href="#">Login</a></div>';	
+*/	
 //execute hooks only if there are hooks to execute
 if ($SHP->hooks_exist('hook-head')) {
     $SHP->execute_hooks('hook-head');
@@ -272,6 +332,8 @@ if (is_array($tags) && count($tags) > 0 && $config['showCategoryCloud'] == 1) {
 }
 /* This function does the main logic to direct to other functions as required */
 mainLogic();
+
+$theme_main['growlmsg']     = $growlmsg;
 
 if($option !== 'RSS') {
 $theme_main['shareme'] = '<style>
@@ -302,53 +364,9 @@ sidebarListEntries();
 $theme_main['menuHeader'] = $lang['sidebarHeadMainMenu'];
 $theme_main['blogTitle']  = $config['blogTitle'];
 $theme_main['home']       = $lang['sidebarLinkHome'];
-$theme_menu['link']     = $theme_menu['linktext'] = "";
-$theme_menu['link']     = $blogPath; //$_SERVER["SCRIPT_NAME"].'/mainPage';
-$theme_menu['linktext'] = $lang['sidebarLinkHome'];
-$theme_main['menu']	    = "";
-$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
-$theme_menu['link']     = $theme_menu['linktext'] = "";
-$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/archives';
-$theme_menu['linktext'] = $lang['sidebarLinkArchive'];
-$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
-$theme_menu['link']     = $theme_menu['linktext'] = "";
-$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/RSS';
-$theme_menu['linktext'] = $lang['sidebarLinkRSSFeeds'];
-$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
-if (isset($_SESSION['logged_in']) && $_SESSION['logged_in'] && (isset($_SESSION['isAdmin'])?$_SESSION['isAdmin']:false)) {
-$theme_menu['link']     = $theme_menu['linktext'] = "";
-$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/adminPage';
-$theme_menu['linktext'] = $lang['sidebarLinkAdmin'];
-$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
-$theme_menu['link']     = $theme_menu['linktext'] = "";
-$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/newEntry';
-$theme_menu['linktext'] = $lang['sidebarLinkNewEntry'];
-$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
-$theme_menu['link']     = $theme_menu['linktext'] = "";
-$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/logoutPage';
-$theme_menu['linktext'] = $lang['sidebarLinkLogout'];
-$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
-} else {
-if (isset($_SESSION['logged_in']) && $_SESSION['logged_in']) {
-$theme_menu['link']     = $theme_menu['linktext'] = "";
-$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/newEntry';
-$theme_menu['linktext'] = $lang['sidebarLinkNewEntry'];
-$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
-$theme_menu['link']     = $theme_menu['linktext'] = "";
-$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/myProfile';
-$theme_menu['linktext'] = $lang['pageMyProfile'];
-$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
-$theme_menu['link']     = $theme_menu['linktext'] = "";
-$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/logoutPage';
-$theme_menu['linktext'] = $lang['sidebarLinkLogout'];
-$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
-} else {
-$theme_menu['link']     = $theme_menu['linktext'] = "";
-$theme_menu['link']     = $blogPath.$config['cleanIndex'].'/loginPage';
-$theme_menu['linktext'] = $lang['sidebarLinkLogin'];
-$theme_main['menu']    .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_menu["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/menu.tpl"));
-}
-}
+
+$theme_main['menu'] = $mainmenu;
+
 $theme_main['categoriesHeader'] = $lang['postFtTags'];
 $theme_main['categories']       = sidebarCategories();
 $theme_main['pagesHeader'] = $lang['sidebarHeadPages'];

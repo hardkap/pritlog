@@ -4,9 +4,8 @@
 {loc_title_after}
 {content}
 {loc_content_after}
-<strong><i><p>This entry was written by <span class="author vcard">{author}</span>, posted on <abbr class="published">{date}, filed under {category}, with {comments}.</i></strong>
-<br/>
-<center>{edit}{delete}</center>
+<br/><br/><i style="text-transform: capitalize">{authorLabel}: {author}&nbsp;-&nbsp; {dateLabel}: {date}&nbsp;-&nbsp; {categoryLabel}: {category}&nbsp;-&nbsp; {visitsLabel}: {visits}&nbsp;-&nbsp; {comments}{loc_footer}
+<br/>{edit}{delete}</i>
 {loc_bottom}
-<br/><br/>
+<br/>
 </div> <!-- end post -->

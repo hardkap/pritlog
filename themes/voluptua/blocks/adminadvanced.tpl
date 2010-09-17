@@ -28,11 +28,13 @@
 <p><label for="limitLogins">{limitLoginsLabel}</label><br>
 <input type="text" class="ptext" name="limitLogins" id="limitLogins" value="{limitLogins}"></p>
 <p><label for="excerptLength">{excerptLabel}</label><br>
-	<input type="text" class="ptext" name="excerptLength" id="excerptLength" value="{excerptLength}"></p>
+<input type="text" class="ptext" name="excerptLength" id="excerptLength" value="{excerptLength}"></p>
+<p><label for="autosaveLabel">{autosaveLabel}</label><br>
+<input type="text" class="ptext" name="autosaveFrequency" id="autosaveFrequency" value="{autosaveFrequency}"></p>
 <p><label for="menuLinks">{menuLinksLabel}</label><br>
-<textarea name="menuLinks" id="menuLinks" rows="5" cols="30" value="">{menuLinks}</textarea></p>
+<textarea class="ptextarea" name="menuLinks" id="menuLinks" rows="5" cols="30" value="">{menuLinks}</textarea></p>
 <p><label for="ipBan">{ipBanLabel}</label><br>
-<textarea name="ipBan" id="ipBan" rows="5" cols="25" value="">{ipBan}</textarea></p>
+<textarea class="ptextarea" name="ipBan" id="ipBan" rows="5" cols="25" value="">{ipBan}</textarea></p>
 
 {sendMailComments}
 {commentsSecurityCode}

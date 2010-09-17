@@ -15,8 +15,8 @@ $lang['sidebarHeadLinks']			=	'Links';
 $lang['sidebarHeadStats']			=	'Stats';
 $lang['sidebarHeadShare']			= 	'Share';
 $lang['sidebarHeadSearch']			=	'Search';
-$lang['sidebarHeadPopularEntries']	=	'Popular Entries';
-$lang['sidebarHeadLatestEntries']	=	'Latest Entries';
+$lang['sidebarHeadPopularEntries']	=	'Popular Posts';
+$lang['sidebarHeadLatestEntries']	=	'Latest Posts';
 $lang['sidebarHeadLatestComments']	=	'Latest Comments';
 $lang['sidebarHeadPages']			=	'Pages';
 
@@ -70,17 +70,18 @@ $lang['pageAdvancedConfigMetaDesc']		=	'Meta Description of blog';
 $lang['pageAdvancedConfigMetaKey']		=	'Meta Keywords for the blog';
 $lang['pageAdvancedConfigCommentsLen']	=	'Maximum length for comments';
 $lang['pageAdvancedConfigCommentsFor']	=	'Comments Forbidden Authors (use commas)';
-$lang['pageAdvancedConfigDontLog']		=	'Dont log the below IPs in stats (use commas)';
-$lang['pageAdvancedConfigEntriesRSS']	=	'Number of entries on RSS feeds';
+$lang['pageAdvancedConfigDontLog']		=	'Dont count hits from these IPs (use commas)';
+$lang['pageAdvancedConfigEntriesRSS']	=	'Number of posts on RSS feeds (0 for no limit)';
 $lang['pageAdvancedConfigPostsperPage']	=	'Number of posts per page';
-$lang['pageAdvancedConfigMenuEntries']	=	'Number of entries on menu';
+$lang['pageAdvancedConfigMenuEntries']	=	'Number of entries on menu (latest, popular, comments)';
 $lang['pageAdvancedConfigMenuLinks']	=	'Menu Links (Link, Site name on each line)';
 $lang['pageAdvancedConfigIpBan']        =   "List of ip's to be banned (One ip per line)";
 $lang['timeoutDuration']                =   'Duration in seconds for user time-out (0 for no timeout)';
 $lang['limitLogins']                    =   'Number of invalid login attempts allowed';
-$lang['excerptLabel']                   =   'Length of excerpts (0 for no excerpt)';
-$lang['pageAdvancedConfigSendMail']		=	'Send mail with new comments';
-$lang['pageAdvancedConfigSecCode']		=	'Comments Security Code';
+$lang['excerptLabel']                   =   'Length of post excerpts (0 for no excerpt)';
+$lang['autosaveLabel']                  =   'Autosave Frequency in secondss (0 to disable)';
+$lang['pageAdvancedConfigSendMail']		=	'Notify admin for new comments';
+$lang['pageAdvancedConfigSecCode']		=	'Captcha security for Comments';
 $lang['pageAdvancedConfigAuthorEdit']   =   'Allow authors to edit / delete any post';
 $lang['pageAdvancedConfigAuthorComment']=   'Allow authors to delete comments for any post';
 $lang['pageAdvancedConfigLanguage']     =   'Language';
@@ -115,8 +116,8 @@ $lang['pageAllCommentsDate']			=	'Date';
 $lang['pageAllCommentsBy']				=	'Posted By';
 $lang['pageAllCommentsNo']				=	'No Comments posted yet';
 
-$lang['pageNew']						=	'Making new entry';
-$lang['pageNewForm']					=	'New Entry Form';
+$lang['pageNew']						=	'Adding new post';
+$lang['pageNewForm']					=	'New Post Form';
 $lang['pageNewTitle']					=	'Title';
 $lang['pageNewContent']					=	'Content';
 $lang['pageNewReadmore']				=	'Add *readmore* in your post to create summary for front page';
@@ -128,18 +129,18 @@ $lang['pageNewIsPage']					=	'Is a page';
 $lang['pageNewIsSticky']				=	'Stick post to front page';
 $lang['pageNewIsDraft']				    =	'Make this post a draft';
 $lang['pageNewIsPageDesc']				=	'A page is basically a post which is linked in the menu and not displayed normally';
-$lang['pageNewSubmit']					=	'Add Entry';
+$lang['pageNewSubmit']					=	'Add Post';
 
-$lang['pageEdit']						=	'Editing entry';
-$lang['pageEditForm']					=	'Edit Entry Form';
-$lang['pageEditSubmit']					=	'Submit Entry';
+$lang['pageEdit']						=	'Editing post';
+$lang['pageEditForm']					=	'Edit Post Form';
+$lang['pageEditSubmit']					=	'Submit Post';
 
 $lang['pageMyProfile']					=	'My Profile';
 $lang['pageMyProfileCurrentPass']		=	'Current Password';
 
-$lang['pageDelete']						=	'Deleting entry';
+$lang['pageDelete']						=	'Deleting post';
 $lang['pageDeletePass']					=	'Password';
-$lang['pageDeleteSubmit']				=	'Delete Entry';
+$lang['pageDeleteSubmit']				=	'Delete Post';
 
 $lang['pageCommentDel']					=	'Deleting Comment';
 $lang['pageCommentDelSubmit']			=	'Delete Comment';
@@ -214,7 +215,8 @@ $lang['errorSearchNothing']				=	'Please enter a text to search';
 $lang['errorSearchEmptyResult']			=	'Sorry no matches found!';
 $lang['errorGeneral']					=	'Error found. Please correct';
 
-$lang['msgSure']						=	'Are you sure you want to delete? Click submit to confirm.';
+$lang['msgSure']						=	'Are you sure you want to delete? \n\nClick OK to confirm.';
+$lang['msgUnsavedChanges']				=	'Your changes have not been saved. \n\nDiscard your changes?';
 $lang['msgConfigSaved']					=	'Changes have been saved';
 $lang['msgGoBack']						=	'Go Back';
 $lang['msgGoHome']						=	'Homepage';
@@ -240,4 +242,8 @@ $lang['msgMail8']		 				=	'Comment email has been sent';
 $lang['msgMail9']		 				=	'Mail could not be sent due to a server error. Please make sure the server allows the PHP mail function.';
 $lang['msgMail10']		 				=	'Here are the login details';
 $lang['msgMail11']		 				=	'Registration details';
+$lang['msgautosaving']	 				=	'Performing autosave';
+$lang['msgautosaveError'] 				=	'Could not autosave due to errors';
+$lang['msgautosaveSuccess']				=	'Autosaved at: ';
+
 ?>

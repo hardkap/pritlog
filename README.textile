@@ -5,9 +5,10 @@ PRITLOG is an extremely simple, small and powerful blog system. It does not use 
 *PRITLOG now uses the MIT License.*
 "MIT License":http://www.opensource.org/licenses/mit-license.php
 
-h2. CHANGES FOR 0.813
-* Improve user friendliness.
-* Added jQuery messages.
+h2. CHANGES FOR 0.82
+* Improve user friendliness using jQuery javascript library.
+* Protect from losing unsaved changes.
+* Autosave posts when in edit mode.
 
 
 h2. INSTALLATION:

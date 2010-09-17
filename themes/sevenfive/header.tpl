@@ -18,6 +18,7 @@ Be inspired, but please don't steal...
 <meta name="Keywords" content="{metaKeywords}"/>
 <meta name="Description" content="{metaDesc}"/>
 <title>{title}</title>
+<link rel="shortcut icon" href="{blogPath}/images/favicon.ico" />
 <link rel="alternate" type="application/rss+xml" title="Recent Posts" href="{script}/RSS/{optionValue}" />
 <link rel="stylesheet" href="{blogPath}/css/jquery.jgrowl.css" type="text/css" />
 
@@ -26,16 +27,7 @@ Be inspired, but please don't steal...
 
 <link rel="shortcut icon" href="{blogPath}/themes/sevenfive/css/images/favicon.ico" type="image/x-icon" /> 
 
-<script type="text/javascript" src="{blogPath}/javascripts/jquery.min.js"></script>
-<script type="text/javascript" src="{blogPath}/javascripts/jquery.jgrowl.min.js"></script>
-<script type="text/javascript" src="{blogPath}/themes/sevenfive/javascripts/jquery.fade.js"></script>
-<script type="text/javascript" src="{blogPath}/themes/sevenfive/javascripts/jquery.imagepreview.js"></script>
-<script type="text/javascript" src="{blogPath}/themes/sevenfive/javascripts/jquery.smoothscroll.js"></script>
-<script type="text/javascript" src="{blogPath}/themes/sevenfive/javascripts/cufon.js"></script>
-<script type="text/javascript" src="{blogPath}/themes/sevenfive/javascripts/Graublau_Web_400-Graublau_Web_700.font.js"></script>
-
 <script type="text/javascript">var blogPath="{blogPath}"; var editor1 = ""; var errorGeneral="{errorGeneral}";</script>
-<script src="{blogPath}/javascripts/main.js" type="text/javascript"></script>
 
 {loc_head}
 
@@ -43,11 +35,18 @@ Be inspired, but please don't steal...
 
 <body>
 
+<div id="headbar">
+<span id="mytimestamp">
+<noscript>
+	<em id="jserror">Please enable Javascript for full functionality.</em>
+</noscript>     
+</span>
+{menu}
+</div>
+
 {loc_top}
 
 <!-- Below is the header portion of the blog -->
-
-<script>{growlmsg}</script>
 
 <div id="header">
 	<div id="logo">

@@ -1,5 +1,6 @@
 <div id="fmenu">
 <ul>
+<!-- <li><a href="{actionNewpost}"  class="adminTabs" style="color:#fff;text-decoration:none;">{newpost}</a></li> -->
 <li><a href="{actionBasic}"    class="adminTabs" style="color:#fff;text-decoration:none;">{basic}</a></li>
 <li><a href="{actionAdvanced}" class="adminTabs" style="color:#fff;text-decoration:none;">{advanced}</a></li>
 <li><a href="{actionAuthor}"   class="adminTabs" style="color:#fff;text-decoration:none;">{manageAuthors}</a></li>

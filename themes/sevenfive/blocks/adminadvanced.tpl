@@ -29,6 +29,8 @@
 	<input type="text" class="ptext" name="limitLogins" id="limitLogins" value="{limitLogins}"></p>
 	<p><label for="excerptLength">{excerptLabel}</label><br>
 	<input type="text" class="ptext" name="excerptLength" id="excerptLength" value="{excerptLength}"></p>
+	<p><label for="autosaveLabel">{autosaveLabel}</label><br>
+	<input type="text" class="ptext" name="autosaveFrequency" id="autosaveFrequency" value="{autosaveFrequency}"></p>
 	<p><label for="menuLinks">{menuLinksLabel}</label><br>
 	<textarea name="menuLinks" id="menuLinks" rows="5" cols="30" value="">{menuLinks}</textarea></p>
 	<p><label for="ipBan">{ipBanLabel}</label><br>

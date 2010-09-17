@@ -17,7 +17,7 @@
 		if((strlen($text) <= $limit) || ($limit == 0)) return closeUnclosedTags($text);
 		if(false !== ($breakpoint = strpos($text, $break, $limit))) {
 			$texta = html_entity_decode($text);
-			if (( substr_count($texta, "<div", 0, $breakpoint) == substr_count($texta, "</div", 0, $breakpoint) ) && !strpos(substr($texta,0,$breakpoint),"<div class")) {
+			if (( @substr_count($texta, "<div", 0, $breakpoint) == @substr_count($texta, "</div", 0, $breakpoint) ) && !strpos(substr($texta,0,$breakpoint),"<div class")) {
 				//echo $limit." ".strlen($text)."  ".substr($text,0,50)."<br/>";
 				if ( ($breakpoint < strlen($text) - 1) ) { $text = substr($text, 0, $breakpoint) . $pad; }
 			}	
@@ -357,7 +357,7 @@
            $theme_post['edit'] = $theme_post['delete'] = "";
            if (isset($_SESSION['logged_in'])?$_SESSION['logged_in']:false) {
                $theme_post['edit']       = "<a href=".$config['blogPath'].$config['cleanIndex']."/editEntry/".$fileName.">".$lang['postFtEdit']."</a>";
-               $theme_post['delete']    = '&nbsp;-&nbsp;<a href="javascript:void(null)" onclick="'.'confirm_delete(\''.$config['blogPath'].$config['cleanIndex']."/deleteEntrySubmit/".$fileName.'\')'.'">'.$lang['postFtDelete']."</a></center><br/>";
+               $theme_post['delete']    = '&nbsp;-&nbsp;<a href="javascript:void(null)" onclick="'.'confirm_delete(\''.$lang['msgSure'].'\',\''.$config['blogPath'].$config['cleanIndex']."/deleteEntrySubmit/".$fileName.'\')'.'">'.$lang['postFtDelete']."</a></center><br/>";
            }
            if ($postType == "page") 
 				$theme_main['content'] .= @preg_replace("/\{([^\{]{1,100}?)\}/e","$"."theme_post["."$1"."]",file_get_contents(getcwd()."/themes/".$config['theme']."/blocks/page.tpl"));
